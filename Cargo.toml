@@ -7,7 +7,6 @@ readme = "README.md"
 keywords = ["http", "server", "https", "file", "directory"]
 license = "MIT"
 version = "0.1.0"
-# Remember to also update in rtffs.md
 authors = ["thecoshman <thecoshman@gmail.com>",
            "nabijaczleweli <nabijaczleweli@gmail.com>"]
 

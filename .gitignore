@@ -7,5 +7,5 @@
 !*.md
 !src
 !src/**
-!tests
-!tests/**
+!assets
+!assets/**

@@ -1,6 +1,9 @@
 //! Module containing various utility functions.
 
 
+pub static NOT_IMPLEMENTED_HTML: &'static str = include_str!("../assets/501.html");
+
+
 /// Uppercase the first character of the supplied string.
 ///
 /// Based on http://stackoverflow.com/a/38406885/2851815

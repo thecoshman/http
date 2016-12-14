@@ -1,6 +1,7 @@
 use std::path::PathBuf;
 use self::super::{Options, Error};
-use iron::{status, IronResult, Listening, Response, Request, Handler, Iron};
+use self::super::util::NOT_IMPLEMENTED_HTML;
+use iron::{status, mime, IronResult, Listening, Response, Request, Handler, Iron};
 
 
 #[derive(Clone, Hash, Ord, PartialOrd, Eq, PartialEq)]
@@ -16,7 +17,7 @@ impl HttpHandler {
 
 impl Handler for HttpHandler {
     fn handle(&self, _: &mut Request) -> IronResult<Response> {
-        Ok(Response::with((status::Ok, format!("The abolishment of the burgeoisie.\n{:#?}\n", self.hosted_directory))))
+        Ok(Response::with((status::NotImplemented, mime::Mime(mime::TopLevel::Text, mime::SubLevel::Html, vec![]), NOT_IMPLEMENTED_HTML)))
     }
 }
 
