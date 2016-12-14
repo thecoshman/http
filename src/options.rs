@@ -34,11 +34,11 @@ impl Options {
             .author(crate_authors!())
             .setting(AppSettings::ColoredHelp)
             .about("Host These Things Please - a basic HTTP server for hosting a folder fast and simply")
-            .arg(Arg::from_usage("<DIR> 'Directory to host'").validator(Options::filesystem_dir_validator))
+            .arg(Arg::from_usage("[DIR] 'Directory to host. Default: current working directory'").validator(Options::filesystem_dir_validator))
             .arg(Arg::from_usage("-p --port [port] 'Port to use. Default: system-chosen free port'").validator(Options::u16_validator))
             .get_matches();
 
-        let dir = matches.value_of("DIR").unwrap();
+        let dir = matches.value_of("DIR").unwrap_or(".");
         Options {
             hosted_directory: (dir.to_string(), fs::canonicalize(dir).unwrap()),
             port: matches.value_of("port").map(u16::from_str).map(Result::unwrap),
