@@ -11,8 +11,9 @@
 //! ```
 
 
-use clap::{App, Arg, AppSettings};
+use clap::{AppSettings, App, Arg};
 use std::path::PathBuf;
+use std::str::FromStr;
 use std::fs;
 
 
@@ -21,8 +22,8 @@ use std::fs;
 pub struct Options {
     /// The directory to host.
     pub hosted_directory: (String, PathBuf),
-    /// The port to host on. Default: first free one from 8000 up
-    pub port: u16,
+    /// The port to host on. Default: system-chosen free port
+    pub port: Option<u16>,
 }
 
 impl Options {
@@ -32,15 +33,15 @@ impl Options {
             .version(crate_version!())
             .author(crate_authors!())
             .setting(AppSettings::ColoredHelp)
-            .setting(AppSettings::VersionlessSubcommands)
             .about("Host These Things Please - a basic HTTP server for hosting a folder fast and simply")
             .arg(Arg::from_usage("<DIR> 'Directory to host'").validator(Options::filesystem_dir_validator))
+            .arg(Arg::from_usage("-p --port [port] 'Port to use. Default: system-chosen free port'").validator(Options::u16_validator))
             .get_matches();
 
         let dir = matches.value_of("DIR").unwrap();
         Options {
             hosted_directory: (dir.to_string(), fs::canonicalize(dir).unwrap()),
-            port: 8000,
+            port: matches.value_of("port").map(u16::from_str).map(Result::unwrap),
         }
     }
 
@@ -50,5 +51,9 @@ impl Options {
         } else {
             Err(format!("Directory to host \"{}\" not actualy a directory", s))
         })
+    }
+
+    fn u16_validator(s: String) -> Result<(), String> {
+        u16::from_str(&s).map(|_| ()).map_err(|_| format!("{} is not a valid port number", s))
     }
 }
