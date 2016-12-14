@@ -15,6 +15,8 @@ pub enum Error {
         ///
         /// This should be lowercase and imperative ("create", "open").
         op: &'static str,
+        /// Additional data.
+        more: Option<&'static str>,
     },
 }
 
@@ -30,20 +32,25 @@ impl Error {
     /// Error::Io {
     ///     desc: "network",
     ///     op: "write",
+    ///     more: Some("full buffer"),
     /// }.print_error(&mut out);
     /// assert_eq!(String::from_iter(out.iter().map(|&i| i as char)),
-    ///            "Writing network failed.\n".to_string());
+    ///            "Writing network failed: full buffer.\n".to_string());
     /// ```
     pub fn print_error<W: Write>(&self, err_out: &mut W) {
         match *self {
-            Error::Io { desc, op } => {
+            Error::Io { desc, op, more } => {
                 // Strip the last 'e', if any, so we get correct inflection for continuous times
                 let op = uppercase_first(if op.ends_with('e') {
                     &op[..op.len() - 1]
                 } else {
                     op
                 });
-                writeln!(err_out, "{}ing {} failed.", op, desc).unwrap()
+                write!(err_out, "{}ing {} failed", op, desc).unwrap();
+                if let Some(more) = more {
+                    write!(err_out, ": {}", more).unwrap();
+                }
+                writeln!(err_out, ".").unwrap();
             }
         }
     }
@@ -57,6 +64,7 @@ impl Error {
     /// assert_eq!(Error::Io {
     ///     desc: "",
     ///     op: "",
+    ///     more: None,
     /// }.exit_value(), 1);
     /// ```
     pub fn exit_value(&self) -> i32 {

@@ -22,7 +22,7 @@ use std::fs;
 pub struct Options {
     /// The directory to host.
     pub hosted_directory: (String, PathBuf),
-    /// The port to host on. Default: system-chosen free port
+    /// The port to host on. Default: first free port from 8000 up
     pub port: Option<u16>,
 }
 
@@ -35,7 +35,7 @@ impl Options {
             .setting(AppSettings::ColoredHelp)
             .about("Host These Things Please - a basic HTTP server for hosting a folder fast and simply")
             .arg(Arg::from_usage("[DIR] 'Directory to host. Default: current working directory'").validator(Options::filesystem_dir_validator))
-            .arg(Arg::from_usage("-p --port [port] 'Port to use. Default: system-chosen free port'").validator(Options::u16_validator))
+            .arg(Arg::from_usage("-p --port [port] 'Port to use. Default: first free port from 8000 up'").validator(Options::u16_validator))
             .get_matches();
 
         let dir = matches.value_of("DIR").unwrap_or(".");

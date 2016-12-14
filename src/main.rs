@@ -33,14 +33,19 @@ fn actual_main() -> i32 {
 fn result_main() -> Result<(), Error> {
     let opts = Options::parse();
 
-    let responder = try!(Iron::new(ops::HttpHandler::new(&opts))
-        .http(("0.0.0.0", opts.port.unwrap_or(0)))
-        .map_err(|_| {
-            Error::Io {
-                desc: "server",
-                op: "start",
-            }
-        }));
+    let responder = try!(if let Some(p) = opts.port {
+        Iron::new(ops::HttpHandler::new(&opts))
+            .http(("0.0.0.0", p))
+            .map_err(|_| {
+                Error::Io {
+                    desc: "server",
+                    op: "start",
+                    more: Some("port taken"),
+                }
+            })
+    } else {
+        ops::try_ports(ops::HttpHandler::new(&opts), 8000, 9999)
+    });
 
     println!("Hosting \"{}\" on port {}...", opts.hosted_directory.0, responder.socket.port());
     println!("Ctrl-C to stop.");
