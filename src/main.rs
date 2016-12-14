@@ -1,0 +1,49 @@
+#[macro_use]
+extern crate clap;
+extern crate iron;
+
+mod error;
+mod options;
+
+pub mod ops;
+pub mod util;
+
+pub use error::Error;
+pub use options::Options;
+
+use iron::Iron;
+use std::io::stderr;
+use std::process::exit;
+
+
+fn main() {
+    let result = actual_main();
+    exit(result);
+}
+
+fn actual_main() -> i32 {
+    if let Err(err) = result_main() {
+        err.print_error(&mut stderr());
+        err.exit_value()
+    } else {
+        0
+    }
+}
+
+fn result_main() -> Result<(), Error> {
+    let opts = Options::parse();
+
+    let responder = try!(Iron::new(ops::HttpHandler::new(&opts))
+        .http(("0.0.0.0", opts.port.unwrap_or(0)))
+        .map_err(|_| {
+            Error::Io {
+                desc: "server",
+                op: "start",
+            }
+        }));
+
+    println!("Listening on port {}...", responder.socket.port());
+    println!("Ctrl-C to stop.");
+
+    Ok(())
+}
