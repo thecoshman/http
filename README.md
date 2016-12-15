@@ -7,7 +7,7 @@ The idea is to make a program that can compile down to a simple binary that can 
   * [x] Sub directories would be automatically hosted.
   * [ ] Symlinks will not be followed by default (in my opinion, this is more likely to be a problem than an intended thing).
   * [x] Root should not be required.
-  * [ ] If an index file isn't provided, one will be generated (in memory, no touching the disk, why would do that you dirty freak you), that will list the current files and folders (and then sub directories will have index files generated as required)
+  * [x] If an index file isn't provided, one will be generated (in memory, no touching the disk, why would do that you dirty freak you), that will list the current files and folders (and then sub directories will have index files generated as required)
   * [x] Changes made to files should be reflected instantly, as I don't see why anything would be cached... you request a file, a file will be looked for
 
 It's not going to be a 'production ready' tool, it's a quick and dirty way of hosting a folder, so whilst I'll try to make it secure, it is not going to be a serious goal.

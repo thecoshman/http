@@ -16,6 +16,9 @@ pub static NOT_IMPLEMENTED_HTML: &'static str = include_str!("../assets/501.html
 /// To be used with 404 Not Found status,
 pub static NOT_FOUND_HTML: &'static str = include_str!("../assets/404.html");
 
+/// The HTML page to use as template for a requested directory's listing.
+pub static DIRECTORY_LISTING_HTML: &'static str = include_str!("../assets/directory_listing.html");
+
 /// The port to start scanning from if no ports were given.
 pub static PORT_SCAN_LOWEST: u16 = 8000;
 
@@ -69,4 +72,18 @@ pub fn file_contains<P: AsRef<Path>>(path: P, byte: u8) -> bool {
     }
 
     false
+}
+
+/// Fill out an HTML template.
+///
+/// All fields must be addressed even if formatted to be empty.
+///
+/// # Examples
+///
+/// ```
+/// # use https::util::{html_response, NOT_IMPLEMENTED_HTML};
+/// println!(html_response(NOT_IMPLEMENTED_HTML, vec!["<p>Abolish the burgeoisie!</p>".to_string()]));
+/// ```
+pub fn html_response(data: &str, format_strings: Vec<String>) -> String {
+    format_strings.iter().enumerate().fold(data.to_string(), |d, (i, ref s)| d.replace(&format!("{{{}}}", i), s))
 }
