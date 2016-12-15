@@ -6,6 +6,11 @@
 /// To be used with 501 Not Implemented status,
 pub static NOT_IMPLEMENTED_HTML: &'static str = include_str!("../assets/501.html");
 
+/// The HTML page to use as response when a non-existant file was requested.
+///
+/// To be used with 404 Not Found status,
+pub static NOT_FOUND_HTML: &'static str = include_str!("../assets/404.html");
+
 /// The port to start scanning from if no ports were given.
 pub static PORT_SCAN_LOWEST: u16 = 8000;
 
