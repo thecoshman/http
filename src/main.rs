@@ -44,7 +44,7 @@ fn result_main() -> Result<(), Error> {
                 }
             })
     } else {
-        ops::try_ports(ops::HttpHandler::new(&opts), 8000, 9999)
+        ops::try_ports(ops::HttpHandler::new(&opts), util::PORT_SCAN_LOWEST, util::PORT_SCAN_HIGHEST)
     });
 
     println!("Hosting \"{}\" on port {}...", opts.hosted_directory.0, responder.socket.port());

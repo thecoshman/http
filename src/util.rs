@@ -1,7 +1,16 @@
 //! Module containing various utility functions.
 
 
+/// The HTML page to use as response when hitting an unimplemented corner of the server.
+///
+/// To be used with 501 Not Implemented status,
 pub static NOT_IMPLEMENTED_HTML: &'static str = include_str!("../assets/501.html");
+
+/// The port to start scanning from if no ports were given.
+pub static PORT_SCAN_LOWEST: u16 = 8000;
+
+/// The port to end scanning at if no ports were given.
+pub static PORT_SCAN_HIGHEST: u16 = 9999;
 
 
 /// Uppercase the first character of the supplied string.
