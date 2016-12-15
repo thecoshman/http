@@ -6,15 +6,8 @@ use std::io::Read;
 use std::path::Path;
 
 
-/// The HTML page to use as response when hitting an unimplemented corner of the server.
-///
-/// To be used with 501 Not Implemented status,
-pub static NOT_IMPLEMENTED_HTML: &'static str = include_str!("../assets/501.html");
-
-/// The HTML page to use as response when a non-existant file was requested.
-///
-/// To be used with 404 Not Found status,
-pub static NOT_FOUND_HTML: &'static str = include_str!("../assets/404.html");
+/// The generic HTML page to use as response to errors.
+pub static ERROR_HTML: &'static str = include_str!("../assets/error.html");
 
 /// The HTML page to use as template for a requested directory's listing.
 pub static DIRECTORY_LISTING_HTML: &'static str = include_str!("../assets/directory_listing.html");

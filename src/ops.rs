@@ -2,8 +2,8 @@ use std::path::PathBuf;
 use iron::modifiers::Header;
 use self::super::{Options, Error};
 use mime_guess::guess_mime_type_opt;
+use self::super::util::{html_response, file_contains, ERROR_HTML, DIRECTORY_LISTING_HTML};
 use iron::{headers, status, method, mime, IronResult, Listening, Response, Request, Handler, Iron};
-use self::super::util::{html_response, file_contains, NOT_FOUND_HTML, NOT_IMPLEMENTED_HTML, DIRECTORY_LISTING_HTML};
 
 
 #[derive(Clone, Hash, Ord, PartialOrd, Eq, PartialEq)]
@@ -27,9 +27,11 @@ impl Handler for HttpHandler {
                     println!("{} requested nonexistant file {}", req.remote_addr, req_p.display());
                     Ok(Response::with((status::NotFound,
                                        "text/html;charset=utf-8".parse::<mime::Mime>().unwrap(),
-                                       html_response(NOT_FOUND_HTML,
-                                                     vec![format!("<p>{}</p>",
-                                                                  &req.url.path().into_iter().fold("".to_string(), |cur, pp| cur + "/" + pp)[1..])]))))
+                                       html_response(ERROR_HTML,
+                                                     vec!["404 Not Found".to_string(),
+                                                          format!("The requested entity \"{}\" doesn't exist.",
+                                                                  &req.url.path().into_iter().fold("".to_string(), |cur, pp| cur + "/" + pp)[1..]),
+                                                          "".to_string()]))))
                 } else if req_p.is_file() {
                     let mime_type = guess_mime_type_opt(&req_p).unwrap_or_else(|| if file_contains(&req_p, 0) {
                         "application/octet-stream".parse().unwrap()
@@ -60,8 +62,10 @@ impl Handler for HttpHandler {
                 println!("{} used invalid request method {}", req.remote_addr, m);
                 Ok(Response::with((status::NotImplemented,
                                    "text/html;charset=utf-8".parse::<mime::Mime>().unwrap(),
-                                   html_response(NOT_IMPLEMENTED_HTML,
-                                                 vec![format!("<p>Unsupported request method: {}.<br />Supported methods: OPTIONS and GET.</p>", m)]))))
+                                   html_response(ERROR_HTML,
+                                                 vec!["501 Not Implemented".to_string(),
+                                                      "This operation was not implemented.".to_string(),
+                                                      format!("<p>Unsupported request method: {}.<br />Supported methods: OPTIONS and GET.</p>", m)]))))
             }
         }
     }
