@@ -11,6 +11,7 @@ authors = ["thecoshman <thecoshman@gmail.com>",
            "nabijaczleweli <nabijaczleweli@gmail.com>"]
 
 [dependencies]
+mime_guess = "1.8"
 clap = "2.19"
 iron = "0.4"
 
