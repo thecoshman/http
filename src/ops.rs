@@ -3,7 +3,7 @@ use iron::modifiers::Header;
 use self::super::{Options, Error};
 use mime_guess::guess_mime_type_opt;
 use self::super::util::{html_response, file_contains, ERROR_HTML, DIRECTORY_LISTING_HTML};
-use iron::{headers, status, method, mime, IronResult, Listening, Response, Request, Handler, Iron};
+use iron::{headers, status, method, mime, IronResult, Listening, Response, TypeMap, Request, Handler, Iron};
 
 
 #[derive(Clone, Hash, Ord, PartialOrd, Eq, PartialEq)]
@@ -25,18 +25,14 @@ impl Handler for HttpHandler {
     fn handle(&self, req: &mut Request) -> IronResult<Response> {
         match req.method {
             method::Options => self.handle_options(req),
-            method::Get => {
-                let req_p = req.url.path().into_iter().filter(|p| !p.is_empty()).fold(self.hosted_directory.1.clone(), |cur, pp| cur.join(pp));
-                if !req_p.exists() {
-                    self.handle_get_nonexistant(req, req_p)
-                } else if req_p.metadata().unwrap().file_type().is_symlink() && !self.follow_symlinks {
-                    self.handle_get_unfollowable_symlink(req, req_p)
-                } else if req_p.is_file() {
-                    self.handle_get_file(req, req_p)
-                } else {
-                    self.handle_get_dir(req, req_p)
-                }
+            method::Get => self.handle_get(req),
+            method::Head => {
+                self.handle_get(req).map(|mut r| {
+                    r.body = None;
+                    r
+                })
             }
+            method::Trace => self.handle_trace(req),
             _ => self.handle_bad_method(req),
         }
     }
@@ -45,7 +41,20 @@ impl Handler for HttpHandler {
 impl HttpHandler {
     fn handle_options(&self, req: &mut Request) -> IronResult<Response> {
         println!("{} asked for options", req.remote_addr);
-        Ok(Response::with((status::Ok, Header(headers::Allow(vec![method::Options, method::Get])))))
+        Ok(Response::with((status::Ok, Header(headers::Allow(vec![method::Options, method::Get, method::Head, method::Trace])))))
+    }
+
+    fn handle_get(&self, req: &mut Request) -> IronResult<Response> {
+        let req_p = req.url.path().into_iter().filter(|p| !p.is_empty()).fold(self.hosted_directory.1.clone(), |cur, pp| cur.join(pp));
+        if !req_p.exists() {
+            self.handle_get_nonexistant(req, req_p)
+        } else if req_p.metadata().unwrap().file_type().is_symlink() && !self.follow_symlinks {
+            self.handle_get_unfollowable_symlink(req, req_p)
+        } else if req_p.is_file() {
+            self.handle_get_file(req, req_p)
+        } else {
+            self.handle_get_dir(req, req_p)
+        }
     }
 
     fn handle_get_nonexistant(&self, req: &mut Request, req_p: PathBuf) -> IronResult<Response> {
@@ -99,6 +108,20 @@ impl HttpHandler {
         })]))))
     }
 
+    fn handle_trace(&self, req: &mut Request) -> IronResult<Response> {
+        println!("{} requested TRACE", req.remote_addr);
+
+        let mut hdr = req.headers.clone();
+        hdr.set(headers::ContentType("message/http".parse().unwrap()));
+
+        Ok(Response {
+            status: Some(status::Ok),
+            headers: hdr,
+            extensions: TypeMap::new(),
+            body: None,
+        })
+    }
+
     fn handle_bad_method(&self, req: &mut Request) -> IronResult<Response> {
         println!("{} used invalid request method {}", req.remote_addr, req.method);
         Ok(Response::with((status::NotImplemented,
@@ -106,7 +129,8 @@ impl HttpHandler {
                            html_response(ERROR_HTML,
                                          vec!["501 Not Implemented".to_string(),
                                               "This operation was not implemented.".to_string(),
-                                              format!("<p>Unsupported request method: {}.<br />Supported methods: OPTIONS and GET.</p>", req.method)]))))
+                                              format!("<p>Unsupported request method: {}.<br />Supported methods: OPTIONS, GET, HEAD AND TRACE.</p>",
+                                                      req.method)]))))
     }
 }
 
