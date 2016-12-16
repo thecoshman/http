@@ -2,7 +2,7 @@ use std::path::PathBuf;
 use iron::modifiers::Header;
 use self::super::{Options, Error};
 use mime_guess::guess_mime_type_opt;
-use self::super::util::{html_response, file_contains, ERROR_HTML, DIRECTORY_LISTING_HTML};
+use self::super::util::{url_path, html_response, file_contains, ERROR_HTML, DIRECTORY_LISTING_HTML};
 use iron::{headers, status, method, mime, IronResult, Listening, Response, TypeMap, Request, Handler, Iron};
 
 
@@ -66,8 +66,7 @@ impl HttpHandler {
                            "text/html;charset=utf-8".parse::<mime::Mime>().unwrap(),
                            html_response(ERROR_HTML,
                                          vec!["404 Not Found".to_string(),
-                                              format!("The requested entity \"{}\" doesn't exist.",
-                                                      &req.url.path().into_iter().fold("".to_string(), |cur, pp| cur + "/" + pp)[1..]),
+                                              format!("The requested entity \"{}\" doesn't exist.", url_path(&req.url)),
                                               "".to_string()]))))
     }
 
@@ -82,7 +81,7 @@ impl HttpHandler {
     }
 
     fn handle_get_dir(&self, req: &mut Request, req_p: PathBuf) -> IronResult<Response> {
-        let relpath = (req.url.path().into_iter().fold("".to_string(), |cur, pp| cur + "/" + pp)[1..].to_string() + "/").replace("//", "/");
+        let relpath = (url_path(&req.url) + "/").replace("//", "/");
         println!("{} was served directory listing for {}", req.remote_addr, req_p.display());
         Ok(Response::with((status::Ok,
                            "text/html;charset=utf-8".parse::<mime::Mime>().unwrap(),

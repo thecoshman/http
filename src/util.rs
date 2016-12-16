@@ -1,6 +1,7 @@
 //! Module containing various utility functions.
 
 
+use iron::Url;
 use std::fs::File;
 use std::io::Read;
 use hyper::Client;
@@ -82,10 +83,27 @@ pub fn html_response(data: &str, format_strings: Vec<String>) -> String {
     format_strings.iter().enumerate().fold(data.to_string(), |d, (i, ref s)| d.replace(&format!("{{{}}}", i), s))
 }
 
+/// Get the response body from the provided URL.
 pub fn response_body(url: &str) -> Option<String> {
     Client::new().get(url).send().ok().map(|mut r| {
         let mut body = String::new();
         r.read_to_string(&mut body).unwrap();
         body
     })
+}
+
+/// Return the path part of the URL.
+///
+/// # Example
+///
+/// ```
+/// # extern crate iron;
+/// # extern crate https;
+/// # use iron::Url;
+/// # use https::util::url_path;
+/// let url = Url::parse("127.0.0.1:8000/capitalism/русский/");
+/// assert_eq!(url_path(&url), "capitalism/русский/");
+/// ```
+pub fn url_path(url: &Url) -> String {
+    url.path().into_iter().fold("".to_string(), |cur, pp| cur + "/" + pp)[1..].to_string()
 }
