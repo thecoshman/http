@@ -97,15 +97,19 @@ impl HttpHandler {
                            "text/html;charset=utf-8".parse::<mime::Mime>().unwrap(),
                            html_response(DIRECTORY_LISTING_HTML,
                                          vec![relpath.clone(),
-                                              req_p.read_dir().unwrap().map(Result::unwrap).fold("".to_string(), |cur, f| {
-            let fname = f.file_name().into_string().unwrap() +
-                        if !f.file_type().unwrap().is_file() {
-                "/"
-            } else {
-                ""
-            };
-            cur + "<li><a href=\"" + &format!("/{}", relpath).replace("//", "/") + &fname + "\">" + &fname + "</a></li>\n"
-        })]))))
+                                              req_p.read_dir()
+                                                  .unwrap()
+                                                  .map(Result::unwrap)
+                                                  .filter(|f| self.follow_symlinks || !f.metadata().unwrap().file_type().is_symlink())
+                                                  .fold("".to_string(), |cur, f| {
+                let fname = f.file_name().into_string().unwrap() +
+                            if !f.file_type().unwrap().is_file() {
+                    "/"
+                } else {
+                    ""
+                };
+                cur + "<li><a href=\"" + &format!("/{}", relpath).replace("//", "/") + &fname + "\">" + &fname + "</a></li>\n"
+            })]))))
     }
 
     fn handle_trace(&self, req: &mut Request) -> IronResult<Response> {
