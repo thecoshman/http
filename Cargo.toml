@@ -12,8 +12,13 @@ authors = ["thecoshman <thecoshman@gmail.com>",
 
 [dependencies]
 mime_guess = "1.8"
+clipboard = "0.1"
+hyper = "0.9"
 clap = "2.19"
-iron = "0.4"
+
+[dependencies.iron]
+version = "0.4"
+features = ["ssl"]
 
 
 [[bin]]
