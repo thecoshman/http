@@ -24,6 +24,8 @@ pub struct Options {
     pub hosted_directory: (String, PathBuf),
     /// The port to host on. Default: first free port from 8000 up
     pub port: Option<u16>,
+    /// Whether to allow symlinks to be requested. Default: false
+    pub follow_symlinks: bool,
 }
 
 impl Options {
@@ -36,12 +38,14 @@ impl Options {
             .about("Host These Things Please - a basic HTTP server for hosting a folder fast and simply")
             .arg(Arg::from_usage("[DIR] 'Directory to host. Default: current working directory'").validator(Options::filesystem_dir_validator))
             .arg(Arg::from_usage("-p --port [port] 'Port to use. Default: first free port from 8000 up'").validator(Options::u16_validator))
+            .arg(Arg::from_usage("-s --follow-symlinks 'Follow symlinks. Default: false'"))
             .get_matches();
 
         let dir = matches.value_of("DIR").unwrap_or(".");
         Options {
             hosted_directory: (dir.to_string(), fs::canonicalize(dir).unwrap()),
             port: matches.value_of("port").map(u16::from_str).map(Result::unwrap),
+            follow_symlinks: matches.is_present("follow-symlinks"),
         }
     }
 

@@ -9,11 +9,15 @@ use iron::{headers, status, method, mime, IronResult, Listening, Response, Reque
 #[derive(Clone, Hash, Ord, PartialOrd, Eq, PartialEq)]
 pub struct HttpHandler {
     pub hosted_directory: (String, PathBuf),
+    pub follow_symlinks: bool,
 }
 
 impl HttpHandler {
     pub fn new(opts: &Options) -> HttpHandler {
-        HttpHandler { hosted_directory: opts.hosted_directory.clone() }
+        HttpHandler {
+            hosted_directory: opts.hosted_directory.clone(),
+            follow_symlinks: opts.follow_symlinks,
+        }
     }
 }
 
@@ -32,6 +36,19 @@ impl Handler for HttpHandler {
                                                           format!("The requested entity \"{}\" doesn't exist.",
                                                                   &req.url.path().into_iter().fold("".to_string(), |cur, pp| cur + "/" + pp)[1..]),
                                                           "".to_string()]))))
+                } else if req_p.metadata().unwrap().file_type().is_symlink() && !self.follow_symlinks {
+                    println!("{} requested nonexistant file {}", req.remote_addr, req_p.display());
+                    Ok(Response::with((status::Forbidden,
+                                       "text/html;charset=utf-8".parse::<mime::Mime>().unwrap(),
+                                       html_response(ERROR_HTML,
+                                                     vec!["403 Forbidden".to_string(),
+                                                          format!("No permission to follow symlink \"{}\".",
+                                                                  &req.url.path().into_iter().fold("".to_string(), |cur, pp| cur + "/" + pp)[1..]),
+                                                          "<p>\
+                                                             Ask the server administrator to pass \"-s\" to <samp>http</samp> \
+                                                             if you think this is unintended.\
+                                                           </p>"
+                                                              .to_string()]))))
                 } else if req_p.is_file() {
                     let mime_type = guess_mime_type_opt(&req_p).unwrap_or_else(|| if file_contains(&req_p, 0) {
                         "application/octet-stream".parse().unwrap()

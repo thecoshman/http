@@ -5,7 +5,7 @@ Host These Things Please - a basic HTTP server for hosting a folder fast and sim
 The idea is to make a program that can compile down to a simple binary that can be used via Linux CLI to quickly take the current directory and server it over HTTP. Everything should have sensible defaults such that you do not *have* to pass parameters like what port to use.
 
   * [x] Sub directories would be automatically hosted.
-  * [ ] Symlinks will not be followed by default (in my opinion, this is more likely to be a problem than an intended thing).
+  * [x] Symlinks will not be followed by default (in my opinion, this is more likely to be a problem than an intended thing).
   * [x] Root should not be required.
   * [x] If an index file isn't provided, one will be generated (in memory, no touching the disk, why would do that you dirty freak you), that will list the current files and folders (and then sub directories will have index files generated as required)
   * [x] Changes made to files should be reflected instantly, as I don't see why anything would be cached... you request a file, a file will be looked for
