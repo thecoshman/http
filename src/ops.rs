@@ -24,67 +24,89 @@ impl HttpHandler {
 impl Handler for HttpHandler {
     fn handle(&self, req: &mut Request) -> IronResult<Response> {
         match req.method {
-            method::Options => Ok(Response::with((status::Ok, Header(headers::Allow(vec![method::Options, method::Get]))))),
+            method::Options => self.handle_options(req),
             method::Get => {
                 let req_p = req.url.path().into_iter().filter(|p| !p.is_empty()).fold(self.hosted_directory.1.clone(), |cur, pp| cur.join(pp));
                 if !req_p.exists() {
-                    println!("{} requested nonexistant file {}", req.remote_addr, req_p.display());
-                    Ok(Response::with((status::NotFound,
-                                       "text/html;charset=utf-8".parse::<mime::Mime>().unwrap(),
-                                       html_response(ERROR_HTML,
-                                                     vec!["404 Not Found".to_string(),
-                                                          format!("The requested entity \"{}\" doesn't exist.",
-                                                                  &req.url.path().into_iter().fold("".to_string(), |cur, pp| cur + "/" + pp)[1..]),
-                                                          "".to_string()]))))
+                    self.handle_get_nonexistant(req, req_p)
                 } else if req_p.metadata().unwrap().file_type().is_symlink() && !self.follow_symlinks {
-                    println!("{} requested nonexistant file {}", req.remote_addr, req_p.display());
-                    Ok(Response::with((status::Forbidden,
-                                       "text/html;charset=utf-8".parse::<mime::Mime>().unwrap(),
-                                       html_response(ERROR_HTML,
-                                                     vec!["403 Forbidden".to_string(),
-                                                          format!("No permission to follow symlink \"{}\".",
-                                                                  &req.url.path().into_iter().fold("".to_string(), |cur, pp| cur + "/" + pp)[1..]),
-                                                          "<p>\
-                                                             Ask the server administrator to pass \"-s\" to <samp>http</samp> \
-                                                             if you think this is unintended.\
-                                                           </p>"
-                                                              .to_string()]))))
+                    self.handle_get_unfollowable_symlink(req, req_p)
                 } else if req_p.is_file() {
-                    let mime_type = guess_mime_type_opt(&req_p).unwrap_or_else(|| if file_contains(&req_p, 0) {
-                        "application/octet-stream".parse().unwrap()
-                    } else {
-                        "text/plain".parse().unwrap()
-                    });
-                    println!("{} was served file {} as {}", req.remote_addr, req_p.display(), mime_type);
-                    Ok(Response::with((status::Ok, mime_type, req_p)))
+                    self.handle_get_file(req, req_p)
                 } else {
-                    let relpath = (req.url.path().into_iter().fold("".to_string(), |cur, pp| cur + "/" + pp)[1..].to_string() + "/").replace("//", "/");
-                    println!("{} was served directory listing for {}", req.remote_addr, req_p.display());
-                    Ok(Response::with((status::Ok,
-                                       "text/html;charset=utf-8".parse::<mime::Mime>().unwrap(),
-                                       html_response(DIRECTORY_LISTING_HTML,
-                                                     vec![relpath.clone(),
-                                                          req_p.read_dir().unwrap().map(Result::unwrap).fold("".to_string(), |cur, f| {
-                        let fname = f.file_name().into_string().unwrap() +
-                                    if !f.file_type().unwrap().is_file() {
-                            "/"
-                        } else {
-                            ""
-                        };
-                        cur + "<li><a href=\"" + &format!("/{}", relpath).replace("//", "/") + &fname + "\">" + &fname + "</a></li>\n"
-                    })]))))
+                    self.handle_get_dir(req, req_p)
                 }
             }
-            ref m => {
-                println!("{} used invalid request method {}", req.remote_addr, m);
-                Ok(Response::with((status::NotImplemented,
-                                   "text/html;charset=utf-8".parse::<mime::Mime>().unwrap(),
-                                   html_response(ERROR_HTML,
-                                                 vec!["501 Not Implemented".to_string(),
-                                                      "This operation was not implemented.".to_string(),
-                                                      format!("<p>Unsupported request method: {}.<br />Supported methods: OPTIONS and GET.</p>", m)]))))
-            }
+            _ => self.handle_bad_method(req),
         }
+    }
+}
+
+impl HttpHandler {
+    fn handle_options(&self, req: &mut Request) -> IronResult<Response> {
+        println!("{} asked for options", req.remote_addr);
+        Ok(Response::with((status::Ok, Header(headers::Allow(vec![method::Options, method::Get])))))
+    }
+
+    fn handle_get_nonexistant(&self, req: &mut Request, req_p: PathBuf) -> IronResult<Response> {
+        println!("{} requested nonexistant file {}", req.remote_addr, req_p.display());
+        Ok(Response::with((status::NotFound,
+                           "text/html;charset=utf-8".parse::<mime::Mime>().unwrap(),
+                           html_response(ERROR_HTML,
+                                         vec!["404 Not Found".to_string(),
+                                              format!("The requested entity \"{}\" doesn't exist.",
+                                                      &req.url.path().into_iter().fold("".to_string(), |cur, pp| cur + "/" + pp)[1..]),
+                                              "".to_string()]))))
+    }
+
+    fn handle_get_unfollowable_symlink(&self, req: &mut Request, req_p: PathBuf) -> IronResult<Response> {
+        println!("{} requested unfollowable symlink {}", req.remote_addr, req_p.display());
+        Ok(Response::with((status::Forbidden,
+                           "text/html;charset=utf-8".parse::<mime::Mime>().unwrap(),
+                           html_response(ERROR_HTML,
+                                         vec!["403 Forbidden".to_string(),
+                                              format!("No permission to follow symlink \"{}\".",
+                                                      &req.url.path().into_iter().fold("".to_string(), |cur, pp| cur + "/" + pp)[1..]),
+                                              "<p>Ask the server administrator to pass \"-s\" to <samp>http</samp> if you think this is unintended.</p>"
+                                                  .to_string()]))))
+    }
+
+    fn handle_get_file(&self, req: &mut Request, req_p: PathBuf) -> IronResult<Response> {
+        let mime_type = guess_mime_type_opt(&req_p).unwrap_or_else(|| if file_contains(&req_p, 0) {
+            "application/octet-stream".parse().unwrap()
+        } else {
+            "text/plain".parse().unwrap()
+        });
+        println!("{} was served file {} as {}", req.remote_addr, req_p.display(), mime_type);
+        Ok(Response::with((status::Ok, mime_type, req_p)))
+    }
+
+    fn handle_get_dir(&self, req: &mut Request, req_p: PathBuf) -> IronResult<Response> {
+        let relpath = (req.url.path().into_iter().fold("".to_string(), |cur, pp| cur + "/" + pp)[1..].to_string() + "/").replace("//", "/");
+        println!("{} was served directory listing for {}", req.remote_addr, req_p.display());
+        Ok(Response::with((status::Ok,
+                           "text/html;charset=utf-8".parse::<mime::Mime>().unwrap(),
+                           html_response(DIRECTORY_LISTING_HTML,
+                                         vec![relpath.clone(),
+                                              req_p.read_dir().unwrap().map(Result::unwrap).fold("".to_string(), |cur, f| {
+            let fname = f.file_name().into_string().unwrap() +
+                        if !f.file_type().unwrap().is_file() {
+                "/"
+            } else {
+                ""
+            };
+            cur + "<li><a href=\"" + &format!("/{}", relpath).replace("//", "/") + &fname + "\">" + &fname + "</a></li>\n"
+        })]))))
+    }
+
+    fn handle_bad_method(&self, req: &mut Request) -> IronResult<Response> {
+        println!("{} used invalid request method {}", req.remote_addr, req.method);
+        Ok(Response::with((status::NotImplemented,
+                           "text/html;charset=utf-8".parse::<mime::Mime>().unwrap(),
+                           html_response(ERROR_HTML,
+                                         vec!["501 Not Implemented".to_string(),
+                                              "This operation was not implemented.".to_string(),
+                                              format!("<p>Unsupported request method: {}.<br />Supported methods: OPTIONS and GET.</p>", req.method)]))))
     }
 }
 
