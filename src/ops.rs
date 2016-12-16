@@ -46,10 +46,8 @@ impl HttpHandler {
 
     fn handle_get(&self, req: &mut Request) -> IronResult<Response> {
         let req_p = req.url.path().into_iter().filter(|p| !p.is_empty()).fold(self.hosted_directory.1.clone(), |cur, pp| cur.join(pp));
-        if !req_p.exists() {
+        if !req_p.exists() || (req_p.metadata().unwrap().file_type().is_symlink() && !self.follow_symlinks) {
             self.handle_get_nonexistant(req, req_p)
-        } else if req_p.metadata().unwrap().file_type().is_symlink() && !self.follow_symlinks {
-            self.handle_get_unfollowable_symlink(req, req_p)
         } else if req_p.is_file() {
             self.handle_get_file(req, req_p)
         } else {
@@ -66,18 +64,6 @@ impl HttpHandler {
                                               format!("The requested entity \"{}\" doesn't exist.",
                                                       &req.url.path().into_iter().fold("".to_string(), |cur, pp| cur + "/" + pp)[1..]),
                                               "".to_string()]))))
-    }
-
-    fn handle_get_unfollowable_symlink(&self, req: &mut Request, req_p: PathBuf) -> IronResult<Response> {
-        println!("{} requested unfollowable symlink {}", req.remote_addr, req_p.display());
-        Ok(Response::with((status::Forbidden,
-                           "text/html;charset=utf-8".parse::<mime::Mime>().unwrap(),
-                           html_response(ERROR_HTML,
-                                         vec!["403 Forbidden".to_string(),
-                                              format!("No permission to follow symlink \"{}\".",
-                                                      &req.url.path().into_iter().fold("".to_string(), |cur, pp| cur + "/" + pp)[1..]),
-                                              "<p>Ask the server administrator to pass \"-s\" to <samp>http</samp> if you think this is unintended.</p>"
-                                                  .to_string()]))))
     }
 
     fn handle_get_file(&self, req: &mut Request, req_p: PathBuf) -> IronResult<Response> {
