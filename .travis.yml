@@ -1,6 +1,15 @@
 sudo: false
 language: generic
-cache: cargo
+cache:
+  apt: true
+  cargo: true
+
+addons:
+  apt:
+    packages:
+      - xorg-dev
+    sources:
+      - r-packages-precise
 
 matrix:
   include:
