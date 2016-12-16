@@ -45,8 +45,13 @@ impl HttpHandler {
     }
 
     fn handle_get(&self, req: &mut Request) -> IronResult<Response> {
-        let req_p = req.url.path().into_iter().filter(|p| !p.is_empty()).fold(self.hosted_directory.1.clone(), |cur, pp| cur.join(pp));
-        if !req_p.exists() || (req_p.metadata().unwrap().file_type().is_symlink() && !self.follow_symlinks) {
+        let (req_p, symlink) = req.url.path().into_iter().filter(|p| !p.is_empty()).fold((self.hosted_directory.1.clone(), false), |(mut cur, mut sk), pp| {
+            cur.push(pp);
+            sk = sk || cur.metadata().unwrap().file_type().is_symlink();
+            (cur, sk)
+        });
+
+        if !req_p.exists() || (symlink && !self.follow_symlinks) {
             self.handle_get_nonexistant(req, req_p)
         } else if req_p.is_file() {
             self.handle_get_file(req, req_p)
