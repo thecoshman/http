@@ -2,7 +2,7 @@ use std::path::PathBuf;
 use iron::modifiers::Header;
 use self::super::{Options, Error};
 use mime_guess::guess_mime_type_opt;
-use self::super::util::{url_path, html_response, file_contains, ERROR_HTML, DIRECTORY_LISTING_HTML};
+use self::super::util::{url_path, html_response, file_contains, percent_decode, ERROR_HTML, DIRECTORY_LISTING_HTML};
 use iron::{headers, status, method, mime, IronResult, Listening, Response, TypeMap, Request, Handler, Iron};
 
 
@@ -45,21 +45,37 @@ impl HttpHandler {
     }
 
     fn handle_get(&self, req: &mut Request) -> IronResult<Response> {
-        let (req_p, symlink) = req.url.path().into_iter().filter(|p| !p.is_empty()).fold((self.hosted_directory.1.clone(), false), |(mut cur, mut sk), pp| {
-            cur.push(pp);
-            if let Ok(meta) = cur.metadata() {
-                sk = sk || meta.file_type().is_symlink();
-            }
-            (cur, sk)
-        });
+        let (req_p, symlink, url_err) =
+            req.url.path().into_iter().filter(|p| !p.is_empty()).fold((self.hosted_directory.1.clone(), false, false), |(mut cur, mut sk, mut err), pp| {
+                if let Some(pp) = percent_decode(pp) {
+                    cur.push(&*pp);
+                } else {
+                    err = true;
+                }
 
-        if !req_p.exists() || (symlink && !self.follow_symlinks) {
+                if let Ok(meta) = cur.metadata() {
+                    sk = sk || meta.file_type().is_symlink();
+                }
+
+                (cur, sk, err)
+            });
+
+        if url_err {
+            self.handle_invalid_url(req, "<p>Percent-encoding decoded to invalid UTF-8.</p>")
+        } else if !req_p.exists() || (symlink && !self.follow_symlinks) {
             self.handle_get_nonexistant(req, req_p)
         } else if req_p.is_file() {
             self.handle_get_file(req, req_p)
         } else {
             self.handle_get_dir(req, req_p)
         }
+    }
+
+    fn handle_invalid_url(&self, req: &mut Request, cause: &str) -> IronResult<Response> {
+        println!("{} requested with invalid URL {}", req.remote_addr, req.url);
+        Ok(Response::with((status::BadRequest,
+                           "text/html;charset=utf-8".parse::<mime::Mime>().unwrap(),
+                           html_response(ERROR_HTML, &["400 Bad Request", "The request URL couldn't be parsed.", cause]))))
     }
 
     fn handle_get_nonexistant(&self, req: &mut Request, req_p: PathBuf) -> IronResult<Response> {

@@ -5,6 +5,8 @@ use iron::Url;
 use std::fs::File;
 use std::io::Read;
 use std::path::Path;
+use std::borrow::Cow;
+use url::percent_encoding;
 
 
 /// The generic HTML page to use as response to errors.
@@ -95,5 +97,21 @@ pub fn html_response<S: AsRef<str>>(data: &str, format_strings: &[S]) -> String 
 /// assert_eq!(url_path(&url), "capitalism/русский/");
 /// ```
 pub fn url_path(url: &Url) -> String {
-    url.path().into_iter().fold("".to_string(), |cur, pp| cur + "/" + pp)[1..].to_string()
+    url.path().into_iter().fold("".to_string(),
+                                |cur, pp| format!("{}/{}", cur, percent_decode(pp).unwrap_or(Cow::Borrowed("<incorrect UTF8>"))))[1..]
+        .to_string()
+}
+
+/// Decode a percent-encoded string (like a part of a URL).
+///
+/// # Example
+///
+/// ```
+/// # use https::util::percent_decode;
+/// # use std::borrow::Cow;
+/// assert_eq!(percent_decode("%D0%B0%D1%81%D0%B4%D1%84%20fdsa"), Some(Cow::Owned("асдф fdsa".to_string())));
+/// assert_eq!(percent_decode("%D0%D1%81%D0%B4%D1%84%20fdsa"), None);
+/// ```
+pub fn percent_decode<'s>(s: &'s str) -> Option<Cow<'s, str>> {
+    percent_encoding::percent_decode(s.as_bytes()).decode_utf8().ok()
 }
