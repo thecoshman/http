@@ -2,8 +2,8 @@ use std::path::PathBuf;
 use iron::modifiers::Header;
 use self::super::{Options, Error};
 use mime_guess::guess_mime_type_opt;
-use self::super::util::{url_path, html_response, file_contains, percent_decode, ERROR_HTML, DIRECTORY_LISTING_HTML};
 use iron::{headers, status, method, mime, IronResult, Listening, Response, TypeMap, Request, Handler, Iron};
+use self::super::util::{url_path, html_response, file_contains, percent_decode, file_time_modified, USER_AGENT, ERROR_HTML, DIRECTORY_LISTING_HTML};
 
 
 #[derive(Clone, Hash, Ord, PartialOrd, Eq, PartialEq)]
@@ -41,7 +41,9 @@ impl Handler for HttpHandler {
 impl HttpHandler {
     fn handle_options(&self, req: &mut Request) -> IronResult<Response> {
         println!("{} asked for options", req.remote_addr);
-        Ok(Response::with((status::Ok, Header(headers::Allow(vec![method::Options, method::Get, method::Head, method::Trace])))))
+        Ok(Response::with((status::Ok,
+                           Header(headers::Server(USER_AGENT.to_string())),
+                           Header(headers::Allow(vec![method::Options, method::Get, method::Head, method::Trace])))))
     }
 
     fn handle_get(&self, req: &mut Request) -> IronResult<Response> {
@@ -74,6 +76,7 @@ impl HttpHandler {
     fn handle_invalid_url(&self, req: &mut Request, cause: &str) -> IronResult<Response> {
         println!("{} requested with invalid URL {}", req.remote_addr, req.url);
         Ok(Response::with((status::BadRequest,
+                           Header(headers::Server(USER_AGENT.to_string())),
                            "text/html;charset=utf-8".parse::<mime::Mime>().unwrap(),
                            html_response(ERROR_HTML, &["400 Bad Request", "The request URL couldn't be parsed.", cause]))))
     }
@@ -81,6 +84,7 @@ impl HttpHandler {
     fn handle_get_nonexistant(&self, req: &mut Request, req_p: PathBuf) -> IronResult<Response> {
         println!("{} requested nonexistant file {}", req.remote_addr, req_p.display());
         Ok(Response::with((status::NotFound,
+                           Header(headers::Server(USER_AGENT.to_string())),
                            "text/html;charset=utf-8".parse::<mime::Mime>().unwrap(),
                            html_response(ERROR_HTML,
                                          &["404 Not Found", &format!("The requested entity \"{}\" doesn't exist.", url_path(&req.url)), ""]))))
@@ -93,13 +97,18 @@ impl HttpHandler {
             "text/plain".parse().unwrap()
         });
         println!("{} was served file {} as {}", req.remote_addr, req_p.display(), mime_type);
-        Ok(Response::with((status::Ok, mime_type, req_p)))
+        Ok(Response::with((status::Ok,
+                           Header(headers::Server(USER_AGENT.to_string())),
+                           Header(headers::LastModified(headers::HttpDate(file_time_modified(&req_p)))),
+                           mime_type,
+                           req_p)))
     }
 
     fn handle_get_dir(&self, req: &mut Request, req_p: PathBuf) -> IronResult<Response> {
         let relpath = (url_path(&req.url) + "/").replace("//", "/");
         println!("{} was served directory listing for {}", req.remote_addr, req_p.display());
         Ok(Response::with((status::Ok,
+                           Header(headers::Server(USER_AGENT.to_string())),
                            "text/html;charset=utf-8".parse::<mime::Mime>().unwrap(),
                            html_response(DIRECTORY_LISTING_HTML,
                                          &[&relpath,
@@ -135,6 +144,7 @@ impl HttpHandler {
     fn handle_bad_method(&self, req: &mut Request) -> IronResult<Response> {
         println!("{} used invalid request method {}", req.remote_addr, req.method);
         Ok(Response::with((status::NotImplemented,
+                           Header(headers::Server(USER_AGENT.to_string())),
                            "text/html;charset=utf-8".parse::<mime::Mime>().unwrap(),
                            html_response(ERROR_HTML,
                                          &["501 Not Implemented",

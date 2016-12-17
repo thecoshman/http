@@ -7,6 +7,7 @@ use std::io::Read;
 use std::path::Path;
 use std::borrow::Cow;
 use url::percent_encoding;
+use time::{self, Duration, Tm};
 
 
 /// The generic HTML page to use as response to errors.
@@ -20,6 +21,9 @@ pub static PORT_SCAN_LOWEST: u16 = 8000;
 
 /// The port to end scanning at if no ports were given.
 pub static PORT_SCAN_HIGHEST: u16 = 9999;
+
+/// The app name and version to use with User-Agent or Server response header.
+pub static USER_AGENT: &'static str = concat!("http/", env!("CARGO_PKG_VERSION"));
 
 
 /// Uppercase the first character of the supplied string.
@@ -114,4 +118,12 @@ pub fn url_path(url: &Url) -> String {
 /// ```
 pub fn percent_decode<'s>(s: &'s str) -> Option<Cow<'s, str>> {
     percent_encoding::percent_decode(s.as_bytes()).decode_utf8().ok()
+}
+
+/// Get the timestamp of the file's last modification as a `time::Tm`.
+pub fn file_time_modified(f: &Path) -> Tm {
+    match f.metadata().unwrap().modified().unwrap().elapsed() {
+        Ok(dur) => time::now() - Duration::from_std(dur).unwrap(),
+        Err(ste) => time::now() + Duration::from_std(ste.duration()).unwrap(),
+    }
 }
