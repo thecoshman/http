@@ -11,6 +11,3 @@ The idea is to make a program that can compile down to a simple binary that can 
   * [x] Changes made to files should be reflected instantly, as I don't see why anything would be cached... you request a file, a file will be looked for
 
 It's not going to be a 'production ready' tool, it's a quick and dirty way of hosting a folder, so whilst I'll try to make it secure, it is not going to be a serious goal.
-
-# Disclaimer
-I mostly just wanted to use this witty name for the project... I'll work on this at some point... maybe... very lazily...
