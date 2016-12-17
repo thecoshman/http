@@ -123,7 +123,7 @@ impl HttpHandler {
                            html_response(ERROR_HTML,
                                          vec!["501 Not Implemented".to_string(),
                                               "This operation was not implemented.".to_string(),
-                                              format!("<p>Unsupported request method: {}.<br />Supported methods: OPTIONS, GET, HEAD AND TRACE.</p>",
+                                              format!("<p>Unsupported request method: {}.<br />Supported methods: OPTIONS, GET, HEAD and TRACE.</p>",
                                                       req.method)]))))
     }
 }
