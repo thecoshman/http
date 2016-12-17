@@ -76,10 +76,10 @@ pub fn file_contains<P: AsRef<Path>>(path: P, byte: u8) -> bool {
 ///
 /// ```
 /// # use https::util::{html_response, NOT_IMPLEMENTED_HTML};
-/// println!(html_response(NOT_IMPLEMENTED_HTML, vec!["<p>Abolish the burgeoisie!</p>".to_string()]));
+/// println!(html_response(NOT_IMPLEMENTED_HTML, &["<p>Abolish the burgeoisie!</p>"]));
 /// ```
-pub fn html_response(data: &str, format_strings: Vec<String>) -> String {
-    format_strings.iter().enumerate().fold(data.to_string(), |d, (i, ref s)| d.replace(&format!("{{{}}}", i), s))
+pub fn html_response<S: AsRef<str>>(data: &str, format_strings: &[S]) -> String {
+    format_strings.iter().enumerate().fold(data.to_string(), |d, (i, ref s)| d.replace(&format!("{{{}}}", i), s.as_ref()))
 }
 
 /// Return the path part of the URL.

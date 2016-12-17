@@ -65,9 +65,7 @@ impl HttpHandler {
         Ok(Response::with((status::NotFound,
                            "text/html;charset=utf-8".parse::<mime::Mime>().unwrap(),
                            html_response(ERROR_HTML,
-                                         vec!["404 Not Found".to_string(),
-                                              format!("The requested entity \"{}\" doesn't exist.", url_path(&req.url)),
-                                              "".to_string()]))))
+                                         &["404 Not Found", &format!("The requested entity \"{}\" doesn't exist.", url_path(&req.url)), ""]))))
     }
 
     fn handle_get_file(&self, req: &mut Request, req_p: PathBuf) -> IronResult<Response> {
@@ -86,12 +84,12 @@ impl HttpHandler {
         Ok(Response::with((status::Ok,
                            "text/html;charset=utf-8".parse::<mime::Mime>().unwrap(),
                            html_response(DIRECTORY_LISTING_HTML,
-                                         vec![relpath.clone(),
-                                              req_p.read_dir()
-                                                  .unwrap()
-                                                  .map(Result::unwrap)
-                                                  .filter(|f| self.follow_symlinks || !f.metadata().unwrap().file_type().is_symlink())
-                                                  .fold("".to_string(), |cur, f| {
+                                         &[&relpath,
+                                           &req_p.read_dir()
+                                               .unwrap()
+                                               .map(Result::unwrap)
+                                               .filter(|f| self.follow_symlinks || !f.metadata().unwrap().file_type().is_symlink())
+                                               .fold("".to_string(), |cur, f| {
                 let fname = f.file_name().into_string().unwrap() +
                             if !f.file_type().unwrap().is_file() {
                     "/"
@@ -121,10 +119,10 @@ impl HttpHandler {
         Ok(Response::with((status::NotImplemented,
                            "text/html;charset=utf-8".parse::<mime::Mime>().unwrap(),
                            html_response(ERROR_HTML,
-                                         vec!["501 Not Implemented".to_string(),
-                                              "This operation was not implemented.".to_string(),
-                                              format!("<p>Unsupported request method: {}.<br />Supported methods: OPTIONS, GET, HEAD and TRACE.</p>",
-                                                      req.method)]))))
+                                         &["501 Not Implemented",
+                                           "This operation was not implemented.",
+                                           &format!("<p>Unsupported request method: {}.<br />Supported methods: OPTIONS, GET, HEAD and TRACE.</p>",
+                                                    req.method)]))))
     }
 }
 
