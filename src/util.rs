@@ -4,7 +4,6 @@
 use iron::Url;
 use std::fs::File;
 use std::io::Read;
-use hyper::Client;
 use std::path::Path;
 
 
@@ -81,15 +80,6 @@ pub fn file_contains<P: AsRef<Path>>(path: P, byte: u8) -> bool {
 /// ```
 pub fn html_response(data: &str, format_strings: Vec<String>) -> String {
     format_strings.iter().enumerate().fold(data.to_string(), |d, (i, ref s)| d.replace(&format!("{{{}}}", i), s))
-}
-
-/// Get the response body from the provided URL.
-pub fn response_body(url: &str) -> Option<String> {
-    Client::new().get(url).send().ok().map(|mut r| {
-        let mut body = String::new();
-        r.read_to_string(&mut body).unwrap();
-        body
-    })
 }
 
 /// Return the path part of the URL.
