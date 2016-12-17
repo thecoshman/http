@@ -47,7 +47,9 @@ impl HttpHandler {
     fn handle_get(&self, req: &mut Request) -> IronResult<Response> {
         let (req_p, symlink) = req.url.path().into_iter().filter(|p| !p.is_empty()).fold((self.hosted_directory.1.clone(), false), |(mut cur, mut sk), pp| {
             cur.push(pp);
-            sk = sk || cur.metadata().unwrap().file_type().is_symlink();
+            if let Ok(meta) = cur.metadata() {
+                sk = sk || meta.file_type().is_symlink();
+            }
             (cur, sk)
         });
 
