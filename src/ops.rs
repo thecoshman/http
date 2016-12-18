@@ -1,3 +1,4 @@
+use lazysort::SortedBy;
 use std::path::PathBuf;
 use iron::modifiers::Header;
 use self::super::{Options, Error};
@@ -116,6 +117,10 @@ impl HttpHandler {
                                                .unwrap()
                                                .map(Result::unwrap)
                                                .filter(|f| self.follow_symlinks || !f.metadata().unwrap().file_type().is_symlink())
+                                               .sorted_by(|lhs, rhs| {
+                                                   (lhs.file_type().unwrap().is_file(), lhs.file_name().to_str().unwrap().to_lowercase())
+                                                       .cmp(&(rhs.file_type().unwrap().is_file(), rhs.file_name().to_str().unwrap().to_lowercase()))
+                                               })
                                                .fold("".to_string(), |cur, f| {
                 let fname = f.file_name().into_string().unwrap() +
                             if !f.file_type().unwrap().is_file() {
