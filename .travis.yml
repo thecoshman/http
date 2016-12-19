@@ -10,7 +10,7 @@ matrix:
     - env: LANGUAGE=Rust
       language: rust
       rust: beta
-    - env: LANGUAGE=Rust
+    - env: LANGUAGE=Rust CLIPPY=true
       language: rust
       rust: nightly
     - env: LANGUAGE=Rust-doc DEPLOY=true DEPLOY_FILE="$TRAVIS_BUILD_DIR/../rtffs-doc-$TRAVIS_TAG.tbz2"
@@ -24,6 +24,12 @@ script:
   - if [ "$LANGUAGE" == "Rust" ]; then cargo build --verbose; fi
   - if [ "$LANGUAGE" == "Rust" ]; then cargo test  --verbose; fi
   - if [ "$LANGUAGE" == "Rust" ] && [ "$DEPLOY" ] && [ "$TRAVIS_TAG" ] && [ "$TRAVIS_SECURE_ENV_VARS" == "true" ]; then cargo build --verbose --release; fi
+  - if [ "$LANGUAGE" == "Rust" ] && [ "$CLIPPY" ]; then
+      cargo install clippy;
+      cargo install cargo-update;
+      cargo install-update -a;
+      cargo clippy;
+    fi
 
 after_success:
   - if [ "$LANGUAGE" == "Rust" ] && [ "$DEPLOY" ] && [ "$TRAVIS_TAG" ] && [ "$TRAVIS_SECURE_ENV_VARS" == "true" ]; then
