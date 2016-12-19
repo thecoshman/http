@@ -85,7 +85,7 @@ pub fn file_contains<P: AsRef<Path>>(path: P, byte: u8) -> bool {
 /// println!(html_response(NOT_IMPLEMENTED_HTML, &["<p>Abolish the burgeoisie!</p>"]));
 /// ```
 pub fn html_response<S: AsRef<str>>(data: &str, format_strings: &[S]) -> String {
-    format_strings.iter().enumerate().fold(data.to_string(), |d, (i, ref s)| d.replace(&format!("{{{}}}", i), s.as_ref()))
+    format_strings.iter().enumerate().fold(data.to_string(), |d, (i, s)| d.replace(&format!("{{{}}}", i), s.as_ref()))
 }
 
 /// Return the path part of the URL.
@@ -116,7 +116,7 @@ pub fn url_path(url: &Url) -> String {
 /// assert_eq!(percent_decode("%D0%B0%D1%81%D0%B4%D1%84%20fdsa"), Some(Cow::Owned("асдф fdsa".to_string())));
 /// assert_eq!(percent_decode("%D0%D1%81%D0%B4%D1%84%20fdsa"), None);
 /// ```
-pub fn percent_decode<'s>(s: &'s str) -> Option<Cow<'s, str>> {
+pub fn percent_decode(s: &str) -> Option<Cow<str>> {
     percent_encoding::percent_decode(s.as_bytes()).decode_utf8().ok()
 }
 
