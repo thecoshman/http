@@ -160,8 +160,23 @@ impl HttpHandler {
 }
 
 
+/// Attempt to start a server on ports from `from` to `up_to`, inclusive, with the specified handler.
+///
+/// If an error other than the port being full is encountered it is returned.
+///
+/// If all ports from the range are not free an error is returned.
+///
+/// # Examples
+///
+/// ```
+/// # extern crate https;
+/// # extern crate iron;
+/// # use https::ops::try_ports;
+/// # use iron::{status, Response};
+/// let server = try_ports(|req| Ok(Response::with((status::Ok, "Abolish the burgeoisie!"))), 8000, 8100).unwrap();
+/// ```
 pub fn try_ports<H: Handler + Clone>(hndlr: H, from: u16, up_to: u16) -> Result<Listening, Error> {
-    for port in from..up_to {
+    for port in from..up_to + 1 {
         match Iron::new(hndlr.clone()).http(("0.0.0.0", port)) {
             Ok(server) => return Ok(server),
             Err(error) => {
