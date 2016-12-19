@@ -4,7 +4,7 @@ cache: cargo
 
 matrix:
   include:
-    - env: LANGUAGE=Rust DEPLOY=true DEPLOY_FILE="$TRAVIS_BUILD_DIR/../https-$TRAVIS_TAG"
+    - env: LANGUAGE=Rust DEPLOY=true DEPLOY_FILE="$TRAVIS_BUILD_DIR/../http-$TRAVIS_TAG"
       language: rust
       rust: stable
     - env: LANGUAGE=Rust
@@ -13,9 +13,6 @@ matrix:
     - env: LANGUAGE=Rust CLIPPY=true
       language: rust
       rust: nightly
-    - env: LANGUAGE=Rust-doc DEPLOY=true DEPLOY_FILE="$TRAVIS_BUILD_DIR/../https-doc-$TRAVIS_TAG.tbz2"
-      language: rust
-      rust: stable
   allow_failures:
     - rust: beta
     - rust: nightly
@@ -24,7 +21,7 @@ script:
   - if [ "$LANGUAGE" == "Rust" ]; then cargo build --verbose; fi
   - if [ "$LANGUAGE" == "Rust" ]; then cargo test  --verbose; fi
   -
-  - if [ "$LANGUAGE" == "Rust" ] && [ "$DEPLOY" ] && [ "$TRAVIS_TAG" ] && [ "$TRAVIS_SECURE_ENV_VARS" == "true" ]; then cargo build --verbose --release; fi
+  - if [ "$LANGUAGE" == "Rust" ] && [ "$DEPLOY" ] && [ "$TRAVIS_TAG" ]; then cargo build --verbose --release; fi
   - if [ "$LANGUAGE" == "Rust" ] && [ "$CLIPPY" ]; then
       cargo install clippy;
       cargo install cargo-update;
@@ -33,17 +30,9 @@ script:
     fi
 
 after_success:
-  - if [ "$LANGUAGE" == "Rust" ] && [ "$DEPLOY" ] && [ "$TRAVIS_TAG" ] && [ "$TRAVIS_SECURE_ENV_VARS" == "true" ]; then
-      cp target/release/https "$DEPLOY_FILE";
+  - if [ "$LANGUAGE" == "Rust" ] && [ "$DEPLOY" ] && [ "$TRAVIS_TAG" ]; then
+      cp target/release/http "$DEPLOY_FILE";
       strip --strip-all --remove-section=.comment --remove-section=.note "$DEPLOY_FILE";
-    fi
-  - if [ "$LANGUAGE" == "Rust-doc" ] && [ "$DEPLOY" ] && [ "$TRAVIS_TAG" ] && [ "$TRAVIS_SECURE_ENV_VARS" == "true" ]; then
-      cargo doc;
-      cp -r target/doc "$TRAVIS_BUILD_DIR/../https-doc-$TRAVIS_TAG";
-      pushd "$TRAVIS_BUILD_DIR/..";
-      tar -caf "https-doc-$TRAVIS_TAG.tbz2" "https-doc-$TRAVIS_TAG";
-      rm -rf "https-doc-$TRAVIS_TAG";
-      popd;
     fi
 
 deploy:
