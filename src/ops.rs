@@ -1,3 +1,4 @@
+use std::fs;
 use lazysort::SortedBy;
 use std::path::PathBuf;
 use iron::modifiers::Header;
@@ -11,6 +12,7 @@ use self::super::util::{url_path, html_response, file_contains, percent_decode, 
 pub struct HttpHandler {
     pub hosted_directory: (String, PathBuf),
     pub follow_symlinks: bool,
+    pub temp_directory: Option<(String, PathBuf)>,
 }
 
 impl HttpHandler {
@@ -18,6 +20,7 @@ impl HttpHandler {
         HttpHandler {
             hosted_directory: opts.hosted_directory.clone(),
             follow_symlinks: opts.follow_symlinks,
+            temp_directory: opts.temp_directory.clone(),
         }
     }
 }
@@ -27,6 +30,9 @@ impl Handler for HttpHandler {
         match req.method {
             method::Options => self.handle_options(req),
             method::Get => self.handle_get(req),
+            method::Post => self.handle_post(req),
+            method::Put => self.handle_put(req),
+            method::Delete => self.handle_delete(req),
             method::Head => {
                 self.handle_get(req).map(|mut r| {
                     r.body = None;
@@ -34,6 +40,7 @@ impl Handler for HttpHandler {
                 })
             }
             method::Trace => self.handle_trace(req),
+            method::Patch => self.handle_patch(req),
             _ => self.handle_bad_method(req),
         }
     }
@@ -132,6 +139,36 @@ impl HttpHandler {
             })]))))
     }
 
+    fn handle_post(&self, req: &mut Request) -> IronResult<Response> {
+        if self.temp_directory.is_none() {
+            return self.handle_bad_method(req);
+        }
+
+        self.create_temp_dir();
+        println!("{} requested POST (unhandled, serving 501)", req.remote_addr);
+        self.handle_bad_method(req)
+    }
+
+    fn handle_put(&self, req: &mut Request) -> IronResult<Response> {
+        if self.temp_directory.is_none() {
+            return self.handle_bad_method(req);
+        }
+
+        self.create_temp_dir();
+        println!("{} requested PUT (unhandled, serving 501)", req.remote_addr);
+        self.handle_bad_method(req)
+    }
+
+    fn handle_delete(&self, req: &mut Request) -> IronResult<Response> {
+        if self.temp_directory.is_none() {
+            return self.handle_bad_method(req);
+        }
+
+        self.create_temp_dir();
+        println!("{} requested DELETE (unhandled, serving 501)", req.remote_addr);
+        self.handle_bad_method(req)
+    }
+
     fn handle_trace(&self, req: &mut Request) -> IronResult<Response> {
         println!("{} requested TRACE", req.remote_addr);
 
@@ -146,6 +183,16 @@ impl HttpHandler {
         })
     }
 
+    fn handle_patch(&self, req: &mut Request) -> IronResult<Response> {
+        if self.temp_directory.is_none() {
+            return self.handle_bad_method(req);
+        }
+
+        self.create_temp_dir();
+        println!("{} requested PATCH (unhandled, serving 501)", req.remote_addr);
+        self.handle_bad_method(req)
+    }
+
     fn handle_bad_method(&self, req: &mut Request) -> IronResult<Response> {
         println!("{} used invalid request method {}", req.remote_addr, req.method);
         Ok(Response::with((status::NotImplemented,
@@ -156,6 +203,13 @@ impl HttpHandler {
                                            "This operation was not implemented.",
                                            &format!("<p>Unsupported request method: {}.<br />Supported methods: OPTIONS, GET, HEAD and TRACE.</p>",
                                                     req.method)]))))
+    }
+
+    fn create_temp_dir(&self) {
+        let &(ref temp_name, ref temp_dir) = self.temp_directory.as_ref().unwrap();
+        if !temp_dir.exists() && fs::create_dir_all(&temp_dir).is_ok() {
+            println!("Created temp dir {}", temp_name);
+        }
     }
 }
 
