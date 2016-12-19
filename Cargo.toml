@@ -1,0 +1,25 @@
+[package]
+# "http" was taken, "https" (with 's' apparently standing for "server") is free
+name = "https"
+description = "Host These Things Please - a basic http server for hosting a folder fast and simply"
+repository = "https://github.com/thecoshman/http"
+readme = "README.md"
+keywords = ["http", "server", "https", "file", "directory"]
+license = "MIT"
+version = "0.1.0"
+authors = ["thecoshman <thecoshman@gmail.com>",
+           "nabijaczleweli <nabijaczleweli@gmail.com>"]
+
+[dependencies]
+mime_guess = "1.8"
+lazysort = "0.1"
+clap = "2.19"
+iron = "0.4"
+time = "0.1"
+url = "1.1"
+
+
+[[bin]]
+name = "http"
+test = false
+doc = false

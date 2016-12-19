@@ -1,0 +1,56 @@
+sudo: false
+language: generic
+cache: cargo
+
+matrix:
+  include:
+    - env: LANGUAGE=Rust DEPLOY=true DEPLOY_FILE="$TRAVIS_BUILD_DIR/../rtffs-$TRAVIS_TAG"
+      language: rust
+      rust: stable
+    - env: LANGUAGE=Rust
+      language: rust
+      rust: beta
+    - env: LANGUAGE=Rust CLIPPY=true
+      language: rust
+      rust: nightly
+    - env: LANGUAGE=Rust-doc DEPLOY=true DEPLOY_FILE="$TRAVIS_BUILD_DIR/../rtffs-doc-$TRAVIS_TAG.tbz2"
+      language: rust
+      rust: stable
+  allow_failures:
+    - rust: beta
+    - rust: nightly
+
+script:
+  - if [ "$LANGUAGE" == "Rust" ]; then cargo build --verbose; fi
+  - if [ "$LANGUAGE" == "Rust" ]; then cargo test  --verbose; fi
+  - if [ "$LANGUAGE" == "Rust" ] && [ "$DEPLOY" ] && [ "$TRAVIS_TAG" ] && [ "$TRAVIS_SECURE_ENV_VARS" == "true" ]; then cargo build --verbose --release; fi
+  - if [ "$LANGUAGE" == "Rust" ] && [ "$CLIPPY" ]; then
+      cargo install clippy;
+      cargo install cargo-update;
+      cargo install-update -a;
+      cargo clippy;
+    fi
+
+after_success:
+  - if [ "$LANGUAGE" == "Rust" ] && [ "$DEPLOY" ] && [ "$TRAVIS_TAG" ] && [ "$TRAVIS_SECURE_ENV_VARS" == "true" ]; then
+      cp target/release/rtffs "$TRAVIS_BUILD_DIR/../rtffs-$TRAVIS_TAG";
+      strip --strip-all --remove-section=.comment --remove-section=.note "$TRAVIS_BUILD_DIR/../rtffs-$TRAVIS_TAG";
+    fi
+  - if [ "$LANGUAGE" == "Rust-doc" ] && [ "$DEPLOY" ] && [ "$TRAVIS_TAG" ] && [ "$TRAVIS_SECURE_ENV_VARS" == "true" ]; then
+      cargo doc;
+      cp -r target/doc "$TRAVIS_BUILD_DIR/../rtffs-doc-$TRAVIS_TAG";
+      pushd "$TRAVIS_BUILD_DIR/..";
+      tar -caf "rtffs-doc-$TRAVIS_TAG.tbz2" "rtffs-doc-$TRAVIS_TAG";
+      rm -rf "rtffs-doc-$TRAVIS_TAG";
+      popd;
+    fi
+
+deploy:
+  provider: releases
+  api_key:
+    secure: "k2Y6coPaGjjGie7UmbTkh2Vms7PVr8PIfVP0+0iuuACyZJaSzfaJmLW4crYgEPpifydVSlf+2EDw25N13yU0blIwhvNMO7BMBWLKFsVUc/0vurHCDj/xuzh8OkpN9VpL/i5nOzi26CHBBzMgIIqqnx8MB1suXkg38X05ZJQoFXciqObvHIl85rP3naLjpzgtWDwHSMZ3tceBpYhcFDAuLgw+LEhIGw2de4KYNfAUOyb2zgy7Sga0dZFyJghb9eOMncC3/F2Ahl18f14Uw+kzYaJkBjL/HA05o0j1dM66MhU14iZNJWsr0CHDwXDBdGsYgAbIcDMl9yeIPh+aMqzQq3+YmJFzwQSVtJDGLQbohBExjPRZRgwZ+RbcIr7AfWW5dvviRG8+kHEIqeUpv/uXOn7bhN0xtgMSj/harzml6qpNzLgR+A3sqS3sVc3uDFQavuiiQpKbi8rq/ZyTmSd2gXjo1jH6qcda1wasqth6nd+m9TpHl01fHSSWVQ9gIhgsqzTTDzSUqb6SHiIMWffaH1q6Py8guUoWZrYaSTVZu6ABu3d6hxGfwAX+m2Y/8BeYNvEflP1MxWzN/g0ziH5NsLy8gxdEYXtDOcWD5wwmB89GLzFpGU1KsafZf4qpBgDD9R3STACmc6WQ4whMDEne9jBXoZfxOxCSA+72907hxUQ="
+  file: "$DEPLOY_FILE"
+  skip_cleanup: true
+  on:
+    tags: true
+    env: $DEPLOY = true

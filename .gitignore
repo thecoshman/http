@@ -1,0 +1,11 @@
+*
+!.gitignore
+!.travis.yml
+!LICENSE
+!Cargo.toml
+!rustfmt.toml
+!*.md
+!src
+!src/**
+!assets
+!assets/**
