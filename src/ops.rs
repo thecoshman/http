@@ -6,7 +6,8 @@ use iron::modifiers::Header;
 use self::super::{Options, Error};
 use mime_guess::guess_mime_type_opt;
 use iron::{headers, status, method, mime, IronResult, Listening, Response, TypeMap, Request, Handler, Iron};
-use self::super::util::{url_path, html_response, file_contains, percent_decode, file_time_modified, USER_AGENT, ERROR_HTML, DIRECTORY_LISTING_HTML};
+use self::super::util::{url_path, is_symlink, html_response, file_contains, percent_decode, detect_file_as_dir, file_time_modified, USER_AGENT, ERROR_HTML,
+                        DIRECTORY_LISTING_HTML};
 
 
 #[derive(Clone, Hash, Ord, PartialOrd, Eq, PartialEq)]
@@ -115,7 +116,7 @@ impl HttpHandler {
                                            &req_p.read_dir()
                                                .unwrap()
                                                .map(Result::unwrap)
-                                               .filter(|f| self.follow_symlinks || !f.metadata().unwrap().file_type().is_symlink())
+                                               .filter(|f| self.follow_symlinks || !is_symlink(f.path()))
                                                .sorted_by(|lhs, rhs| {
                                                    (lhs.file_type().unwrap().is_file(), lhs.file_name().to_str().unwrap().to_lowercase())
                                                        .cmp(&(rhs.file_type().unwrap().is_file(), rhs.file_name().to_str().unwrap().to_lowercase()))
@@ -142,7 +143,7 @@ impl HttpHandler {
             self.handle_invalid_url(req, "<p>Percent-encoding decoded to invalid UTF-8.</p>")
         } else if req_p.is_dir() {
             self.handle_disallowed_method(req, &[method::Options, method::Get, method::Head, method::Trace], "directory")
-        } else if req_p.parent().unwrap().exists() && !req_p.parent().unwrap().is_dir() {
+        } else if detect_file_as_dir(&req_p) {
             self.handle_invalid_url(req, "<p>Attempted to use file as directory.</p>")
         } else if req.headers.has::<headers::ContentRange>() {
             self.handle_put_partial_content(req)
@@ -273,8 +274,9 @@ impl HttpHandler {
                 err = true;
             }
 
-            if let Ok(meta) = cur.metadata() {
-                sk = sk || meta.file_type().is_symlink();
+            while let Ok(newlink) = cur.read_link() {
+                cur = newlink;
+                sk = true;
             }
 
             (cur, sk, err)

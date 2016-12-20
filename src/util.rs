@@ -127,3 +127,33 @@ pub fn file_time_modified(f: &Path) -> Tm {
         Err(ste) => time::now() + Duration::from_std(ste.duration()).unwrap(),
     }
 }
+
+/// Check, whether, in any place of the path, a file is treated like a directory.
+///
+/// A file is treated like a directory when it is treated as if it had a subpath, e.g., given:
+///
+/// ```sh
+/// tree .
+/// | dir0
+/// | dir1
+///   | file01
+/// ```
+///
+/// This function would return true for `./dir1/file01/file010`, `./dir1/file01/dir010/file0100`, etc., but not
+/// for `./dir0/file00`, `./dir0/dir00/file000`, `./dir1/file02/`, `./dir1/dir010/file0100`.
+pub fn detect_file_as_dir(mut p: &Path) -> bool {
+    while let Some(pnt) = p.parent() {
+        if pnt.is_file() {
+            return true;
+        }
+
+        p = pnt;
+    }
+
+    false
+}
+
+/// Check if a path refers to a symlink in a way that also works on Windows.
+pub fn is_symlink<P: AsRef<Path>>(p: P) -> bool {
+    p.as_ref().read_link().is_ok()
+}
