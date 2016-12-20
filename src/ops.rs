@@ -49,9 +49,9 @@ impl Handler for HttpHandler {
 impl HttpHandler {
     fn handle_options(&self, req: &mut Request) -> IronResult<Response> {
         println!("{} asked for options", req.remote_addr);
-        Ok(Response::with((status::Ok,
+        Ok(Response::with((status::NoContent,
                            Header(headers::Server(USER_AGENT.to_string())),
-                           Header(headers::Allow(vec![method::Options, method::Get, method::Put, method::Head, method::Trace])))))
+                           Header(headers::Allow(vec![method::Options, method::Get, method::Put, method::Delete, method::Head, method::Trace])))))
     }
 
     fn handle_get(&self, req: &mut Request) -> IronResult<Response> {
@@ -82,7 +82,7 @@ impl HttpHandler {
     }
 
     fn handle_nonexistant(&self, req: &mut Request, req_p: PathBuf) -> IronResult<Response> {
-        println!("{} requested nonexistant file {}", req.remote_addr, req_p.display());
+        println!("{} requested to {} nonexistant entity {}", req.remote_addr, req.method, req_p.display());
         Ok(Response::with((status::NotFound,
                            Header(headers::Server(USER_AGENT.to_string())),
                            "text/html;charset=utf-8".parse::<mime::Mime>().unwrap(),
@@ -141,7 +141,7 @@ impl HttpHandler {
         if url_err {
             self.handle_invalid_url(req, "<p>Percent-encoding decoded to invalid UTF-8.</p>")
         } else if req_p.is_dir() {
-            self.handle_disallowed_method(req, &[method::Options, method::Get, method::Head, method::Trace], "directory")
+            self.handle_disallowed_method(req, &[method::Options, method::Get, method::Delete, method::Head, method::Trace], "directory")
         } else if detect_file_as_dir(&req_p) {
             self.handle_invalid_url(req, "<p>Attempted to use file as directory.</p>")
         } else if req.headers.has::<headers::ContentRange>() {
@@ -224,9 +224,30 @@ impl HttpHandler {
             return self.handle_bad_method(req);
         }
 
-        self.create_temp_dir();
-        println!("{} requested DELETE (unhandled, serving 501)", req.remote_addr);
-        self.handle_bad_method(req)
+        let (req_p, symlink, url_err) = self.parse_requested_path(req);
+
+        if url_err {
+            self.handle_invalid_url(req, "<p>Percent-encoding decoded to invalid UTF-8.</p>")
+        } else if !req_p.exists() || (symlink && !self.follow_symlinks) {
+            self.handle_nonexistant(req, req_p)
+        } else {
+            self.handle_delete_path(req, req_p)
+        }
+    }
+
+    fn handle_delete_path(&self, req: &mut Request, req_p: PathBuf) -> IronResult<Response> {
+        println!("{} deleted {} {}",
+                 req.remote_addr,
+                 if req_p.is_file() { "file" } else { "directory" },
+                 req_p.display());
+
+        if req_p.is_file() {
+            fs::remove_file(req_p).unwrap();
+        } else {
+            fs::remove_dir_all(req_p).unwrap();
+        }
+
+        Ok(Response::with((status::NoContent, Header(headers::Server(USER_AGENT.to_string())))))
     }
 
     fn handle_trace(&self, req: &mut Request) -> IronResult<Response> {
@@ -251,7 +272,8 @@ impl HttpHandler {
                            html_response(ERROR_HTML,
                                          &["501 Not Implemented",
                                            "This operation was not implemented.",
-                                           &format!("<p>Unsupported request method: {}.<br />Supported methods: OPTIONS, GET, HEAD and TRACE.</p>",
+                                           &format!("<p>Unsupported request method: {}.<br />\n\
+                                                     Supported methods: OPTIONS, GET, PUT, DELETE, HEAD and TRACE.</p>",
                                                     req.method)]))))
     }
 
