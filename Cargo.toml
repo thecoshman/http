@@ -6,7 +6,7 @@ repository = "https://github.com/thecoshman/http"
 readme = "README.md"
 keywords = ["http", "server", "https", "file", "directory"]
 license = "MIT"
-version = "0.1.0"
+version = "0.2.0"
 authors = ["thecoshman <thecoshman@gmail.com>",
            "nabijaczleweli <nabijaczleweli@gmail.com>"]
 
