@@ -1,6 +1,7 @@
-use std::fs;
+use std::io;
 use lazysort::SortedBy;
 use std::path::PathBuf;
+use std::fs::{self, File};
 use iron::modifiers::Header;
 use self::super::{Options, Error};
 use mime_guess::guess_mime_type_opt;
@@ -51,29 +52,16 @@ impl HttpHandler {
         println!("{} asked for options", req.remote_addr);
         Ok(Response::with((status::Ok,
                            Header(headers::Server(USER_AGENT.to_string())),
-                           Header(headers::Allow(vec![method::Options, method::Get, method::Head, method::Trace])))))
+                           Header(headers::Allow(vec![method::Options, method::Get, method::Put, method::Head, method::Trace])))))
     }
 
     fn handle_get(&self, req: &mut Request) -> IronResult<Response> {
-        let (req_p, symlink, url_err) =
-            req.url.path().into_iter().filter(|p| !p.is_empty()).fold((self.hosted_directory.1.clone(), false, false), |(mut cur, mut sk, mut err), pp| {
-                if let Some(pp) = percent_decode(pp) {
-                    cur.push(&*pp);
-                } else {
-                    err = true;
-                }
-
-                if let Ok(meta) = cur.metadata() {
-                    sk = sk || meta.file_type().is_symlink();
-                }
-
-                (cur, sk, err)
-            });
+        let (req_p, symlink, url_err) = self.parse_requested_path(req);
 
         if url_err {
             self.handle_invalid_url(req, "<p>Percent-encoding decoded to invalid UTF-8.</p>")
         } else if !req_p.exists() || (symlink && !self.follow_symlinks) {
-            self.handle_get_nonexistant(req, req_p)
+            self.handle_nonexistant(req, req_p)
         } else if req_p.is_file() {
             self.handle_get_file(req, req_p)
         } else {
@@ -82,14 +70,19 @@ impl HttpHandler {
     }
 
     fn handle_invalid_url(&self, req: &mut Request, cause: &str) -> IronResult<Response> {
-        println!("{} requested with invalid URL {}", req.remote_addr, req.url);
+        println!("{} requested to {} {} with invalid URL -- {}",
+                 req.remote_addr,
+                 req.method,
+                 req.url,
+                 cause.replace("<p>", "").replace("</p>", ""));
+
         Ok(Response::with((status::BadRequest,
                            Header(headers::Server(USER_AGENT.to_string())),
                            "text/html;charset=utf-8".parse::<mime::Mime>().unwrap(),
-                           html_response(ERROR_HTML, &["400 Bad Request", "The request URL couldn't be parsed.", cause]))))
+                           html_response(ERROR_HTML, &["400 Bad Request", "The request URL was invalid.", cause]))))
     }
 
-    fn handle_get_nonexistant(&self, req: &mut Request, req_p: PathBuf) -> IronResult<Response> {
+    fn handle_nonexistant(&self, req: &mut Request, req_p: PathBuf) -> IronResult<Response> {
         println!("{} requested nonexistant file {}", req.remote_addr, req_p.display());
         Ok(Response::with((status::NotFound,
                            Header(headers::Server(USER_AGENT.to_string())),
@@ -154,9 +147,87 @@ impl HttpHandler {
             return self.handle_bad_method(req);
         }
 
-        self.create_temp_dir();
-        println!("{} requested PUT (unhandled, serving 501)", req.remote_addr);
-        self.handle_bad_method(req)
+        let (req_p, _, url_err) = self.parse_requested_path(req);
+
+        if url_err {
+            self.handle_invalid_url(req, "<p>Percent-encoding decoded to invalid UTF-8.</p>")
+        } else if req_p.is_dir() {
+            self.handle_disallowed_method(req, &[method::Options, method::Get, method::Head, method::Trace], "directory")
+        } else if req_p.parent().unwrap().exists() && !req_p.parent().unwrap().is_dir() {
+            self.handle_invalid_url(req, "<p>Attempted to use file as directory.</p>")
+        } else if req.headers.has::<headers::ContentRange>() {
+            self.handle_put_partial_content(req)
+        } else {
+            self.create_temp_dir();
+            self.handle_put_file(req, req_p)
+        }
+    }
+
+    fn handle_disallowed_method(&self, req: &mut Request, allowed: &[method::Method], tpe: &str) -> IronResult<Response> {
+        let allowed_s = allowed.iter()
+            .enumerate()
+            .fold("".to_string(), |cur, (i, m)| {
+                cur + &m.to_string() +
+                if i == allowed.len() - 2 {
+                    ", and "
+                } else if i == allowed.len() - 1 {
+                    ""
+                } else {
+                    ", "
+                }
+            })
+            .to_string();
+
+        println!("{} tried to {} on {} ({}) but only {} are allowed",
+                 req.remote_addr,
+                 req.method,
+                 url_path(&req.url),
+                 tpe,
+                 allowed_s);
+
+        Ok(Response::with((status::MethodNotAllowed,
+                           Header(headers::Server(USER_AGENT.to_string())),
+                           Header(headers::Allow(allowed.to_vec())),
+                           "text/html;charset=utf-8".parse::<mime::Mime>().unwrap(),
+                           html_response(ERROR_HTML,
+                                         &["405 Method Not Allowed",
+                                           &format!("Can't {} on a {}.", req.method, tpe),
+                                           &format!("<p>Allowed methods: {}</p>", allowed_s)]))))
+    }
+
+    fn handle_put_partial_content(&self, req: &mut Request) -> IronResult<Response> {
+        println!("{} tried to PUT partial content to {}", req.remote_addr, url_path(&req.url));
+        Ok(Response::with((status::BadRequest,
+                           Header(headers::Server(USER_AGENT.to_string())),
+                           "text/html;charset=utf-8".parse::<mime::Mime>().unwrap(),
+                           html_response(ERROR_HTML,
+                                         &["400 Bad Request",
+                                           "<a href=\"https://tools.ietf.org/html/rfc7231#section-4.3.3\">RFC7231 forbids partial-content PUT \
+                                            requests.</a>",
+                                           ""]))))
+    }
+
+    fn handle_put_file(&self, req: &mut Request, req_p: PathBuf) -> IronResult<Response> {
+        let existant = req_p.exists();
+        println!("{} {} {}, size: {}B",
+                 req.remote_addr,
+                 if existant { "replaced" } else { "created" },
+                 req_p.display(),
+                 *req.headers.get::<headers::ContentLength>().unwrap());
+
+        let &(_, ref temp_dir) = self.temp_directory.as_ref().unwrap();
+        let temp_file_p = temp_dir.join(req_p.file_name().unwrap());
+
+        io::copy(&mut req.body, &mut File::create(&temp_file_p).unwrap()).unwrap();
+        let _ = fs::create_dir_all(req_p.parent().unwrap());
+        fs::copy(&temp_file_p, req_p).unwrap();
+
+        Ok(Response::with((if existant {
+                               status::NoContent
+                           } else {
+                               status::Created
+                           },
+                           Header(headers::Server(USER_AGENT.to_string())))))
     }
 
     fn handle_delete(&self, req: &mut Request) -> IronResult<Response> {
@@ -203,6 +274,22 @@ impl HttpHandler {
                                            "This operation was not implemented.",
                                            &format!("<p>Unsupported request method: {}.<br />Supported methods: OPTIONS, GET, HEAD and TRACE.</p>",
                                                     req.method)]))))
+    }
+
+    fn parse_requested_path(&self, req: &Request) -> (PathBuf, bool, bool) {
+        req.url.path().into_iter().filter(|p| !p.is_empty()).fold((self.hosted_directory.1.clone(), false, false), |(mut cur, mut sk, mut err), pp| {
+            if let Some(pp) = percent_decode(pp) {
+                cur.push(&*pp);
+            } else {
+                err = true;
+            }
+
+            if let Ok(meta) = cur.metadata() {
+                sk = sk || meta.file_type().is_symlink();
+            }
+
+            (cur, sk, err)
+        })
     }
 
     fn create_temp_dir(&self) {
