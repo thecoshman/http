@@ -133,7 +133,7 @@ impl HttpHandler {
 
     fn handle_put(&self, req: &mut Request) -> IronResult<Response> {
         if self.temp_directory.is_none() {
-            return self.handle_bad_method(req);
+            return self.handle_forbidden_method(req, "-w", "write requests");
         }
 
         let (req_p, _, url_err) = self.parse_requested_path(req);
@@ -221,7 +221,7 @@ impl HttpHandler {
 
     fn handle_delete(&self, req: &mut Request) -> IronResult<Response> {
         if self.temp_directory.is_none() {
-            return self.handle_bad_method(req);
+            return self.handle_forbidden_method(req, "-w", "write requests");
         }
 
         let (req_p, symlink, url_err) = self.parse_requested_path(req);
@@ -262,6 +262,20 @@ impl HttpHandler {
             extensions: TypeMap::new(),
             body: None,
         })
+    }
+
+    fn handle_forbidden_method(&self, req: &mut Request, switch: &str, desc: &str) -> IronResult<Response> {
+        println!("{} used disabled request method {} grouped under {}", req.remote_addr, req.method, desc);
+        Ok(Response::with((status::Forbidden,
+                           Header(headers::Server(USER_AGENT.to_string())),
+                           "text/html;charset=utf-8".parse::<mime::Mime>().unwrap(),
+                           html_response(ERROR_HTML,
+                                         &["403 Forbidden",
+                                           "This feature is currently disabled.",
+                                           &format!("<p>Ask the server administrator to pass <samp>{}</samp> \
+                                                        to the executable to enable support for {}.</p>",
+                                                    switch,
+                                                    desc)]))))
     }
 
     fn handle_bad_method(&self, req: &mut Request) -> IronResult<Response> {
