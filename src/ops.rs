@@ -41,7 +41,6 @@ impl Handler for HttpHandler {
                 })
             }
             method::Trace => self.handle_trace(req),
-            method::Patch => self.handle_patch(req),
             _ => self.handle_bad_method(req),
         }
     }
@@ -242,16 +241,6 @@ impl HttpHandler {
             extensions: TypeMap::new(),
             body: None,
         })
-    }
-
-    fn handle_patch(&self, req: &mut Request) -> IronResult<Response> {
-        if self.temp_directory.is_none() {
-            return self.handle_bad_method(req);
-        }
-
-        self.create_temp_dir();
-        println!("{} requested PATCH (unhandled, serving 501)", req.remote_addr);
-        self.handle_bad_method(req)
     }
 
     fn handle_bad_method(&self, req: &mut Request) -> IronResult<Response> {
