@@ -42,7 +42,7 @@ impl Options {
             .arg(Arg::from_usage("[DIR] 'Directory to host. Default: current working directory'")
                 .validator(|s| Options::filesystem_dir_validator(s, "Directory to host")))
             .arg(Arg::from_usage("-p --port [port] 'Port to use. Default: first free port from 8000 up'").validator(Options::u16_validator))
-            .arg(Arg::from_usage("--temp-dir [temp] 'Temporary directory. Default: $TEMP'")
+            .arg(Arg::from_usage("-t --temp-dir [temp] 'Temporary directory. Default: $TEMP'")
                 .validator(|s| Options::filesystem_dir_validator(s, "Temporary directory")))
             .arg(Arg::from_usage("-s --follow-symlinks 'Follow symlinks. Default: false'"))
             .arg(Arg::from_usage("-w --allow-write 'Allow for write operations. Default: false'"))
