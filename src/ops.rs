@@ -31,7 +31,6 @@ impl Handler for HttpHandler {
         match req.method {
             method::Options => self.handle_options(req),
             method::Get => self.handle_get(req),
-            method::Post => self.handle_post(req),
             method::Put => self.handle_put(req),
             method::Delete => self.handle_delete(req),
             method::Head => {
@@ -130,16 +129,6 @@ impl HttpHandler {
                 };
                 cur + "<li><a href=\"" + &format!("/{}", relpath).replace("//", "/") + &fname + "\">" + &fname + "</a></li>\n"
             })]))))
-    }
-
-    fn handle_post(&self, req: &mut Request) -> IronResult<Response> {
-        if self.temp_directory.is_none() {
-            return self.handle_bad_method(req);
-        }
-
-        self.create_temp_dir();
-        println!("{} requested POST (unhandled, serving 501)", req.remote_addr);
-        self.handle_bad_method(req)
     }
 
     fn handle_put(&self, req: &mut Request) -> IronResult<Response> {
