@@ -30,9 +30,7 @@ script:
   -
   - if [ "$LANGUAGE" == "Rust" ] && [ "$DEPLOY" ] && [ "$TRAVIS_TAG" ]; then cargo build --verbose --release; fi
   - if [ "$LANGUAGE" == "Rust" ] && [ "$CLIPPY" ]; then
-      cargo install clippy;
-      cargo install cargo-update;
-      cargo install-update -a;
+      cargo install -f clippy;
       cargo clippy;
     fi
   -
