@@ -13,9 +13,16 @@ matrix:
     - env: LANGUAGE=Rust CLIPPY=true
       language: rust
       rust: nightly
+    - env: LANGUAGE=Ruby DEPLOY=true DEPLOY_FILE="$TRAVIS_BUILD_DIR/../http-man-$TRAVIS_TAG.tbz2"
+      language: ruby
+      rust: []
+      rvm: "2.2"
   allow_failures:
     - rust: beta
     - rust: nightly
+
+install:
+  - if [ "$LANGUAGE" == "Ruby" ]; then gem install ronn; fi
 
 script:
   - if [ "$LANGUAGE" == "Rust" ]; then cargo build --verbose; fi
@@ -28,11 +35,25 @@ script:
       cargo install-update -a;
       cargo clippy;
     fi
+  -
+  - if [ "$LANGUAGE" == "Ruby" ] && [ "$DEPLOY" ] && [ "$TRAVIS_TAG" ]; then
+      mkdir man; pushd man;
+      cp ../http.md .;
+      ronn --organization="http developers" http.md;
+      popd;
+    fi
 
 after_success:
   - if [ "$LANGUAGE" == "Rust" ] && [ "$DEPLOY" ] && [ "$TRAVIS_TAG" ]; then
       cp target/release/http "$DEPLOY_FILE";
       strip --strip-all --remove-section=.comment --remove-section=.note "$DEPLOY_FILE";
+    fi
+  - if [ "$LANGUAGE" == "Ruby" ] && [ "$DEPLOY" ] && [ "$TRAVIS_TAG" ]; then
+      cp -r man "$TRAVIS_BUILD_DIR/../http-man-$TRAVIS_TAG";
+      pushd "$TRAVIS_BUILD_DIR/..";
+      tar -caf "http-man-$TRAVIS_TAG.tbz2" "http-man-$TRAVIS_TAG";
+      rm -rf "http-man-$TRAVIS_TAG";
+      popd;
     fi
 
 deploy:

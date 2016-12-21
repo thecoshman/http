@@ -1,6 +1,20 @@
 # http [![Build status](https://travis-ci.org/thecoshman/http.svg)](https://travis-ci.org/thecoshman/http) [![Licence](https://img.shields.io/badge/license-MIT-blue.svg?style=flat)](LICENSE) [![Crates.io version](http://meritbadge.herokuapp.com/https)](https://crates.io/crates/https)
 Host These Things Please - a basic HTTP server for hosting a folder fast and simply
 
+## Selected features
+
+See [the manpage](http.md) for full list.
+
+  * [x] Optional following of symlinks (`-s` option)
+  * [x] Index generation for directories (all for now)
+  * [x] Sane defaults (like hosted dir (`.`) and port (forst free one from range `8000`-`9999`))
+  * [x] Correct MIME type for served files
+  * [x] Handled request methods: OPTIONS, GET, PUT, DELETE, HEAD and TRACE ("writing" methods are off by default, enable via `-w` switch)
+  * [x] Proper handling of percent-encoded URLs (like `асдф fdsa`)
+  * [x] Good symlink handling compatible with Windows
+
+## [Manpage](http.md)
+
 ## Aims
 The idea is to make a program that can compile down to a simple binary that can be used via Linux CLI to quickly take the current directory and serve it over HTTP. Everything should have sensible defaults such that you do not *have* to pass parameters like what port to use.
 
