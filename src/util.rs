@@ -1,13 +1,16 @@
 //! Module containing various utility functions.
 
 
+use base64;
 use iron::Url;
 use std::fs::File;
 use std::io::Read;
 use std::path::Path;
 use std::borrow::Cow;
 use url::percent_encoding;
+use std::collections::HashMap;
 use time::{self, Duration, Tm};
+use mime_guess::get_mime_type_str;
 
 
 /// The generic HTML page to use as response to errors.
@@ -15,6 +18,15 @@ pub static ERROR_HTML: &'static str = include_str!("../assets/error.html");
 
 /// The HTML page to use as template for a requested directory's listing.
 pub static DIRECTORY_LISTING_HTML: &'static str = include_str!("../assets/directory_listing.html");
+
+lazy_static! {
+    pub static ref ASSETS: HashMap<&'static str, Cow<'static, str>> = {
+        let mut ass = HashMap::with_capacity(1);
+        ass.insert("favicon",
+            Cow::Owned(format!("data:{};base64,{}", get_mime_type_str("ico").unwrap(), base64::encode(include_bytes!("../assets/favicon.ico")))));
+        ass
+    };
+}
 
 /// The port to start scanning from if no ports were given.
 pub static PORT_SCAN_LOWEST: u16 = 8000;
@@ -85,7 +97,8 @@ pub fn file_contains<P: AsRef<Path>>(path: P, byte: u8) -> bool {
 /// println!(html_response(NOT_IMPLEMENTED_HTML, &["<p>Abolish the burgeoisie!</p>"]));
 /// ```
 pub fn html_response<S: AsRef<str>>(data: &str, format_strings: &[S]) -> String {
-    format_strings.iter().enumerate().fold(data.to_string(), |d, (i, s)| d.replace(&format!("{{{}}}", i), s.as_ref()))
+    ASSETS.iter().fold(format_strings.iter().enumerate().fold(data.to_string(), |d, (i, s)| d.replace(&format!("{{{}}}", i), s.as_ref())),
+                       |d, (k, v)| d.replace(&format!("{{{}}}", k), &v))
 }
 
 /// Return the path part of the URL.

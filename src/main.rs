@@ -1,5 +1,8 @@
+#[macro_use]
+extern crate lazy_static;
 extern crate mime_guess;
 extern crate lazysort;
+extern crate base64;
 #[macro_use]
 extern crate clap;
 extern crate iron;
