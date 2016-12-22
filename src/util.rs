@@ -2,6 +2,8 @@
 
 
 use base64;
+use std::f64;
+use std::cmp;
 use iron::Url;
 use std::fs::File;
 use std::io::Read;
@@ -173,4 +175,25 @@ pub fn detect_file_as_dir(mut p: &Path) -> bool {
 /// Check if a path refers to a symlink in a way that also works on Windows.
 pub fn is_symlink<P: AsRef<Path>>(p: P) -> bool {
     p.as_ref().read_link().is_ok()
+}
+
+/// Construct string representing a human-readable size.
+///
+/// Stolen, adapted and inlined from [fielsize.js](http://filesizejs.com).
+pub fn human_readable_size(s: u64) -> String {
+    if s == 0 {
+        "0B".to_string()
+    } else {
+        let num = s as f64;
+        let exp = cmp::min(cmp::max((num.log(f64::consts::E) / 1024f64.log(f64::consts::E)) as i32, 0), 8);
+
+        let val = num / 2f64.powi(exp * 10);
+
+        if exp > 0 {
+                (val * 10f64).round() / 10f64
+            } else {
+                val.round()
+            }
+            .to_string() + ["B", "KiB", "MiB", "GiB", "TiB", "PiB", "EiB", "ZiB", "YiB"][cmp::max(exp, 0) as usize]
+    }
 }

@@ -56,7 +56,7 @@ fn result_main() -> Result<(), Error> {
 
     println!("Hosting \"{}\" on port {}...", opts.hosted_directory.0, responder.socket.port());
     println!("Ctrl-C to stop.");
-    println!("");
+    println!();
 
     Ok(())
 }
