@@ -30,6 +30,12 @@ lazy_static! {
             Cow::Owned(format!("data:{};base64,{}", get_mime_type_str("gif").unwrap(), base64::encode(include_bytes!("../assets/directory_icon.gif")))));
         ass.insert("file_icon",
             Cow::Owned(format!("data:{};base64,{}", get_mime_type_str("gif").unwrap(), base64::encode(include_bytes!("../assets/file_icon.gif")))));
+        ass.insert("file_binary_icon",
+            Cow::Owned(format!("data:{};base64,{}", get_mime_type_str("gif").unwrap(), base64::encode(include_bytes!("../assets/file_binary_icon.gif")))));
+        ass.insert("file_image_icon",
+            Cow::Owned(format!("data:{};base64,{}", get_mime_type_str("gif").unwrap(), base64::encode(include_bytes!("../assets/file_image_icon.gif")))));
+        ass.insert("file_text_icon",
+            Cow::Owned(format!("data:{};base64,{}", get_mime_type_str("gif").unwrap(), base64::encode(include_bytes!("../assets/file_text_icon.gif")))));
         ass
     };
 }

@@ -169,14 +169,33 @@ impl HttpHandler {
                 let path = f.path();
                 let fname = f.file_name().into_string().unwrap();
                 let len = f.metadata().unwrap().len();
+                let mime = if is_file {
+                    match guess_mime_type_opt(&path) {
+                        Some(mime::Mime(mime::TopLevel::Image, ..)) |
+                        Some(mime::Mime(mime::TopLevel::Video, ..)) => "_image",
+                        Some(mime::Mime(mime::TopLevel::Text, ..))  => "_text",
+                        Some(mime::Mime(mime::TopLevel::Application, ..)) => "_binary",
+                        None => {
+                            if file_contains(&req_p, 0) {
+                                ""
+                            } else {
+                                "_text"
+                            }
+                        }
+                        _ => "",
+                    }
+                } else {
+                    ""
+                };
 
-                format!("{}<tr><td><a href=\"{}{}\"><img id=\"{}\" src=\"{{{}_icon}}\"></img></a></td> <td><a href=\"{}{}\">{}{}</a></td> <td>{}</td> \
+                format!("{}<tr><td><a href=\"{}{}\"><img id=\"{}\" src=\"{{{}{}_icon}}\"></img></a></td> <td><a href=\"{}{}\">{}{}</a></td> <td>{}</td> \
                          <td><abbr title=\"{} B\">{}</abbr></td></tr>\n",
                         cur,
                         url,
                         fname,
                         path.file_stem().map(|p| p.to_str().unwrap()).unwrap_or(&fname),
                         if is_file { "file" } else { "dir" },
+                        mime,
                         url,
                         fname,
                         fname,
