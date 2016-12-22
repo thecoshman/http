@@ -24,6 +24,10 @@ lazy_static! {
         let mut ass = HashMap::with_capacity(1);
         ass.insert("favicon",
             Cow::Owned(format!("data:{};base64,{}", get_mime_type_str("ico").unwrap(), base64::encode(include_bytes!("../assets/favicon.ico")))));
+        ass.insert("dir_icon",
+            Cow::Owned(format!("data:{};base64,{}", get_mime_type_str("gif").unwrap(), base64::encode(include_bytes!("../assets/directory_icon.gif")))));
+        ass.insert("file_icon",
+            Cow::Owned(format!("data:{};base64,{}", get_mime_type_str("gif").unwrap(), base64::encode(include_bytes!("../assets/file_icon.gif")))));
         ass
     };
 }

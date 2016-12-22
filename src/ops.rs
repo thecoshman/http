@@ -1,4 +1,5 @@
 use std::io;
+use time::strftime;
 use lazysort::SortedBy;
 use std::path::PathBuf;
 use std::fs::{self, File};
@@ -121,13 +122,28 @@ impl HttpHandler {
                                                        .cmp(&(rhs.file_type().unwrap().is_file(), rhs.file_name().to_str().unwrap().to_lowercase()))
                                                })
                                                .fold("".to_string(), |cur, f| {
-                let fname = f.file_name().into_string().unwrap() +
-                            if !f.file_type().unwrap().is_file() {
-                    "/"
-                } else {
-                    ""
-                };
-                cur + "<li><a href=\"" + &format!("/{}", relpath).replace("//", "/") + &fname + "\">" + &fname + "</a></li>\n"
+                let url = format!("/{}", relpath).replace("//", "/");
+                let is_file = f.file_type().unwrap().is_file();
+                let path = f.path();
+                let fname = f.file_name().into_string().unwrap();
+
+                format!("{}<tr><td><a href=\"{}{}\"><img id=\"{}\" src=\"{{{}_icon}}\"></img></a></td> <td><a href=\"{}{}\">{}{}</a></td> <td>{}</td> \
+                         <td>{}</td></tr>\n",
+                        cur,
+                        url,
+                        fname,
+                        path.file_stem().map(|p| p.to_str().unwrap()).unwrap_or(&fname),
+                        if is_file { "file" } else { "dir" },
+                        url,
+                        fname,
+                        fname,
+                        if is_file { "" } else { "/" },
+                        strftime("%F %T", &file_time_modified(&path)).unwrap(),
+                        if is_file {
+                            f.metadata().unwrap().len().to_string()
+                        } else {
+                            String::new()
+                        })
             })]))))
     }
 

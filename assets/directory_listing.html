@@ -13,7 +13,7 @@
         margin-bottom: 0;
       }
 
-      p.pre-list {
+      .pre-list {
         margin-bottom: 0;
       }
     </style>
@@ -21,9 +21,10 @@
   <body>
     <div>
       <p class="pre-list">The requested directory {0} contains the following files:</p>
-      <ul>
+      <table>
+        <tr><th></th> <th>Name</th> <th>Last modified</th> <th>Size</th></tr>
         {1}
-      </ul>
+      </table>
     </div>
     <p></p>
     <hr />
