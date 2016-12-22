@@ -1,4 +1,5 @@
 use std::io;
+use std::iter;
 use time::strftime;
 use lazysort::SortedBy;
 use std::path::PathBuf;
@@ -8,7 +9,7 @@ use self::super::{Options, Error};
 use mime_guess::guess_mime_type_opt;
 use iron::{headers, status, method, mime, IronResult, Listening, Response, TypeMap, Request, Handler, Iron};
 use self::super::util::{url_path, is_symlink, html_response, file_contains, percent_decode, detect_file_as_dir, file_time_modified, human_readable_size,
-                        USER_AGENT, ERROR_HTML, DIRECTORY_LISTING_HTML};
+                        USER_AGENT, ERROR_HTML, INDEX_EXTENSIONS, DIRECTORY_LISTING_HTML};
 
 
 #[derive(Clone, Hash, Ord, PartialOrd, Eq, PartialEq)]
@@ -16,6 +17,7 @@ pub struct HttpHandler {
     pub hosted_directory: (String, PathBuf),
     pub follow_symlinks: bool,
     pub temp_directory: Option<(String, PathBuf)>,
+    pub check_indices: bool,
 }
 
 impl HttpHandler {
@@ -24,6 +26,7 @@ impl HttpHandler {
             hosted_directory: opts.hosted_directory.clone(),
             follow_symlinks: opts.follow_symlinks,
             temp_directory: opts.temp_directory.clone(),
+            check_indices: opts.check_indices,
         }
     }
 }
@@ -106,6 +109,45 @@ impl HttpHandler {
     }
 
     fn handle_get_dir(&self, req: &mut Request, req_p: PathBuf) -> IronResult<Response> {
+        if self.check_indices {
+            let mut idx = req_p.join("index");
+            if let Some(e) = INDEX_EXTENSIONS.iter()
+                .find(|e| {
+                    idx.set_extension(e);
+                    idx.exists()
+                }) {
+                if {
+                    let p = req.url.path();
+                    p[p.len() - 1] == ""
+                } {
+                    let r = self.handle_get_file(req, idx);
+                    println!("{} found index file for directory {}",
+                             iter::repeat(' ').take(req.remote_addr.to_string().len()).collect::<String>(),
+                             req_p.display());
+                    return r;
+                } else {
+                    return self.handle_get_dir_index_no_slash(req, e);
+                }
+            }
+        }
+
+        self.handle_get_dir_listing(req, req_p)
+    }
+
+    fn handle_get_dir_index_no_slash(&self, req: &mut Request, idx_ext: &str) -> IronResult<Response> {
+        let new_url = req.url.to_string() + "/";
+        println!("Redirecting {} to {} - found index file index.{}", req.remote_addr, new_url, idx_ext);
+
+        // We redirect here because if we don't and serve the index right away funky shit happens.
+        // Example:
+        //   - Without following slash:
+        //     https://cloud.githubusercontent.com/assets/6709544/21442017/9eb20d64-c89b-11e6-8c7b-888b5f70a403.png
+        //   - With following slash:
+        //     https://cloud.githubusercontent.com/assets/6709544/21442028/a50918c4-c89b-11e6-8936-c29896947f6a.png
+        Ok(Response::with((status::MovedPermanently, Header(headers::Server(USER_AGENT.to_string())), Header(headers::Location(new_url)))))
+    }
+
+    fn handle_get_dir_listing(&self, req: &mut Request, req_p: PathBuf) -> IronResult<Response> {
         let relpath = (url_path(&req.url) + "/").replace("//", "/");
         println!("{} was served directory listing for {}", req.remote_addr, req_p.display());
         Ok(Response::with((status::Ok,
@@ -129,7 +171,7 @@ impl HttpHandler {
                 let len = f.metadata().unwrap().len();
 
                 format!("{}<tr><td><a href=\"{}{}\"><img id=\"{}\" src=\"{{{}_icon}}\"></img></a></td> <td><a href=\"{}{}\">{}{}</a></td> <td>{}</td> \
-                         <td><abbr title=\"{}B\">{}</abbr></td></tr>\n",
+                         <td><abbr title=\"{} B\">{}</abbr></td></tr>\n",
                         cur,
                         url,
                         fname,

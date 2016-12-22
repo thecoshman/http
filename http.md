@@ -59,6 +59,13 @@ pass parameters like what port to use.
     This is false by default because it's most likely not something you
     want to do.
 
+  -i --no-indices
+
+    Always generate directory listings, even for directories containing an
+    index file.
+
+    This is false by default because it's most likely for debugging purposes.
+
 ## EXAMPLES
 
   `http`

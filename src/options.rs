@@ -29,6 +29,8 @@ pub struct Options {
     pub follow_symlinks: bool,
     /// The temp directory to write to before copying to hosted directory. Default: `None`
     pub temp_directory: Option<(String, PathBuf)>,
+    /// Whether to check for index files in served directories before serving a listing. Default: true
+    pub check_indices: bool,
 }
 
 impl Options {
@@ -46,6 +48,7 @@ impl Options {
                 .validator(|s| Options::filesystem_dir_validator(s, "Temporary directory")))
             .arg(Arg::from_usage("-s --follow-symlinks 'Follow symlinks. Default: false'"))
             .arg(Arg::from_usage("-w --allow-write 'Allow for write operations. Default: false'"))
+            .arg(Arg::from_usage("-i --no-indices 'Always generate dir listings even if index files are available. Default: false'"))
             .get_matches();
 
         let dir = matches.value_of("DIR").unwrap_or(".");
@@ -75,6 +78,7 @@ impl Options {
             } else {
                 None
             },
+            check_indices: !matches.is_present("no-indices"),
         }
     }
 

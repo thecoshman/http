@@ -43,6 +43,9 @@ pub static PORT_SCAN_HIGHEST: u16 = 9999;
 /// The app name and version to use with User-Agent or Server response header.
 pub static USER_AGENT: &'static str = concat!("http/", env!("CARGO_PKG_VERSION"));
 
+/// Index file extensions to look for if `-i` was not specified.
+pub static INDEX_EXTENSIONS: &'static [&'static str] = &["html", "htm", "shtml"];
+
 
 /// Uppercase the first character of the supplied string.
 ///
@@ -182,7 +185,7 @@ pub fn is_symlink<P: AsRef<Path>>(p: P) -> bool {
 /// Stolen, adapted and inlined from [fielsize.js](http://filesizejs.com).
 pub fn human_readable_size(s: u64) -> String {
     if s == 0 {
-        "0B".to_string()
+        "0 B".to_string()
     } else {
         let num = s as f64;
         let exp = cmp::min(cmp::max((num.log(f64::consts::E) / 1024f64.log(f64::consts::E)) as i32, 0), 8);
@@ -194,6 +197,6 @@ pub fn human_readable_size(s: u64) -> String {
             } else {
                 val.round()
             }
-            .to_string() + ["B", "KiB", "MiB", "GiB", "TiB", "PiB", "EiB", "ZiB", "YiB"][cmp::max(exp, 0) as usize]
+            .to_string() + " " + ["B", "KiB", "MiB", "GiB", "TiB", "PiB", "EiB", "ZiB", "YiB"][cmp::max(exp, 0) as usize]
     }
 }
