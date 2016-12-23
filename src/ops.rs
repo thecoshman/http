@@ -155,6 +155,13 @@ impl HttpHandler {
                            "text/html;charset=utf-8".parse::<mime::Mime>().unwrap(),
                            html_response(DIRECTORY_LISTING_HTML,
                                          &[&relpath,
+                                           &if &req.url.path() == &[""] {
+                                               String::new()
+                                           } else {
+                                               format!("<tr><td><a href=\"../\"><img id=\"parent_dir\" src=\"{{back_arrow_icon}}\"></img></a></td> \
+                                                        <td><a href=\"../\">Parent directory</a></td> <td>{}</td> <td></td></tr>",
+                                                       strftime("%F %T", &file_time_modified(req_p.parent().unwrap())).unwrap())
+                                           },
                                            &req_p.read_dir()
                                                .unwrap()
                                                .map(Result::unwrap)
@@ -173,7 +180,7 @@ impl HttpHandler {
                     match guess_mime_type_opt(&path) {
                         Some(mime::Mime(mime::TopLevel::Image, ..)) |
                         Some(mime::Mime(mime::TopLevel::Video, ..)) => "_image",
-                        Some(mime::Mime(mime::TopLevel::Text, ..))  => "_text",
+                        Some(mime::Mime(mime::TopLevel::Text, ..)) => "_text",
                         Some(mime::Mime(mime::TopLevel::Application, ..)) => "_binary",
                         None => {
                             if file_contains(&req_p, 0) {

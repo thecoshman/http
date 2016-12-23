@@ -27,15 +27,29 @@ lazy_static! {
         ass.insert("favicon",
             Cow::Owned(format!("data:{};base64,{}", get_mime_type_str("ico").unwrap(), base64::encode(include_bytes!("../assets/favicon.ico")))));
         ass.insert("dir_icon",
-            Cow::Owned(format!("data:{};base64,{}", get_mime_type_str("gif").unwrap(), base64::encode(include_bytes!("../assets/directory_icon.gif")))));
+            Cow::Owned(format!("data:{};base64,{}",
+                               get_mime_type_str("gif").unwrap(),
+                               base64::encode(include_bytes!("../assets/icons/directory_icon.gif")))));
         ass.insert("file_icon",
-            Cow::Owned(format!("data:{};base64,{}", get_mime_type_str("gif").unwrap(), base64::encode(include_bytes!("../assets/file_icon.gif")))));
+            Cow::Owned(format!("data:{};base64,{}",
+                               get_mime_type_str("gif").unwrap(),
+                               base64::encode(include_bytes!("../assets/icons/file_icon.gif")))));
         ass.insert("file_binary_icon",
-            Cow::Owned(format!("data:{};base64,{}", get_mime_type_str("gif").unwrap(), base64::encode(include_bytes!("../assets/file_binary_icon.gif")))));
+            Cow::Owned(format!("data:{};base64,{}",
+                               get_mime_type_str("gif").unwrap(),
+                               base64::encode(include_bytes!("../assets/icons/file_binary_icon.gif")))));
         ass.insert("file_image_icon",
-            Cow::Owned(format!("data:{};base64,{}", get_mime_type_str("gif").unwrap(), base64::encode(include_bytes!("../assets/file_image_icon.gif")))));
+            Cow::Owned(format!("data:{};base64,{}",
+                               get_mime_type_str("gif").unwrap(),
+                               base64::encode(include_bytes!("../assets/icons/file_image_icon.gif")))));
         ass.insert("file_text_icon",
-            Cow::Owned(format!("data:{};base64,{}", get_mime_type_str("gif").unwrap(), base64::encode(include_bytes!("../assets/file_text_icon.gif")))));
+            Cow::Owned(format!("data:{};base64,{}",
+                               get_mime_type_str("gif").unwrap(),
+                               base64::encode(include_bytes!("../assets/icons/file_text_icon.gif")))));
+        ass.insert("back_arrow_icon",
+            Cow::Owned(format!("data:{};base64,{}",
+                               get_mime_type_str("gif").unwrap(),
+                               base64::encode(include_bytes!("../assets/icons/back_arrow_icon.gif")))));
         ass
     };
 }
