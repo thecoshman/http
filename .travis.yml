@@ -34,7 +34,7 @@ script:
       cargo clippy;
     fi
   -
-  - if [ "$LANGUAGE" == "Ruby" ] && [ "$DEPLOY" ] && [ "$TRAVIS_TAG" ]; then
+  - if [ "$LANGUAGE" == "Ruby" ]; then
       mkdir man; pushd man;
       cp ../http.md .;
       ronn --organization="http developers" http.md;
