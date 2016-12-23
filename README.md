@@ -6,12 +6,14 @@ Host These Things Please - a basic HTTP server for hosting a folder fast and sim
 See [the manpage](http.md) for full list.
 
   * [x] Optional following of symlinks (`-s` option)
-  * [x] Index generation for directories (all for now)
+  * [x] Index generation for directories
   * [x] Sane defaults (like hosted dir (`.`) and port (forst free one from range `8000`-`9999`))
   * [x] Correct MIME type for served files
   * [x] Handled request methods: OPTIONS, GET, PUT, DELETE, HEAD and TRACE ("writing" methods are off by default, enable via `-w` switch)
   * [x] Proper handling of percent-encoded URLs (like `асдф fdsa`)
   * [x] Good symlink handling compatible with Windows
+  * [x] Multitude of information in directory indices
+  * [x] Serving index files like `index.{html,htm,shtml}` from directories (disableable via `-i` switch)
 
 ## [Manpage](http.md)
 
