@@ -116,10 +116,7 @@ impl HttpHandler {
                     idx.set_extension(e);
                     idx.exists()
                 }) {
-                if {
-                    let p = req.url.path();
-                    p[p.len() - 1] == ""
-                } {
+                if req.url.path().pop() == Some("") {
                     let r = self.handle_get_file(req, idx);
                     println!("{} found index file for directory {}",
                              iter::repeat(' ').take(req.remote_addr.to_string().len()).collect::<String>(),

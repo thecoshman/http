@@ -127,7 +127,7 @@ pub fn file_contains<P: AsRef<Path>>(path: P, byte: u8) -> bool {
 /// ```
 pub fn html_response<S: AsRef<str>>(data: &str, format_strings: &[S]) -> String {
     ASSETS.iter().fold(format_strings.iter().enumerate().fold(data.to_string(), |d, (i, s)| d.replace(&format!("{{{}}}", i), s.as_ref())),
-                       |d, (k, v)| d.replace(&format!("{{{}}}", k), &v))
+                       |d, (k, v)| d.replace(&format!("{{{}}}", k), v))
 }
 
 /// Return the path part of the URL.
