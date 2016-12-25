@@ -8,7 +8,7 @@ use iron::modifiers::Header;
 use self::super::{Options, Error};
 use mime_guess::guess_mime_type_opt;
 use iron::{headers, status, method, mime, IronResult, Listening, Response, TypeMap, Request, Handler, Iron};
-use self::super::util::{url_path, is_symlink, html_response, file_contains, percent_decode, detect_file_as_dir, file_time_modified, human_readable_size,
+use self::super::util::{url_path, is_symlink, html_response, file_binary, percent_decode, detect_file_as_dir, file_time_modified, human_readable_size,
                         USER_AGENT, ERROR_HTML, INDEX_EXTENSIONS, DIRECTORY_LISTING_HTML};
 
 
@@ -95,7 +95,7 @@ impl HttpHandler {
     }
 
     fn handle_get_file(&self, req: &mut Request, req_p: PathBuf) -> IronResult<Response> {
-        let mime_type = guess_mime_type_opt(&req_p).unwrap_or_else(|| if file_contains(&req_p, 0) {
+        let mime_type = guess_mime_type_opt(&req_p).unwrap_or_else(|| if file_binary(&req_p) {
             "application/octet-stream".parse().unwrap()
         } else {
             "text/plain".parse().unwrap()
@@ -179,13 +179,7 @@ impl HttpHandler {
                         Some(mime::Mime(mime::TopLevel::Video, ..)) => "_image",
                         Some(mime::Mime(mime::TopLevel::Text, ..)) => "_text",
                         Some(mime::Mime(mime::TopLevel::Application, ..)) => "_binary",
-                        None => {
-                            if file_contains(&req_p, 0) {
-                                ""
-                            } else {
-                                "_text"
-                            }
-                        }
+                        None => if file_binary(&path) { "" } else { "_text" },
                         _ => "",
                     }
                 } else {

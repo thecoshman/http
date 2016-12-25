@@ -6,12 +6,12 @@ use std::f64;
 use std::cmp;
 use iron::Url;
 use std::fs::File;
-use std::io::Read;
 use std::path::Path;
 use std::borrow::Cow;
 use url::percent_encoding;
 use std::collections::HashMap;
 use time::{self, Duration, Tm};
+use std::io::{BufReader, BufRead};
 use mime_guess::get_mime_type_str;
 
 
@@ -85,34 +85,22 @@ pub fn uppercase_first(s: &str) -> String {
     }
 }
 
-/// Check if the specified file contains the specified byte.
+/// Check if the specified file is to be considered "binary".
+///
+/// Basically checks is a file is UTF-8.
 ///
 /// # Examples
 ///
 /// ```
-/// # use https::util::file_contains;
+/// # use https::util::file_binary;
 /// # #[cfg(target_os = "windows")]
-/// # assert!(file_contains("target/debug/http.exe", 0));
+/// # assert!(file_binary("target/debug/http.exe"));
 /// # #[cfg(not(target_os = "windows"))]
-/// assert!(file_contains("target/debug/http", 0));
-/// assert!(!file_contains("Cargo.toml", 0));
+/// assert!(file_binary("target/debug/http"));
+/// assert!(!file_binary("Cargo.toml"));
 /// ```
-pub fn file_contains<P: AsRef<Path>>(path: P, byte: u8) -> bool {
-    if let Ok(mut f) = File::open(path) {
-        let mut buf = [0u8; 1024];
-
-        while let Ok(read) = f.read(&mut buf) {
-            if buf[..read].contains(&byte) {
-                return true;
-            }
-
-            if read < buf.len() {
-                break;
-            }
-        }
-    }
-
-    false
+pub fn file_binary<P: AsRef<Path>>(path: P) -> bool {
+    File::open(path).and_then(|f| BufReader::new(f).read_line(&mut String::new())).is_err()
 }
 
 /// Fill out an HTML template.
