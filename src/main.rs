@@ -2,8 +2,10 @@
 extern crate lazy_static;
 extern crate mime_guess;
 extern crate lazysort;
+extern crate brotli2;
 extern crate base64;
 extern crate flate2;
+extern crate bzip2;
 #[macro_use]
 extern crate clap;
 extern crate iron;

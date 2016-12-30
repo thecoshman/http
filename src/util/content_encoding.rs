@@ -1,11 +1,20 @@
+use brotli2::stream::{CompressMode as BrotliCompressMode, CompressParams as BrotliCompressParams};
+use flate2::write::{DeflateEncoder, GzEncoder};
+use flate2::{Compression as Flate2Compression};
+use bzip2::Compression as BzCompression;
 use iron::headers::{QualityItem, Encoding};
-use flate2::write::GzEncoder;
-use flate2::Compression;
+use brotli2::write::BrotliEncoder;
+use bzip2::write::BzEncoder;
 use std::io::Write;
 
 
-/// The list of content encodings we handle.
-pub static SUPPORTED_ENCODINGS: &'static [Encoding] = &[Encoding::Gzip];
+lazy_static! {
+    /// The list of content encodings we handle.
+    pub static ref SUPPORTED_ENCODINGS: Vec<Encoding> = vec![Encoding::Gzip,
+                                                             Encoding::Deflate,
+                                                             Encoding::EncodingExt("br".to_string()),
+                                                             Encoding::EncodingExt("bzip2".to_string())];
+}
 
 
 /// Find best supported encoding to use, or `None` for identity.
@@ -18,11 +27,38 @@ pub fn response_encoding(requested: &mut [QualityItem<Encoding>]) -> Option<Enco
 pub fn encode_str(dt: &str, enc: &Encoding) -> Option<Vec<u8>> {
     match *enc {
         Encoding::Gzip => encode_gzip(dt),
+        Encoding::Deflate => encode_deflate(dt),
+        Encoding::EncodingExt(ref e) => {
+            match &e[..] {
+                "br" => encode_brotli(dt),
+                "bzip2" => encode_bzip2(dt),
+                _ => None,
+            }
+        }
         _ => None,
     }
 }
 
-fn encode_gzip(dt: &str) -> Option<Vec<u8>> {
-    let mut cmp = GzEncoder::new(Vec::new(), Compression::Default);
+
+macro_rules! encode_fn_flate2_write_iface {
+    ($fn_name:ident, $enc_tp:ident) => {
+        fn $fn_name(dt: &str) -> Option<Vec<u8>> {
+            let mut cmp = $enc_tp::new(Vec::new(), Flate2Compression::Default);
+            cmp.write_all(dt.as_bytes()).ok().and_then(|_| cmp.finish().ok())
+        }
+    }
+}
+
+encode_fn_flate2_write_iface!(encode_gzip, GzEncoder);
+encode_fn_flate2_write_iface!(encode_deflate, DeflateEncoder);
+
+fn encode_brotli(dt: &str) -> Option<Vec<u8>> {
+    let mut cmp = BrotliEncoder::new(Vec::new(), 0);
+    cmp.set_params(BrotliCompressParams::new().mode(BrotliCompressMode::Text));
+    cmp.write_all(dt.as_bytes()).ok().and_then(|_| cmp.finish().ok())
+}
+
+fn encode_bzip2(dt: &str) -> Option<Vec<u8>> {
+    let mut cmp = BzEncoder::new(Vec::new(), BzCompression::Default);
     cmp.write_all(dt.as_bytes()).ok().and_then(|_| cmp.finish().ok())
 }
