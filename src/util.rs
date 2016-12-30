@@ -13,6 +13,7 @@ use std::collections::HashMap;
 use time::{self, Duration, Tm};
 use std::io::{BufReader, BufRead};
 use mime_guess::get_mime_type_str;
+use iron::headers::{QualityItem, Encoding};
 
 
 /// The generic HTML page to use as response to errors.
@@ -66,6 +67,9 @@ pub static USER_AGENT: &'static str = concat!("http/", env!("CARGO_PKG_VERSION")
 
 /// Index file extensions to look for if `-i` was not specified.
 pub static INDEX_EXTENSIONS: &'static [&'static str] = &["html", "htm", "shtml"];
+
+/// The list of content encodings we handle.
+pub static SUPPORTED_ENCODINGS: &'static [Encoding] = &[];
 
 
 /// Uppercase the first character of the supplied string.
@@ -213,4 +217,10 @@ pub fn human_readable_size(s: u64) -> String {
             }
             .to_string() + " " + ["B", "KiB", "MiB", "GiB", "TiB", "PiB", "EiB", "ZiB", "YiB"][cmp::max(exp, 0) as usize]
     }
+}
+
+/// Find best supported encoding to use, or `None` for identity.
+pub fn response_encoding(requested: &mut [QualityItem<Encoding>]) -> Option<Encoding> {
+    requested.sort_by_key(|e| e.quality);
+    requested.iter().find(|e| SUPPORTED_ENCODINGS.contains(&e.item)).map(|e| e.item.clone())
 }

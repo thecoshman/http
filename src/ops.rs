@@ -8,8 +8,8 @@ use iron::modifiers::Header;
 use self::super::{Options, Error};
 use mime_guess::guess_mime_type_opt;
 use iron::{headers, status, method, mime, IronResult, Listening, Response, TypeMap, Request, Handler, Iron};
-use self::super::util::{url_path, is_symlink, html_response, file_binary, percent_decode, detect_file_as_dir, file_time_modified, human_readable_size,
-                        USER_AGENT, ERROR_HTML, INDEX_EXTENSIONS, DIRECTORY_LISTING_HTML};
+use self::super::util::{url_path, is_symlink, html_response, file_binary, percent_decode, response_encoding, detect_file_as_dir, file_time_modified,
+                        human_readable_size, USER_AGENT, ERROR_HTML, INDEX_EXTENSIONS, DIRECTORY_LISTING_HTML};
 
 
 #[derive(Clone, Hash, Ord, PartialOrd, Eq, PartialEq)]
@@ -147,32 +147,29 @@ impl HttpHandler {
     fn handle_get_dir_listing(&self, req: &mut Request, req_p: PathBuf) -> IronResult<Response> {
         let relpath = (url_path(&req.url) + "/").replace("//", "/");
         println!("{} was served directory listing for {}", req.remote_addr, req_p.display());
-        Ok(Response::with((status::Ok,
-                           Header(headers::Server(USER_AGENT.to_string())),
-                           "text/html;charset=utf-8".parse::<mime::Mime>().unwrap(),
-                           html_response(DIRECTORY_LISTING_HTML,
-                                         &[&relpath,
-                                           &if self.temp_directory.is_some() {
-                                               r#"<script type="text/javascript">{drag_drop}</script>"#.to_string()
-                                           } else {
-                                               String::new()
-                                           },
-                                           &if &req.url.path() == &[""] {
-                                               String::new()
-                                           } else {
-                                               format!("<tr><td><a href=\"../\"><img id=\"parent_dir\" src=\"{{back_arrow_icon}}\"></img></a></td> \
-                                                        <td><a href=\"../\">Parent directory</a></td> <td>{}</td> <td></td></tr>",
-                                                       strftime("%F %T", &file_time_modified(req_p.parent().unwrap())).unwrap())
-                                           },
-                                           &req_p.read_dir()
-                                               .unwrap()
-                                               .map(Result::unwrap)
-                                               .filter(|f| self.follow_symlinks || !is_symlink(f.path()))
-                                               .sorted_by(|lhs, rhs| {
-                                                   (lhs.file_type().unwrap().is_file(), lhs.file_name().to_str().unwrap().to_lowercase())
-                                                       .cmp(&(rhs.file_type().unwrap().is_file(), rhs.file_name().to_str().unwrap().to_lowercase()))
-                                               })
-                                               .fold("".to_string(), |cur, f| {
+        let resp = html_response(DIRECTORY_LISTING_HTML,
+                                 &[&relpath,
+                                   &if self.temp_directory.is_some() {
+                                       r#"<script type="text/javascript">{drag_drop}</script>"#.to_string()
+                                   } else {
+                                       String::new()
+                                   },
+                                   &if &req.url.path() == &[""] {
+                                       String::new()
+                                   } else {
+                                       format!("<tr><td><a href=\"../\"><img id=\"parent_dir\" src=\"{{back_arrow_icon}}\"></img></a></td> <td><a \
+                                                href=\"../\">Parent directory</a></td> <td>{}</td> <td></td></tr>",
+                                               strftime("%F %T", &file_time_modified(req_p.parent().unwrap())).unwrap())
+                                   },
+                                   &req_p.read_dir()
+                                       .unwrap()
+                                       .map(Result::unwrap)
+                                       .filter(|f| self.follow_symlinks || !is_symlink(f.path()))
+                                       .sorted_by(|lhs, rhs| {
+                                           (lhs.file_type().unwrap().is_file(), lhs.file_name().to_str().unwrap().to_lowercase())
+                                               .cmp(&(rhs.file_type().unwrap().is_file(), rhs.file_name().to_str().unwrap().to_lowercase()))
+                                       })
+                                       .fold("".to_string(), |cur, f| {
                 let url = format!("/{}", relpath).replace("//", "/");
                 let is_file = f.file_type().unwrap().is_file();
                 let path = f.path();
@@ -214,7 +211,13 @@ impl HttpHandler {
                         } else {
                             String::new()
                         })
-            })]))))
+            })]);
+        if let Some(encoding) = req.headers.get_mut::<headers::AcceptEncoding>().and_then(|es| response_encoding(&mut **es)) {
+            println!("{:#?} => {}", encoding, resp.len());
+            Ok(Response::with((status::Ok, Header(headers::Server(USER_AGENT.to_string())), "text/html;charset=utf-8".parse::<mime::Mime>().unwrap(), resp)))
+        } else {
+            Ok(Response::with((status::Ok, Header(headers::Server(USER_AGENT.to_string())), "text/html;charset=utf-8".parse::<mime::Mime>().unwrap(), resp)))
+        }
     }
 
     fn handle_put(&self, req: &mut Request) -> IronResult<Response> {
