@@ -8,12 +8,13 @@ use std::f64;
 use std::cmp;
 use iron::Url;
 use std::fs::File;
+use hyper::Client;
 use std::path::Path;
 use std::borrow::Cow;
 use url::percent_encoding;
 use std::collections::HashMap;
 use time::{self, Duration, Tm};
-use std::io::{BufReader, BufRead};
+use std::io::{BufReader, BufRead, Read};
 use mime_guess::get_mime_type_str;
 
 pub use self::content_encoding::*;
@@ -122,6 +123,15 @@ pub fn file_binary<P: AsRef<Path>>(path: P) -> bool {
 pub fn html_response<S: AsRef<str>>(data: &str, format_strings: &[S]) -> String {
     ASSETS.iter().fold(format_strings.iter().enumerate().fold(data.to_string(), |d, (i, s)| d.replace(&format!("{{{}}}", i), s.as_ref())),
                        |d, (k, v)| d.replace(&format!("{{{}}}", k), v))
+}
+
+/// Get the response body from the provided URL.
+pub fn response_body(url: &str) -> Option<String> {
+    Client::new().get(url).send().ok().map(|mut r| {
+        let mut body = String::new();
+        r.read_to_string(&mut body).unwrap();
+        body
+    })
 }
 
 /// Return the path part of the URL.
