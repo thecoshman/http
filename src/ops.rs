@@ -8,8 +8,8 @@ use iron::modifiers::Header;
 use self::super::{Options, Error};
 use mime_guess::guess_mime_type_opt;
 use iron::{headers, status, method, mime, IronResult, Listening, Response, TypeMap, Request, Handler, Iron};
-use self::super::util::{url_path, is_symlink, html_response, file_binary, percent_decode, response_encoding, detect_file_as_dir, file_time_modified,
-                        human_readable_size, USER_AGENT, ERROR_HTML, INDEX_EXTENSIONS, DIRECTORY_LISTING_HTML};
+use self::super::util::{url_path, is_symlink, encode_str, html_response, file_binary, percent_decode, response_encoding, detect_file_as_dir,
+                        file_time_modified, human_readable_size, USER_AGENT, ERROR_HTML, INDEX_EXTENSIONS, DIRECTORY_LISTING_HTML};
 
 
 #[derive(Clone, Hash, Ord, PartialOrd, Eq, PartialEq)]
@@ -79,19 +79,19 @@ impl HttpHandler {
                  req.url,
                  cause.replace("<p>", "").replace("</p>", ""));
 
-        Ok(Response::with((status::BadRequest,
-                           Header(headers::Server(USER_AGENT.to_string())),
-                           "text/html;charset=utf-8".parse::<mime::Mime>().unwrap(),
-                           html_response(ERROR_HTML, &["400 Bad Request", "The request URL was invalid.", cause]))))
+
+        self.handle_generated_response_encoding(req,
+                                                status::BadRequest,
+                                                html_response(ERROR_HTML, &["400 Bad Request", "The request URL was invalid.", cause]))
     }
 
     fn handle_nonexistant(&self, req: &mut Request, req_p: PathBuf) -> IronResult<Response> {
         println!("{} requested to {} nonexistant entity {}", req.remote_addr, req.method, req_p.display());
-        Ok(Response::with((status::NotFound,
-                           Header(headers::Server(USER_AGENT.to_string())),
-                           "text/html;charset=utf-8".parse::<mime::Mime>().unwrap(),
-                           html_response(ERROR_HTML,
-                                         &["404 Not Found", &format!("The requested entity \"{}\" doesn't exist.", url_path(&req.url)), ""]))))
+        let url_p = url_path(&req.url);
+        self.handle_generated_response_encoding(req,
+                                                status::NotFound,
+                                                html_response(ERROR_HTML,
+                                                              &["404 Not Found", &format!("The requested entity \"{}\" doesn't exist.", url_p), ""]))
     }
 
     fn handle_get_file(&self, req: &mut Request, req_p: PathBuf) -> IronResult<Response> {
@@ -146,30 +146,35 @@ impl HttpHandler {
 
     fn handle_get_dir_listing(&self, req: &mut Request, req_p: PathBuf) -> IronResult<Response> {
         let relpath = (url_path(&req.url) + "/").replace("//", "/");
+        let is_root = &req.url.path() == &[""];
         println!("{} was served directory listing for {}", req.remote_addr, req_p.display());
-        let resp = html_response(DIRECTORY_LISTING_HTML,
-                                 &[&relpath,
-                                   &if self.temp_directory.is_some() {
-                                       r#"<script type="text/javascript">{drag_drop}</script>"#.to_string()
-                                   } else {
-                                       String::new()
-                                   },
-                                   &if &req.url.path() == &[""] {
-                                       String::new()
-                                   } else {
-                                       format!("<tr><td><a href=\"../\"><img id=\"parent_dir\" src=\"{{back_arrow_icon}}\"></img></a></td> <td><a \
-                                                href=\"../\">Parent directory</a></td> <td>{}</td> <td></td></tr>",
-                                               strftime("%F %T", &file_time_modified(req_p.parent().unwrap())).unwrap())
-                                   },
-                                   &req_p.read_dir()
-                                       .unwrap()
-                                       .map(Result::unwrap)
-                                       .filter(|f| self.follow_symlinks || !is_symlink(f.path()))
-                                       .sorted_by(|lhs, rhs| {
-                                           (lhs.file_type().unwrap().is_file(), lhs.file_name().to_str().unwrap().to_lowercase())
-                                               .cmp(&(rhs.file_type().unwrap().is_file(), rhs.file_name().to_str().unwrap().to_lowercase()))
-                                       })
-                                       .fold("".to_string(), |cur, f| {
+        self.handle_generated_response_encoding(req,
+                                                status::Ok,
+                                                html_response(DIRECTORY_LISTING_HTML,
+                                                              &[&relpath,
+                                                                &if self.temp_directory.is_some() {
+                                                                    r#"<script type="text/javascript">{drag_drop}</script>"#.to_string()
+                                                                } else {
+                                                                    String::new()
+                                                                },
+                                                                &if is_root {
+                                                                    String::new()
+                                                                } else {
+                                                                    format!("<tr><td><a href=\"../\"><img id=\"parent_dir\" \
+                                                                             src=\"{{back_arrow_icon}}\"></img></a></td> <td><a href=\"../\">Parent \
+                                                                             directory</a></td> <td>{}</td> <td></td></tr>",
+                                                                            strftime("%F %T", &file_time_modified(req_p.parent().unwrap())).unwrap())
+                                                                },
+                                                                &req_p.read_dir()
+                                                                    .unwrap()
+                                                                    .map(Result::unwrap)
+                                                                    .filter(|f| self.follow_symlinks || !is_symlink(f.path()))
+                                                                    .sorted_by(|lhs, rhs| {
+                                                                        (lhs.file_type().unwrap().is_file(), lhs.file_name().to_str().unwrap().to_lowercase())
+                                                                            .cmp(&(rhs.file_type().unwrap().is_file(),
+                                                                                   rhs.file_name().to_str().unwrap().to_lowercase()))
+                                                                    })
+                                                                    .fold("".to_string(), |cur, f| {
                 let url = format!("/{}", relpath).replace("//", "/");
                 let is_file = f.file_type().unwrap().is_file();
                 let path = f.path();
@@ -211,13 +216,7 @@ impl HttpHandler {
                         } else {
                             String::new()
                         })
-            })]);
-        if let Some(encoding) = req.headers.get_mut::<headers::AcceptEncoding>().and_then(|es| response_encoding(&mut **es)) {
-            println!("{:#?} => {}", encoding, resp.len());
-            Ok(Response::with((status::Ok, Header(headers::Server(USER_AGENT.to_string())), "text/html;charset=utf-8".parse::<mime::Mime>().unwrap(), resp)))
-        } else {
-            Ok(Response::with((status::Ok, Header(headers::Server(USER_AGENT.to_string())), "text/html;charset=utf-8".parse::<mime::Mime>().unwrap(), resp)))
-        }
+            })]))
     }
 
     fn handle_put(&self, req: &mut Request) -> IronResult<Response> {
@@ -355,29 +354,46 @@ impl HttpHandler {
 
     fn handle_forbidden_method(&self, req: &mut Request, switch: &str, desc: &str) -> IronResult<Response> {
         println!("{} used disabled request method {} grouped under {}", req.remote_addr, req.method, desc);
-        Ok(Response::with((status::Forbidden,
-                           Header(headers::Server(USER_AGENT.to_string())),
-                           "text/html;charset=utf-8".parse::<mime::Mime>().unwrap(),
-                           html_response(ERROR_HTML,
-                                         &["403 Forbidden",
-                                           "This feature is currently disabled.",
-                                           &format!("<p>Ask the server administrator to pass <samp>{}</samp> \
-                                                        to the executable to enable support for {}.</p>",
-                                                    switch,
-                                                    desc)]))))
+        self.handle_generated_response_encoding(req,
+                                                status::Forbidden,
+                                                html_response(ERROR_HTML,
+                                                              &["403 Forbidden",
+                                                                "This feature is currently disabled.",
+                                                                &format!("<p>Ask the server administrator to pass <samp>{}</samp> to the executable to \
+                                                                          enable support for {}.</p>",
+                                                                         switch,
+                                                                         desc)]))
     }
 
     fn handle_bad_method(&self, req: &mut Request) -> IronResult<Response> {
         println!("{} used invalid request method {}", req.remote_addr, req.method);
-        Ok(Response::with((status::NotImplemented,
-                           Header(headers::Server(USER_AGENT.to_string())),
-                           "text/html;charset=utf-8".parse::<mime::Mime>().unwrap(),
-                           html_response(ERROR_HTML,
-                                         &["501 Not Implemented",
-                                           "This operation was not implemented.",
-                                           &format!("<p>Unsupported request method: {}.<br />\n\
-                                                     Supported methods: OPTIONS, GET, PUT, DELETE, HEAD and TRACE.</p>",
-                                                    req.method)]))))
+        let last_p = format!("<p>Unsupported request method: {}.<br />\nSupported methods: OPTIONS, GET, PUT, DELETE, HEAD and TRACE.</p>",
+                             req.method);
+        self.handle_generated_response_encoding(req,
+                                                status::NotImplemented,
+                                                html_response(ERROR_HTML, &["501 Not Implemented", "This operation was not implemented.", &last_p]))
+    }
+
+    fn handle_generated_response_encoding(&self, req: &mut Request, st: status::Status, resp: String) -> IronResult<Response> {
+        if let Some(encoding) = req.headers.get_mut::<headers::AcceptEncoding>().and_then(|es| response_encoding(&mut **es)) {
+            if let Some(enc_resp) = encode_str(&resp, &encoding) {
+                println!("{} encoded as {} for {:.1}% ratio",
+                         iter::repeat(' ').take(req.remote_addr.to_string().len()).collect::<String>(),
+                         encoding,
+                         ((resp.len() as f64) / (enc_resp.len() as f64)) * 100f64);
+                return Ok(Response::with((st,
+                                          Header(headers::Server(USER_AGENT.to_string())),
+                                          Header(headers::ContentEncoding(vec![encoding])),
+                                          "text/html;charset=utf-8".parse::<mime::Mime>().unwrap(),
+                                          enc_resp)));
+            } else {
+                println!("{} failed to encode as {}, sending identity",
+                         iter::repeat(' ').take(req.remote_addr.to_string().len()).collect::<String>(),
+                         encoding);
+            }
+        }
+
+        Ok(Response::with((st, Header(headers::Server(USER_AGENT.to_string())), "text/html;charset=utf-8".parse::<mime::Mime>().unwrap(), resp)))
     }
 
     fn parse_requested_path(&self, req: &Request) -> (PathBuf, bool, bool) {

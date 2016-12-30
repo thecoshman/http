@@ -26,6 +26,7 @@ pub static ERROR_HTML: &'static str = include_str!("../../assets/error.html");
 pub static DIRECTORY_LISTING_HTML: &'static str = include_str!("../../assets/directory_listing.html");
 
 lazy_static! {
+    /// Collection of data to be injected into generated responses.
     pub static ref ASSETS: HashMap<&'static str, Cow<'static, str>> = {
         let mut ass = HashMap::with_capacity(1);
         ass.insert("favicon",
