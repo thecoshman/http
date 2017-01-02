@@ -1,10 +1,14 @@
+use md6;
 use std::io;
 use std::iter;
 use time::strftime;
+use std::sync::RwLock;
 use lazysort::SortedBy;
 use std::path::PathBuf;
 use std::fs::{self, File};
+use std::default::Default;
 use iron::modifiers::Header;
+use std::collections::HashMap;
 use self::super::{Options, Error};
 use mime_guess::guess_mime_type_opt;
 use iron::{headers, status, method, mime, IronResult, Listening, Response, TypeMap, Request, Handler, Iron};
@@ -12,12 +16,13 @@ use self::super::util::{url_path, is_symlink, encode_str, html_response, file_bi
                         file_time_modified, human_readable_size, USER_AGENT, ERROR_HTML, INDEX_EXTENSIONS, DIRECTORY_LISTING_HTML};
 
 
-#[derive(Clone, Hash, Ord, PartialOrd, Eq, PartialEq)]
 pub struct HttpHandler {
     pub hosted_directory: (String, PathBuf),
     pub follow_symlinks: bool,
     pub temp_directory: Option<(String, PathBuf)>,
     pub check_indices: bool,
+    // TODO: ideally this String here would be Encoding instead but hyper is bad
+    cache: RwLock<HashMap<([u8; 32], String), Vec<u8>>>,
 }
 
 impl HttpHandler {
@@ -27,6 +32,7 @@ impl HttpHandler {
             follow_symlinks: opts.follow_symlinks,
             temp_directory: opts.temp_directory.clone(),
             check_indices: opts.check_indices,
+            cache: Default::default(),
         }
     }
 }
@@ -376,16 +382,38 @@ impl HttpHandler {
 
     fn handle_generated_response_encoding(&self, req: &mut Request, st: status::Status, resp: String) -> IronResult<Response> {
         if let Some(encoding) = req.headers.get_mut::<headers::AcceptEncoding>().and_then(|es| response_encoding(&mut **es)) {
+            let mut cache_key = ([0u8; 32], encoding.to_string());
+            md6::hash(256, resp.as_bytes(), &mut cache_key.0).unwrap();
+
+            {
+                if let Some(enc_resp) = self.cache.read().unwrap().get(&cache_key) {
+                    println!("{} encoded as {} for {:.1}% ratio (cached)",
+                             iter::repeat(' ').take(req.remote_addr.to_string().len()).collect::<String>(),
+                             encoding,
+                             ((resp.len() as f64) / (enc_resp.len() as f64)) * 100f64);
+
+                    return Ok(Response::with((st,
+                                              Header(headers::Server(USER_AGENT.to_string())),
+                                              Header(headers::ContentEncoding(vec![encoding])),
+                                              "text/html;charset=utf-8".parse::<mime::Mime>().unwrap(),
+                                              &enc_resp[..])));
+                }
+            }
+
             if let Some(enc_resp) = encode_str(&resp, &encoding) {
                 println!("{} encoded as {} for {:.1}% ratio",
                          iter::repeat(' ').take(req.remote_addr.to_string().len()).collect::<String>(),
                          encoding,
                          ((resp.len() as f64) / (enc_resp.len() as f64)) * 100f64);
+
+                let mut cache = self.cache.try_write().unwrap();
+                cache.insert(cache_key.clone(), enc_resp);
+
                 return Ok(Response::with((st,
                                           Header(headers::Server(USER_AGENT.to_string())),
                                           Header(headers::ContentEncoding(vec![encoding])),
                                           "text/html;charset=utf-8".parse::<mime::Mime>().unwrap(),
-                                          enc_resp)));
+                                          &cache[&cache_key][..])));
             } else {
                 println!("{} failed to encode as {}, sending identity",
                          iter::repeat(' ').take(req.remote_addr.to_string().len()).collect::<String>(),
@@ -417,6 +445,18 @@ impl HttpHandler {
         let &(ref temp_name, ref temp_dir) = self.temp_directory.as_ref().unwrap();
         if !temp_dir.exists() && fs::create_dir_all(&temp_dir).is_ok() {
             println!("Created temp dir {}", temp_name);
+        }
+    }
+}
+
+impl Clone for HttpHandler {
+    fn clone(&self) -> HttpHandler {
+        HttpHandler {
+            hosted_directory: self.hosted_directory.clone(),
+            follow_symlinks: self.follow_symlinks,
+            temp_directory: self.temp_directory.clone(),
+            check_indices: self.check_indices,
+            cache: Default::default(),
         }
     }
 }

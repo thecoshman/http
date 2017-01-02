@@ -1,8 +1,8 @@
 use brotli2::stream::{CompressMode as BrotliCompressMode, CompressParams as BrotliCompressParams};
 use flate2::write::{DeflateEncoder, GzEncoder};
 use flate2::Compression as Flate2Compression;
-use bzip2::Compression as BzCompression;
 use iron::headers::{QualityItem, Encoding};
+use bzip2::Compression as BzCompression;
 use brotli2::write::BrotliEncoder;
 use bzip2::write::BzEncoder;
 use std::io::Write;

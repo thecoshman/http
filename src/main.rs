@@ -11,6 +11,7 @@ extern crate clap;
 extern crate iron;
 extern crate time;
 extern crate url;
+extern crate md6;
 
 mod error;
 mod options;
