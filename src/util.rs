@@ -131,9 +131,14 @@ pub fn html_response<S: AsRef<str>>(data: &str, format_strings: &[S]) -> String 
 /// assert_eq!(url_path(&url), "capitalism/русский/");
 /// ```
 pub fn url_path(url: &Url) -> String {
-    url.path().into_iter().fold("".to_string(),
-                                |cur, pp| format!("{}/{}", cur, percent_decode(pp).unwrap_or(Cow::Borrowed("<incorrect UTF8>"))))[1..]
-        .to_string()
+    let path = url.path();
+    if path == [""] {
+        "/".to_string()
+    } else {
+        path.into_iter().fold("".to_string(),
+                              |cur, pp| format!("{}/{}", cur, percent_decode(pp).unwrap_or(Cow::Borrowed("<incorrect UTF8>"))))[1..]
+            .to_string()
+    }
 }
 
 /// Decode a percent-encoded string (like a part of a URL).
