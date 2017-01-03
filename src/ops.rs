@@ -268,26 +268,25 @@ impl HttpHandler {
                  tpe,
                  allowed_s);
 
-        Ok(Response::with((status::MethodNotAllowed,
-                           Header(headers::Server(USER_AGENT.to_string())),
-                           Header(headers::Allow(allowed.to_vec())),
-                           "text/html;charset=utf-8".parse::<mime::Mime>().unwrap(),
-                           html_response(ERROR_HTML,
-                                         &["405 Method Not Allowed",
-                                           &format!("Can't {} on a {}.", req.method, tpe),
-                                           &format!("<p>Allowed methods: {}</p>", allowed_s)]))))
+        let resp_text =
+            html_response(ERROR_HTML,
+                          &["405 Method Not Allowed", &format!("Can't {} on a {}.", req.method, tpe), &format!("<p>Allowed methods: {}</p>", allowed_s)]);
+        self.handle_generated_response_encoding(req, status::MethodNotAllowed, resp_text)
+            .map(|mut r| {
+                r.headers.set(headers::Allow(allowed.to_vec()));
+                r
+            })
     }
 
     fn handle_put_partial_content(&self, req: &mut Request) -> IronResult<Response> {
         println!("{} tried to PUT partial content to {}", req.remote_addr, url_path(&req.url));
-        Ok(Response::with((status::BadRequest,
-                           Header(headers::Server(USER_AGENT.to_string())),
-                           "text/html;charset=utf-8".parse::<mime::Mime>().unwrap(),
-                           html_response(ERROR_HTML,
-                                         &["400 Bad Request",
-                                           "<a href=\"https://tools.ietf.org/html/rfc7231#section-4.3.3\">RFC7231 forbids partial-content PUT \
-                                            requests.</a>",
-                                           ""]))))
+        self.handle_generated_response_encoding(req,
+                                                status::BadRequest,
+                                                html_response(ERROR_HTML,
+                                                              &["400 Bad Request",
+                                                                "<a href=\"https://tools.ietf.org/html/rfc7231#section-4.3.3\">RFC7231 forbids \
+                                                                 partial-content PUT requests.</a>",
+                                                                ""]))
     }
 
     fn handle_put_file(&self, req: &mut Request, req_p: PathBuf) -> IronResult<Response> {
