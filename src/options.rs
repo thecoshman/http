@@ -31,6 +31,8 @@ pub struct Options {
     pub temp_directory: Option<(String, PathBuf)>,
     /// Whether to check for index files in served directories before serving a listing. Default: true
     pub check_indices: bool,
+    /// Whether to allow write operations. Default: false
+    pub allow_writes: bool,
 }
 
 impl Options {
@@ -48,13 +50,14 @@ impl Options {
             .arg(Arg::from_usage("-i --no-indices 'Always generate dir listings even if index files are available. Default: false'"))
             .get_matches();
 
+        let w = matches.is_present("allow-write");
         let dir = matches.value_of("DIR").unwrap_or(".");
         let dir_pb = fs::canonicalize(dir).unwrap();
         Options {
             hosted_directory: (dir.to_string(), dir_pb.clone()),
             port: matches.value_of("port").map(u16::from_str).map(Result::unwrap),
             follow_symlinks: matches.is_present("follow-symlinks"),
-            temp_directory: if matches.is_present("allow-write") {
+            temp_directory: if w {
                 let (temp_s, temp_pb) = if let Some(tmpdir) = matches.value_of("temp-dir") {
                     (tmpdir.to_string(), fs::canonicalize(tmpdir).unwrap())
                 } else {
@@ -76,6 +79,7 @@ impl Options {
                 None
             },
             check_indices: !matches.is_present("no-indices"),
+            allow_writes: w,
         }
     }
 

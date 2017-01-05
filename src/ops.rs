@@ -21,6 +21,7 @@ pub struct HttpHandler {
     pub follow_symlinks: bool,
     pub temp_directory: Option<(String, PathBuf)>,
     pub check_indices: bool,
+    pub allow_writes: bool,
     // TODO: ideally this String here would be Encoding instead but hyper is bad
     cache: RwLock<HashMap<([u8; 32], String), Vec<u8>>>,
 }
@@ -32,6 +33,7 @@ impl HttpHandler {
             follow_symlinks: opts.follow_symlinks,
             temp_directory: opts.temp_directory.clone(),
             check_indices: opts.check_indices,
+            allow_writes: opts.allow_writes,
             cache: Default::default(),
         }
     }
@@ -226,7 +228,7 @@ impl HttpHandler {
     }
 
     fn handle_put(&self, req: &mut Request) -> IronResult<Response> {
-        if self.temp_directory.is_none() {
+        if !self.allow_writes {
             return self.handle_forbidden_method(req, "-w", "write requests");
         }
 
@@ -313,7 +315,7 @@ impl HttpHandler {
     }
 
     fn handle_delete(&self, req: &mut Request) -> IronResult<Response> {
-        if self.temp_directory.is_none() {
+        if !self.allow_writes {
             return self.handle_forbidden_method(req, "-w", "write requests");
         }
 
@@ -455,6 +457,7 @@ impl Clone for HttpHandler {
             follow_symlinks: self.follow_symlinks,
             temp_directory: self.temp_directory.clone(),
             check_indices: self.check_indices,
+            allow_writes: self.allow_writes,
             cache: Default::default(),
         }
     }
