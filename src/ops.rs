@@ -2,6 +2,7 @@ use md6;
 use std::io;
 use std::iter;
 use time::strftime;
+use iron::mime::Mime;
 use std::sync::RwLock;
 use lazysort::SortedBy;
 use std::path::PathBuf;
@@ -13,7 +14,7 @@ use self::super::{Options, Error};
 use mime_guess::guess_mime_type_opt;
 use iron::{headers, status, method, mime, IronResult, Listening, Response, TypeMap, Request, Handler, Iron};
 use self::super::util::{url_path, is_symlink, encode_str, html_response, file_binary, percent_decode, response_encoding, detect_file_as_dir,
-                        file_time_modified, human_readable_size, USER_AGENT, ERROR_HTML, INDEX_EXTENSIONS, DIRECTORY_LISTING_HTML};
+                        file_time_modified, human_readable_size, USER_AGENT, ERROR_HTML, INDEX_EXTENSIONS, MIN_ENCODING_SIZE, DIRECTORY_LISTING_HTML};
 
 
 pub struct HttpHandler {
@@ -22,6 +23,7 @@ pub struct HttpHandler {
     pub temp_directory: Option<(String, PathBuf)>,
     pub check_indices: bool,
     pub allow_writes: bool,
+    pub encode_fs: bool,
     // TODO: ideally this String here would be Encoding instead but hyper is bad
     cache: RwLock<HashMap<([u8; 32], String), Vec<u8>>>,
 }
@@ -34,6 +36,7 @@ impl HttpHandler {
             temp_directory: opts.temp_directory.clone(),
             check_indices: opts.check_indices,
             allow_writes: opts.allow_writes,
+            encode_fs: opts.encode_fs,
             cache: Default::default(),
         }
     }
@@ -109,10 +112,23 @@ impl HttpHandler {
             "text/plain".parse().unwrap()
         });
         println!("{} was served file {} as {}", req.remote_addr, req_p.display(), mime_type);
+
+        if self.encode_fs && req_p.metadata().unwrap().len() > MIN_ENCODING_SIZE {
+            self.handle_get_file_encoded(req, req_p, mime_type)
+        } else {
+            Ok(Response::with((status::Ok,
+                               Header(headers::Server(USER_AGENT.to_string())),
+                               Header(headers::LastModified(headers::HttpDate(file_time_modified(&req_p)))),
+                               mime_type,
+                               req_p)))
+        }
+    }
+
+    fn handle_get_file_encoded(&self, req: &mut Request, req_p: PathBuf, mt: Mime) -> IronResult<Response> {
         Ok(Response::with((status::Ok,
                            Header(headers::Server(USER_AGENT.to_string())),
                            Header(headers::LastModified(headers::HttpDate(file_time_modified(&req_p)))),
-                           mime_type,
+                           mt,
                            req_p)))
     }
 
@@ -458,6 +474,7 @@ impl Clone for HttpHandler {
             temp_directory: self.temp_directory.clone(),
             check_indices: self.check_indices,
             allow_writes: self.allow_writes,
+            encode_fs: self.encode_fs,
             cache: Default::default(),
         }
     }

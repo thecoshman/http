@@ -33,6 +33,8 @@ pub struct Options {
     pub check_indices: bool,
     /// Whether to allow write operations. Default: false
     pub allow_writes: bool,
+    /// Whether to encode filesystem files. Default: true
+    pub encode_fs: bool,
 }
 
 impl Options {
@@ -48,16 +50,18 @@ impl Options {
             .arg(Arg::from_usage("-s --follow-symlinks 'Follow symlinks. Default: false'"))
             .arg(Arg::from_usage("-w --allow-write 'Allow for write operations. Default: false'"))
             .arg(Arg::from_usage("-i --no-indices 'Always generate dir listings even if index files are available. Default: false'"))
+            .arg(Arg::from_usage("-e --no-encode 'Do not encode filesystem files. Default: false'"))
             .get_matches();
 
         let w = matches.is_present("allow-write");
+        let e = !matches.is_present("no-encode");
         let dir = matches.value_of("DIR").unwrap_or(".");
         let dir_pb = fs::canonicalize(dir).unwrap();
         Options {
             hosted_directory: (dir.to_string(), dir_pb.clone()),
             port: matches.value_of("port").map(u16::from_str).map(Result::unwrap),
             follow_symlinks: matches.is_present("follow-symlinks"),
-            temp_directory: if w {
+            temp_directory: if w || e {
                 let (temp_s, temp_pb) = if let Some(tmpdir) = matches.value_of("temp-dir") {
                     (tmpdir.to_string(), fs::canonicalize(tmpdir).unwrap())
                 } else {
@@ -80,6 +84,7 @@ impl Options {
             },
             check_indices: !matches.is_present("no-indices"),
             allow_writes: w,
+            encode_fs: e,
         }
     }
 

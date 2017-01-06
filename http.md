@@ -36,7 +36,7 @@ pass parameters like what port to use.
 
     Temporary directory to use to store data to write.
 
-    Only matters if --allow-write is also specified.
+    Only matters if --allow-write is also specified or --no-encode is not.
 
     Default: $TEMP.
 
@@ -65,6 +65,15 @@ pass parameters like what port to use.
     index file.
 
     This is false by default because it's most likely for debugging purposes.
+
+  -e --no-encode
+
+    Do not encode filesystem files.
+
+    Encoded files are stored in the temp directory rather than being kept in
+    memory.
+
+    This is false by default because it's useful for reducing bandwidth usage.
 
 ## EXAMPLES
 
