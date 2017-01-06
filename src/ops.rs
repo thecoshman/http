@@ -13,8 +13,9 @@ use std::collections::HashMap;
 use self::super::{Options, Error};
 use mime_guess::guess_mime_type_opt;
 use iron::{headers, status, method, mime, IronResult, Listening, Response, TypeMap, Request, Handler, Iron};
-use self::super::util::{url_path, is_symlink, encode_str, html_response, file_binary, percent_decode, response_encoding, detect_file_as_dir,
-                        file_time_modified, human_readable_size, USER_AGENT, ERROR_HTML, INDEX_EXTENSIONS, MIN_ENCODING_SIZE, DIRECTORY_LISTING_HTML};
+use self::super::util::{url_path, file_hash, is_symlink, encode_str, encode_file, hash_string, html_response, file_binary, percent_decode, response_encoding,
+                        detect_file_as_dir, encoding_extension, file_time_modified, human_readable_size, USER_AGENT, ERROR_HTML, INDEX_EXTENSIONS,
+                        MIN_ENCODING_SIZE, DIRECTORY_LISTING_HTML};
 
 
 pub struct HttpHandler {
@@ -25,7 +26,8 @@ pub struct HttpHandler {
     pub allow_writes: bool,
     pub encode_fs: bool,
     // TODO: ideally this String here would be Encoding instead but hyper is bad
-    cache: RwLock<HashMap<([u8; 32], String), Vec<u8>>>,
+    cache_gen: RwLock<HashMap<([u8; 32], String), Vec<u8>>>,
+    cache_fs: RwLock<HashMap<([u8; 32], String), PathBuf>>,
 }
 
 impl HttpHandler {
@@ -37,7 +39,8 @@ impl HttpHandler {
             check_indices: opts.check_indices,
             allow_writes: opts.allow_writes,
             encode_fs: opts.encode_fs,
-            cache: Default::default(),
+            cache_gen: Default::default(),
+            cache_fs: Default::default(),
         }
     }
 }
@@ -119,17 +122,65 @@ impl HttpHandler {
             Ok(Response::with((status::Ok,
                                Header(headers::Server(USER_AGENT.to_string())),
                                Header(headers::LastModified(headers::HttpDate(file_time_modified(&req_p)))),
-                               mime_type,
-                               req_p)))
+                               req_p,
+                               mime_type)))
         }
     }
 
     fn handle_get_file_encoded(&self, req: &mut Request, req_p: PathBuf, mt: Mime) -> IronResult<Response> {
+        if let Some(encoding) = req.headers.get_mut::<headers::AcceptEncoding>().and_then(|es| response_encoding(&mut **es)) {
+            self.create_temp_dir();
+            let cache_key = (file_hash(&req_p), encoding.to_string());
+
+            {
+                if let Some(resp_p) = self.cache_fs.read().unwrap().get(&cache_key) {
+                    println!("{} encoded as {} for {:.1}% ratio (cached)",
+                             iter::repeat(' ').take(req.remote_addr.to_string().len()).collect::<String>(),
+                             encoding,
+                             ((req_p.metadata().unwrap().len() as f64) / (resp_p.metadata().unwrap().len() as f64)) * 100f64);
+
+                    return Ok(Response::with((status::Ok,
+                                              Header(headers::Server(USER_AGENT.to_string())),
+                                              Header(headers::ContentEncoding(vec![encoding])),
+                                              resp_p.as_path(),
+                                              mt)));
+                }
+            }
+
+            let mut resp_p = self.temp_directory.as_ref().unwrap().1.join(hash_string(&cache_key.0));
+            match (req_p.extension(), encoding_extension(&encoding)) {
+                (Some(ext), Some(enc)) => resp_p.set_extension(format!("{}.{}", ext.to_str().unwrap_or("ext"), enc)),
+                (Some(ext), None) => resp_p.set_extension(format!("{}.{}", ext.to_str().unwrap_or("ext"), encoding)),
+                (None, Some(enc)) => resp_p.set_extension(enc),
+                (None, None) => resp_p.set_extension(format!("{}", encoding)),
+            };
+
+            if encode_file(&req_p, &resp_p, &encoding) {
+                println!("{} encoded as {} for {:.1}% ratio",
+                         iter::repeat(' ').take(req.remote_addr.to_string().len()).collect::<String>(),
+                         encoding,
+                         ((req_p.metadata().unwrap().len() as f64) / (resp_p.metadata().unwrap().len() as f64)) * 100f64);
+
+                let mut cache = self.cache_fs.write().unwrap();
+                cache.insert(cache_key, resp_p.clone());
+
+                return Ok(Response::with((status::Ok,
+                                          Header(headers::Server(USER_AGENT.to_string())),
+                                          Header(headers::ContentEncoding(vec![encoding])),
+                                          resp_p.as_path(),
+                                          mt)));
+            } else {
+                println!("{} failed to encode as {}, sending identity",
+                         iter::repeat(' ').take(req.remote_addr.to_string().len()).collect::<String>(),
+                         encoding);
+            }
+        }
+
         Ok(Response::with((status::Ok,
                            Header(headers::Server(USER_AGENT.to_string())),
                            Header(headers::LastModified(headers::HttpDate(file_time_modified(&req_p)))),
-                           mt,
-                           req_p)))
+                           req_p,
+                           mt)))
     }
 
     fn handle_get_dir(&self, req: &mut Request, req_p: PathBuf) -> IronResult<Response> {
@@ -403,7 +454,7 @@ impl HttpHandler {
             md6::hash(256, resp.as_bytes(), &mut cache_key.0).unwrap();
 
             {
-                if let Some(enc_resp) = self.cache.read().unwrap().get(&cache_key) {
+                if let Some(enc_resp) = self.cache_gen.read().unwrap().get(&cache_key) {
                     println!("{} encoded as {} for {:.1}% ratio (cached)",
                              iter::repeat(' ').take(req.remote_addr.to_string().len()).collect::<String>(),
                              encoding,
@@ -423,7 +474,7 @@ impl HttpHandler {
                          encoding,
                          ((resp.len() as f64) / (enc_resp.len() as f64)) * 100f64);
 
-                let mut cache = self.cache.try_write().unwrap();
+                let mut cache = self.cache_gen.write().unwrap();
                 cache.insert(cache_key.clone(), enc_resp);
 
                 return Ok(Response::with((st,
@@ -475,7 +526,8 @@ impl Clone for HttpHandler {
             check_indices: self.check_indices,
             allow_writes: self.allow_writes,
             encode_fs: self.encode_fs,
-            cache: Default::default(),
+            cache_gen: Default::default(),
+            cache_fs: Default::default(),
         }
     }
 }
