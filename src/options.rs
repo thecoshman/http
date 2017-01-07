@@ -11,7 +11,7 @@
 //! ```
 
 
-use clap::{AppSettings, App, Arg};
+use clap::{AppSettings, Arg};
 use std::path::PathBuf;
 use std::env::temp_dir;
 use std::str::FromStr;
@@ -36,11 +36,8 @@ pub struct Options {
 impl Options {
     /// Parse `env`-wide command-line arguments into an `Options` instance
     pub fn parse() -> Options {
-        let matches = App::new("http")
-            .version(crate_version!())
-            .author(crate_authors!())
+        let matches = app_from_crate!()
             .setting(AppSettings::ColoredHelp)
-            .about("Host These Things Please - a basic HTTP server for hosting a folder fast and simply")
             .arg(Arg::from_usage("[DIR] 'Directory to host. Default: current working directory'")
                 .validator(|s| Options::filesystem_dir_validator(s, "Directory to host")))
             .arg(Arg::from_usage("-p --port [port] 'Port to use. Default: first free port from 8000 up'").validator(Options::u16_validator))
