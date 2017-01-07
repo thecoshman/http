@@ -152,6 +152,11 @@ impl HttpHandler {
                            "text/html;charset=utf-8".parse::<mime::Mime>().unwrap(),
                            html_response(DIRECTORY_LISTING_HTML,
                                          &[&relpath,
+                                           &if self.temp_directory.is_some() {
+                                               r#"<script type="text/javascript">{drag_drop}</script>"#.to_string()
+                                           } else {
+                                               String::new()
+                                           },
                                            &if &req.url.path() == &[""] {
                                                String::new()
                                            } else {
