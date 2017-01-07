@@ -14,6 +14,7 @@ See [the manpage](http.md) for full list.
   * [x] Good symlink handling compatible with Windows
   * [x] Multitude of information in directory indices
   * [x] Serving index files like `index.{html,htm,shtml}` from directories (disableable via `-i` switch)
+  * [x] Drag&Drop to upload files (with `-w` specified)
 
 ## [Manpage](http.md)
 
