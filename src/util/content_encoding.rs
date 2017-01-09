@@ -31,7 +31,7 @@ pub fn response_encoding(requested: &mut [QualityItem<Encoding>]) -> Option<Enco
 
 /// Encode a string slice using a specified encoding or `None` if encoding failed or is not recognised.
 pub fn encode_str(dt: &str, enc: &Encoding) -> Option<Vec<u8>> {
-	type EncodeT = fn(&str) -> Option<Vec<u8>>;
+    type EncodeT = fn(&str) -> Option<Vec<u8>>;
     static STR_ENCODING_FNS: &'static [EncodeT] = &[encode_str_gzip, encode_str_deflate, encode_str_brotli, encode_str_bzip2];
 
     encoding_idx(enc).and_then(|fi| STR_ENCODING_FNS[fi](dt))
@@ -108,41 +108,31 @@ fn encoding_idx(enc: &Encoding) -> Option<usize> {
     }
 }
 
-macro_rules! encode_fn_flate2_write_iface {
-    ($str_fn_name:ident, $file_fn_name:ident, $enc_tp:ident) => {
+macro_rules! encode_fn {
+    ($str_fn_name:ident, $file_fn_name:ident, $enc_tp:ident, $comp_lvl:expr, $setup:expr) => {
         fn $str_fn_name(dt: &str) -> Option<Vec<u8>> {
-            let mut cmp = $enc_tp::new(Vec::new(), Flate2Compression::Default);
+            let mut cmp = $enc_tp::new(Vec::new(), $comp_lvl);
+            $setup(&mut cmp);
             cmp.write_all(dt.as_bytes()).ok().and_then(|_| cmp.finish().ok())
         }
 
         fn $file_fn_name(mut inf: File, outf: File) -> bool {
-            let mut cmp = $enc_tp::new(outf, Flate2Compression::Default);
+            let mut cmp = $enc_tp::new(outf, $comp_lvl);
+            $setup(&mut cmp);
             io::copy(&mut inf, &mut cmp).and_then(|_| cmp.finish()).is_ok()
         }
+    };
+
+    ($str_fn_name:ident, $file_fn_name:ident, $enc_tp:ident, $comp_lvl:expr) => {
+        encode_fn!($str_fn_name, $file_fn_name, $enc_tp, $comp_lvl, |_| ());
     }
 }
 
-encode_fn_flate2_write_iface!(encode_str_gzip, encode_file_gzip, GzEncoder);
-encode_fn_flate2_write_iface!(encode_str_deflate, encode_file_deflate, DeflateEncoder);
+encode_fn!(encode_str_gzip, encode_file_gzip, GzEncoder, Flate2Compression::Default);
+encode_fn!(encode_str_deflate, encode_file_deflate, DeflateEncoder, Flate2Compression::Default);
+encode_fn!(encode_str_brotli, encode_file_brotli, BrotliEncoder, 0, setup_brotli);
+encode_fn!(encode_str_bzip2, encode_file_bzip2, BzEncoder, BzCompression::Default);
 
-fn encode_str_brotli(dt: &str) -> Option<Vec<u8>> {
-    let mut cmp = BrotliEncoder::new(Vec::new(), 0);
+fn setup_brotli<W: Write>(cmp: &mut BrotliEncoder<W>) {
     cmp.set_params(BrotliCompressParams::new().mode(BrotliCompressMode::Text));
-    cmp.write_all(dt.as_bytes()).ok().and_then(|_| cmp.finish().ok())
-}
-
-fn encode_file_brotli(mut inf: File, outf: File) -> bool {
-    let mut cmp = BrotliEncoder::new(outf, 0);
-    cmp.set_params(BrotliCompressParams::new().mode(BrotliCompressMode::Text));
-    io::copy(&mut inf, &mut cmp).and_then(|_| cmp.finish()).is_ok()
-}
-
-fn encode_str_bzip2(dt: &str) -> Option<Vec<u8>> {
-    let mut cmp = BzEncoder::new(Vec::new(), BzCompression::Default);
-    cmp.write_all(dt.as_bytes()).ok().and_then(|_| cmp.finish().ok())
-}
-
-fn encode_file_bzip2(mut inf: File, outf: File) -> bool {
-    let mut cmp = BzEncoder::new(outf, BzCompression::Default);
-    io::copy(&mut inf, &mut cmp).and_then(|_| cmp.finish()).is_ok()
 }
