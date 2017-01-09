@@ -31,7 +31,8 @@ pub fn response_encoding(requested: &mut [QualityItem<Encoding>]) -> Option<Enco
 
 /// Encode a string slice using a specified encoding or `None` if encoding failed or is not recognised.
 pub fn encode_str(dt: &str, enc: &Encoding) -> Option<Vec<u8>> {
-    static STR_ENCODING_FNS: &'static [fn(&str) -> Option<Vec<u8>>] = &[encode_str_gzip, encode_str_deflate, encode_str_brotli, encode_str_bzip2];
+	type EncodeT = fn(&str) -> Option<Vec<u8>>;
+    static STR_ENCODING_FNS: &'static [EncodeT] = &[encode_str_gzip, encode_str_deflate, encode_str_brotli, encode_str_bzip2];
 
     encoding_idx(enc).and_then(|fi| STR_ENCODING_FNS[fi](dt))
 }
@@ -39,7 +40,8 @@ pub fn encode_str(dt: &str, enc: &Encoding) -> Option<Vec<u8>> {
 /// Encode the file denoted by the specified path into the file denoted by the specified path using a specified encoding or
 /// `false` if encoding failed, is not recognised or an I/O error occurred.
 pub fn encode_file(p: &Path, op: &Path, enc: &Encoding) -> bool {
-    static FILE_ENCODING_FNS: &'static [fn(File, File) -> bool] = &[encode_file_gzip, encode_file_deflate, encode_file_brotli, encode_file_bzip2];
+    type EncodeT = fn(File, File) -> bool;
+    static FILE_ENCODING_FNS: &'static [EncodeT] = &[encode_file_gzip, encode_file_deflate, encode_file_brotli, encode_file_bzip2];
 
     encoding_idx(enc)
         .map(|fi| {

@@ -18,6 +18,9 @@ use self::super::util::{url_path, file_hash, is_symlink, encode_str, encode_file
                         MIN_ENCODING_SIZE, DIRECTORY_LISTING_HTML};
 
 
+// TODO: ideally this String here would be Encoding instead but hyper is bad
+type CacheT<Cnt> = HashMap<([u8; 32], String), Cnt>;
+
 pub struct HttpHandler {
     pub hosted_directory: (String, PathBuf),
     pub follow_symlinks: bool,
@@ -25,9 +28,8 @@ pub struct HttpHandler {
     pub check_indices: bool,
     pub allow_writes: bool,
     pub encode_fs: bool,
-    // TODO: ideally this String here would be Encoding instead but hyper is bad
-    cache_gen: RwLock<HashMap<([u8; 32], String), Vec<u8>>>,
-    cache_fs: RwLock<HashMap<([u8; 32], String), PathBuf>>,
+    cache_gen: RwLock<CacheT<Vec<u8>>>,
+    cache_fs: RwLock<CacheT<PathBuf>>,
 }
 
 impl HttpHandler {
