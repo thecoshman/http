@@ -15,7 +15,7 @@ use mime_guess::guess_mime_type_opt;
 use iron::{headers, status, method, mime, IronResult, Listening, Response, TypeMap, Request, Handler, Iron};
 use self::super::util::{url_path, file_hash, is_symlink, encode_str, encode_file, hash_string, html_response, file_binary, percent_decode, response_encoding,
                         detect_file_as_dir, encoding_extension, file_time_modified, human_readable_size, USER_AGENT, ERROR_HTML, INDEX_EXTENSIONS,
-                        MIN_ENCODING_SIZE, DIRECTORY_LISTING_HTML};
+                        MAX_ENCODING_SIZE, MIN_ENCODING_SIZE, DIRECTORY_LISTING_HTML};
 
 
 // TODO: ideally this String here would be Encoding instead but hyper is bad
@@ -118,7 +118,8 @@ impl HttpHandler {
         });
         println!("{} was served file {} as {}", req.remote_addr, req_p.display(), mime_type);
 
-        if self.encode_fs && req_p.metadata().unwrap().len() > MIN_ENCODING_SIZE {
+        let flen = req_p.metadata().unwrap().len();
+        if self.encode_fs && flen > MIN_ENCODING_SIZE && flen < MAX_ENCODING_SIZE {
             self.handle_get_file_encoded(req, req_p, mime_type)
         } else {
             Ok(Response::with((status::Ok,
