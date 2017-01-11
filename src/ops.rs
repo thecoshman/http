@@ -309,7 +309,7 @@ impl HttpHandler {
                         fname,
                         fname,
                         if is_file { "" } else { "/" },
-                        strftime("%F %T", &file_time_modified(&path)).unwrap(),
+                        file_time_modified(&path).strftime("%F %T").unwrap(),
                         if is_file {
                             len.to_string()
                         } else {
