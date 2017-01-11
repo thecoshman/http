@@ -28,7 +28,7 @@ pub static DIRECTORY_LISTING_HTML: &'static str = include_str!("../../assets/dir
 lazy_static! {
     /// Collection of data to be injected into generated responses.
     pub static ref ASSETS: HashMap<&'static str, Cow<'static, str>> = {
-        let mut ass = HashMap::with_capacity(1);
+        let mut ass = HashMap::with_capacity(8);
         ass.insert("favicon",
             Cow::Owned(format!("data:{};base64,{}", get_mime_type_str("ico").unwrap(), base64::encode(include_bytes!("../../assets/favicon.ico")))));
         ass.insert("dir_icon",
