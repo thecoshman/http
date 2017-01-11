@@ -25,7 +25,7 @@ pub struct Options {
     pub hosted_directory: (String, PathBuf),
     /// The port to host on. Default: first free port from 8000 up
     pub port: Option<u16>,
-    /// Whether to allow symlinks to be requested. Default: false
+    /// Whether to allow symlinks to be requested. Default: true
     pub follow_symlinks: bool,
     /// The temp directory to write to before copying to hosted directory. Default: `None`
     pub temp_directory: Option<(String, PathBuf)>,
@@ -47,7 +47,7 @@ impl Options {
             .arg(Arg::from_usage("-p --port [port] 'Port to use. Default: first free port from 8000 up'").validator(Options::u16_validator))
             .arg(Arg::from_usage("-t --temp-dir [temp] 'Temporary directory. Default: $TEMP'")
                 .validator(|s| Options::filesystem_dir_validator(s, "Temporary directory")))
-            .arg(Arg::from_usage("-s --follow-symlinks 'Follow symlinks. Default: false'"))
+            .arg(Arg::from_usage("-s --no-follow-symlinks 'Don't follow symlinks. Default: false'"))
             .arg(Arg::from_usage("-w --allow-write 'Allow for write operations. Default: false'"))
             .arg(Arg::from_usage("-i --no-indices 'Always generate dir listings even if index files are available. Default: false'"))
             .arg(Arg::from_usage("-e --no-encode 'Do not encode filesystem files. Default: false'"))
@@ -60,7 +60,7 @@ impl Options {
         Options {
             hosted_directory: (dir.to_string(), dir_pb.clone()),
             port: matches.value_of("port").map(u16::from_str).map(Result::unwrap),
-            follow_symlinks: matches.is_present("follow-symlinks"),
+            follow_symlinks: !matches.is_present("no-follow-symlinks"),
             temp_directory: if w || e {
                 let (temp_s, temp_pb) = if let Some(tmpdir) = matches.value_of("temp-dir") {
                     (tmpdir.to_string(), fs::canonicalize(tmpdir).unwrap())

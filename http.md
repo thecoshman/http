@@ -40,15 +40,12 @@ pass parameters like what port to use.
 
     Default: $TEMP.
 
-  -s --follow-symlinks
+  -s --no-follow-symlinks
 
-    Follow symlinks when requesting file access.
+    Don't follow symlinks when requesting file access.
 
-    This is false by default because it is most likely a problem (according to
-    thecoshman anyway).
-
-    If a symlink is requested and this is not on it will be treated as if it
-    didn't exist.
+    If a symlink is requested and this is on it will be treated as if it didn't
+    exist.
 
   -w --allow-write
 
@@ -89,7 +86,7 @@ pass parameters like what port to use.
 
       127.0.0.1:47880 was served directory listing for \\?\P:\Rust\http
       127.0.0.1:47902 was served file \\?\P:\Rust\http\http.1.html as text/html
-      127.0.0.1:47916 requested to GET nonexistant entity S:\Rust-target\doc\main.css
+      127.0.0.1:47916 was served file S:\Rust-target\doc\main.css as text/css
       127.0.0.1:48049 asked for options
       127.0.0.1:47936 used disabled request method DELETE
       127.0.0.1:48222 used disabled request method PUT
@@ -109,10 +106,10 @@ pass parameters like what port to use.
 
   `http -s`
 
-    As in the first example, but follow symlinks.
+    As in the first example, but don't follow symlinks.
 
     Example output change:
-      127.0.0.1:47916 was served file S:\Rust-target\doc\main.css as text/css
+      127.0.0.1:47916 requested to GET nonexistant entity S:\Rust-target\doc\main.css
 
   `http -w`
 

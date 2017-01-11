@@ -5,9 +5,9 @@ Host These Things Please - a basic HTTP server for hosting a folder fast and sim
 
 See [the manpage](http.md) for full list.
 
-  * [x] Optional following of symlinks (`-s` option)
+  * [x] Symlinks followed by default (disableable via `-s` option)
   * [x] Index generation for directories
-  * [x] Sane defaults (like hosted dir (`.`) and port (forst free one from range `8000`-`9999`))
+  * [x] Sane defaults (like hosted dir (`.`) and port (first free one from range `8000`-`9999`))
   * [x] Correct MIME type for served files
   * [x] Handled request methods: OPTIONS, GET, PUT, DELETE, HEAD and TRACE ("writing" methods are off by default, enable via `-w` switch)
   * [x] Proper handling of percent-encoded URLs (like `асдф fdsa`)
@@ -23,7 +23,7 @@ See [the manpage](http.md) for full list.
 The idea is to make a program that can compile down to a simple binary that can be used via Linux CLI to quickly take the current directory and serve it over HTTP. Everything should have sensible defaults such that you do not *have* to pass parameters like what port to use.
 
   * [x] Sub directories would be automatically hosted.
-  * [x] Symlinks will not be followed by default (in my opinion, this is more likely to be a problem than an intended thing).
+  * [ ] Symlinks will not be followed by default (in my opinion, this is more likely to be a problem than an intended thing).
   * [x] Root should not be required.
   * [x] If an index file isn't provided, one will be generated (in memory, no touching the disk, why would you do that you dirty freak you), that will list the current files and folders (and then sub directories will have index files generated as required)
   * [x] Changes made to files should be reflected instantly, as I don't see why anything would be cached... you request a file, a file will be looked for
