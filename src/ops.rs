@@ -24,10 +24,9 @@ type CacheT<Cnt> = HashMap<([u8; 32], String), Cnt>;
 pub struct HttpHandler {
     pub hosted_directory: (String, PathBuf),
     pub follow_symlinks: bool,
-    pub temp_directory: Option<(String, PathBuf)>,
     pub check_indices: bool,
-    pub allow_writes: bool,
-    pub encode_fs: bool,
+    pub writes_temp_dir: Option<(String, PathBuf)>,
+    pub encoded_temp_dir: Option<(String, PathBuf)>,
     cache_gen: RwLock<CacheT<Vec<u8>>>,
     cache_fs: RwLock<CacheT<PathBuf>>,
 }
@@ -37,12 +36,28 @@ impl HttpHandler {
         HttpHandler {
             hosted_directory: opts.hosted_directory.clone(),
             follow_symlinks: opts.follow_symlinks,
-            temp_directory: opts.temp_directory.clone(),
             check_indices: opts.check_indices,
-            allow_writes: opts.allow_writes,
-            encode_fs: opts.encode_fs,
+            writes_temp_dir: HttpHandler::temp_subdir(&opts.temp_directory, opts.allow_writes, "writes"),
+            encoded_temp_dir: HttpHandler::temp_subdir(&opts.temp_directory, opts.encode_fs, "encoded"),
             cache_gen: Default::default(),
             cache_fs: Default::default(),
+        }
+    }
+
+    fn temp_subdir(td: &Option<(String, PathBuf)>, flag: bool, name: &str) -> Option<(String, PathBuf)> {
+        if flag && td.is_some() {
+            let &(ref temp_name, ref temp_dir) = td.as_ref().unwrap();
+            Some((format!("{}{}{}",
+                          temp_name,
+                          if temp_name.ends_with("/") || temp_name.ends_with(r"\") {
+                              ""
+                          } else {
+                              "/"
+                          },
+                          name),
+                  temp_dir.join(name)))
+        } else {
+            None
         }
     }
 }
@@ -119,7 +134,7 @@ impl HttpHandler {
         println!("{} was served file {} as {}", req.remote_addr, req_p.display(), mime_type);
 
         let flen = req_p.metadata().unwrap().len();
-        if self.encode_fs && flen > MIN_ENCODING_SIZE && flen < MAX_ENCODING_SIZE {
+        if self.encoded_temp_dir.is_some() && flen > MIN_ENCODING_SIZE && flen < MAX_ENCODING_SIZE {
             self.handle_get_file_encoded(req, req_p, mime_type)
         } else {
             Ok(Response::with((status::Ok,
@@ -132,7 +147,7 @@ impl HttpHandler {
 
     fn handle_get_file_encoded(&self, req: &mut Request, req_p: PathBuf, mt: Mime) -> IronResult<Response> {
         if let Some(encoding) = req.headers.get_mut::<headers::AcceptEncoding>().and_then(|es| response_encoding(&mut **es)) {
-            self.create_temp_dir();
+            self.create_temp_dir(&self.encoded_temp_dir);
             let cache_key = (file_hash(&req_p), encoding.to_string());
 
             {
@@ -150,7 +165,7 @@ impl HttpHandler {
                 }
             }
 
-            let mut resp_p = self.temp_directory.as_ref().unwrap().1.join(hash_string(&cache_key.0));
+            let mut resp_p = self.encoded_temp_dir.as_ref().unwrap().1.join(hash_string(&cache_key.0));
             match (req_p.extension(), encoding_extension(&encoding)) {
                 (Some(ext), Some(enc)) => resp_p.set_extension(format!("{}.{}", ext.to_str().unwrap_or("ext"), enc)),
                 (Some(ext), None) => resp_p.set_extension(format!("{}.{}", ext.to_str().unwrap_or("ext"), encoding)),
@@ -230,7 +245,7 @@ impl HttpHandler {
                                                 status::Ok,
                                                 html_response(DIRECTORY_LISTING_HTML,
                                                               &[&relpath,
-                                                                &if self.temp_directory.is_some() {
+                                                                &if self.writes_temp_dir.is_some() {
                                                                     r#"<script type="text/javascript">{drag_drop}</script>"#.to_string()
                                                                 } else {
                                                                     String::new()
@@ -298,7 +313,7 @@ impl HttpHandler {
     }
 
     fn handle_put(&self, req: &mut Request) -> IronResult<Response> {
-        if !self.allow_writes {
+        if self.writes_temp_dir.is_none() {
             return self.handle_forbidden_method(req, "-w", "write requests");
         }
 
@@ -313,7 +328,7 @@ impl HttpHandler {
         } else if req.headers.has::<headers::ContentRange>() {
             self.handle_put_partial_content(req)
         } else {
-            self.create_temp_dir();
+            self.create_temp_dir(&self.writes_temp_dir);
             self.handle_put_file(req, req_p)
         }
     }
@@ -369,7 +384,7 @@ impl HttpHandler {
                  req_p.display(),
                  *req.headers.get::<headers::ContentLength>().unwrap());
 
-        let &(_, ref temp_dir) = self.temp_directory.as_ref().unwrap();
+        let &(_, ref temp_dir) = self.writes_temp_dir.as_ref().unwrap();
         let temp_file_p = temp_dir.join(req_p.file_name().unwrap());
 
         io::copy(&mut req.body, &mut File::create(&temp_file_p).unwrap()).unwrap();
@@ -385,7 +400,7 @@ impl HttpHandler {
     }
 
     fn handle_delete(&self, req: &mut Request) -> IronResult<Response> {
-        if !self.allow_writes {
+        if self.writes_temp_dir.is_none() {
             return self.handle_forbidden_method(req, "-w", "write requests");
         }
 
@@ -512,8 +527,8 @@ impl HttpHandler {
         })
     }
 
-    fn create_temp_dir(&self) {
-        let &(ref temp_name, ref temp_dir) = self.temp_directory.as_ref().unwrap();
+    fn create_temp_dir(&self, td: &Option<(String, PathBuf)>) {
+        let &(ref temp_name, ref temp_dir) = td.as_ref().unwrap();
         if !temp_dir.exists() && fs::create_dir_all(&temp_dir).is_ok() {
             println!("Created temp dir {}", temp_name);
         }
@@ -525,10 +540,9 @@ impl Clone for HttpHandler {
         HttpHandler {
             hosted_directory: self.hosted_directory.clone(),
             follow_symlinks: self.follow_symlinks,
-            temp_directory: self.temp_directory.clone(),
             check_indices: self.check_indices,
-            allow_writes: self.allow_writes,
-            encode_fs: self.encode_fs,
+            writes_temp_dir: self.writes_temp_dir.clone(),
+            encoded_temp_dir: self.encoded_temp_dir.clone(),
             cache_gen: Default::default(),
             cache_fs: Default::default(),
         }

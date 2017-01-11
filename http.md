@@ -127,8 +127,8 @@ pass parameters like what port to use.
       PUT /index.html with request body containing roughly 1MB of data
 
     Another behavioral change is that, in this case, the folder (and file)
-    named "T:/-=- TEMP -=-/http-P-Rust-http/" and
-    "T:/-=- TEMP -=-/http-P-Rust-http/index.html" were created while the file
+    named "T:/-=- TEMP -=-/http-P-Rust-http/writes/" and
+    "T:/-=- TEMP -=-/http-P-Rust-http/writes/index.html" were created while the file
     "P:\Rust\http\http.1.html" was deleted (also works on directories).
 
   `http -w -t "../TEMP"`
@@ -136,8 +136,8 @@ pass parameters like what port to use.
     As in the previous example, but use a different temp dir.
 
     Behavioral changes: the created folder and file are
-    named "P:/Rust/TEMP/http-P-Rust-http/" and
-    "P:/Rust/TEMP/http-P-Rust-http/index.html".
+    named "P:/Rust/TEMP/http-P-Rust-http/writes/" and
+    "P:/Rust/TEMP/http-P-Rust-http/writes/index.html".
 
   `http -p 6969`
 
