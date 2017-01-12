@@ -1,6 +1,7 @@
 #[macro_use]
 extern crate lazy_static;
 extern crate mime_guess;
+#[cfg(feature = "clipboard")]
 extern crate clipboard;
 extern crate lazysort;
 extern crate brotli2;
@@ -27,6 +28,7 @@ pub use options::Options;
 use iron::Iron;
 use std::io::stderr;
 use std::process::exit;
+#[cfg(feature = "clipboard")]
 use clipboard::ClipboardContext;
 
 
@@ -62,10 +64,13 @@ fn result_main() -> Result<(), Error> {
     });
 
     println!("Hosting \"{}\" on port {}...", opts.hosted_directory.0, responder.socket.port());
-    if let Some(self_ip) = util::response_body("https://api.ipify.org") {
-        if let Ok(mut clpbrd) = ClipboardContext::new() {
-            if clpbrd.set_contents(format!("{}:{}", self_ip, responder.socket.port())).is_ok() {
-                println!("Externally-accessible URL is in the clipboard.");
+    #[cfg(feature = "clipboard")]
+    {
+        if let Some(self_ip) = util::response_body("https://api.ipify.org") {
+            if let Ok(mut clpbrd) = ClipboardContext::new() {
+                if clpbrd.set_contents(format!("{}:{}", self_ip, responder.socket.port())).is_ok() {
+                    println!("Externally-accessible URL is in the clipboard.");
+                }
             }
         }
     }

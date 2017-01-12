@@ -4,13 +4,6 @@ cache:
   apt: true
   cargo: true
 
-addons:
-  apt:
-    packages:
-      - xorg-dev
-    sources:
-      - r-packages-precise
-
 matrix:
   include:
     - env: LANGUAGE=Rust DEPLOY=true DEPLOY_FILE="$TRAVIS_BUILD_DIR/../http-$TRAVIS_TAG"
@@ -34,13 +27,13 @@ install:
   - if [ "$LANGUAGE" == "Ruby" ]; then gem install ronn; fi
 
 script:
-  - if [ "$LANGUAGE" == "Rust" ]; then cargo build --verbose; fi
-  - if [ "$LANGUAGE" == "Rust" ]; then cargo test  --verbose; fi
+  - if [ "$LANGUAGE" == "Rust" ]; then cargo build --no-default-features --verbose; fi
+  - if [ "$LANGUAGE" == "Rust" ]; then cargo test  --no-default-features --verbose; fi
   -
-  - if [ "$LANGUAGE" == "Rust" ] && [ "$DEPLOY" ] && [ "$TRAVIS_TAG" ]; then cargo build --verbose --release; fi
+  - if [ "$LANGUAGE" == "Rust" ] && [ "$DEPLOY" ] && [ "$TRAVIS_TAG" ]; then cargo build --no-default-features --verbose --release; fi
   - if [ "$LANGUAGE" == "Rust" ] && [ "$CLIPPY" ]; then
       cargo install -f clippy;
-      cargo clippy;
+      cargo clippy --no-default-features;
     fi
   -
   - if [ "$LANGUAGE" == "Ruby" ]; then

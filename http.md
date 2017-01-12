@@ -15,6 +15,11 @@ be used via Linux CLI to quickly take the current directory and serve it over
 HTTP. Everything should have sensible defaults such that you do not *have* to
 pass parameters like what port to use.
 
+By default `http` is built with clipboard support -- it'll copy the
+externally-accessible URL to the clipboard, which requires the `xorg-dev`
+package on Linux. If, for some reason, that's inaccessible on your system,
+compile with `--no-default-features`.
+
 ## OPTIONS
 
   [DIR]
@@ -82,6 +87,7 @@ pass parameters like what port to use.
     Example output:
       p:\Rust\http> http
       Hosting "." on port 8000...
+      Externally-accessible URL is in the clipboard.
       Ctrl-C to stop.
 
       127.0.0.1:47880 was served directory listing for \\?\P:\Rust\http

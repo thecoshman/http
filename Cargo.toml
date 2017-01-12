@@ -13,7 +13,6 @@ authors = ["thecoshman <thecoshman@gmail.com>",
 [dependencies]
 lazy_static = "0.2"
 mime_guess = "1.8"
-clipboard = "0.1"
 lazysort = "0.1"
 brotli2 = "0.2"
 base64 = "0.2"
@@ -28,6 +27,13 @@ md6 = "1.1"
 [dependencies.iron]
 version = "0.4"
 features = ["ssl"]
+
+[dependencies.clipboard]
+version = "0.1"
+optional = true
+
+[features]
+default = ["clipboard"]
 
 
 [[bin]]
