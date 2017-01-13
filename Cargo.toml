@@ -24,6 +24,10 @@ time = "0.1"
 url = "1.2"
 md6 = "1.1"
 
+[dependencies.trivial_colours]
+version = "0.2"
+default-features = false
+
 
 [[bin]]
 name = "http"

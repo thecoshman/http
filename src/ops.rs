@@ -11,6 +11,7 @@ use iron::modifiers::Header;
 use std::collections::HashMap;
 use self::super::{Options, Error};
 use mime_guess::guess_mime_type_opt;
+use trivial_colours::{Reset as CReset, Colour as C};
 use iron::{headers, status, method, mime, IronResult, Listening, Response, TypeMap, Request, Handler, Iron};
 use self::super::util::{url_path, file_hash, is_symlink, encode_str, encode_file, hash_string, html_response, file_binary, percent_decode, response_encoding,
                         detect_file_as_dir, encoding_extension, file_time_modified, human_readable_size, USER_AGENT, ERROR_HTML, INDEX_EXTENSIONS,
@@ -19,11 +20,11 @@ use self::super::util::{url_path, file_hash, is_symlink, encode_str, encode_file
 
 macro_rules! log {
     ($fmt:expr) => {
-        print!("[{}] ", now().strftime("%F %T").unwrap());
+        print!("{}[{}]{} ", C::Cyan, now().strftime("%F %T").unwrap(), CReset);
         println!($fmt);
     };
     ($fmt:expr, $($arg:tt)*) => {
-        print!("[{}] ", now().strftime("%F %T").unwrap());
+        print!("{}[{}]{} ", C::Cyan, now().strftime("%F %T").unwrap(), CReset);
         println!($fmt, $($arg)*);
     };
 }
@@ -94,7 +95,7 @@ impl Handler for HttpHandler {
 
 impl HttpHandler {
     fn handle_options(&self, req: &mut Request) -> IronResult<Response> {
-        log!("{} asked for options", req.remote_addr);
+        log!("{}{}{} asked for {}OPTIONS{}", C::Green, req.remote_addr, CReset, C::Red, CReset);
         Ok(Response::with((status::NoContent,
                            Header(headers::Server(USER_AGENT.to_string())),
                            Header(headers::Allow(vec![method::Options, method::Get, method::Put, method::Delete, method::Head, method::Trace])))))
@@ -115,10 +116,16 @@ impl HttpHandler {
     }
 
     fn handle_invalid_url(&self, req: &mut Request, cause: &str) -> IronResult<Response> {
-        log!("{} requested to {} {} with invalid URL -- {}",
+        log!("{}{}{} requested to {}{}{} {}{}{} with invalid URL -- {}",
+             C::Green,
              req.remote_addr,
+             CReset,
+             C::Red,
              req.method,
+             CReset,
+             C::Yellow,
              req.url,
+             CReset,
              cause.replace("<p>", "").replace("</p>", ""));
 
 
@@ -128,7 +135,16 @@ impl HttpHandler {
     }
 
     fn handle_nonexistant(&self, req: &mut Request, req_p: PathBuf) -> IronResult<Response> {
-        log!("{} requested to {} nonexistant entity {}", req.remote_addr, req.method, req_p.display());
+        log!("{}{}{} requested to {}{}{} nonexistant entity {}{}{}",
+             C::Green,
+             req.remote_addr,
+             CReset,
+             C::Red,
+             req.method,
+             CReset,
+             C::Magenta,
+             req_p.display(),
+             CReset);
         let url_p = url_path(&req.url);
         self.handle_generated_response_encoding(req,
                                                 status::NotFound,
@@ -142,7 +158,16 @@ impl HttpHandler {
         } else {
             "text/plain".parse().unwrap()
         });
-        log!("{} was served file {} as {}", req.remote_addr, req_p.display(), mime_type);
+        log!("{}{}{} was served file {}{}{} as {}{}{}",
+             C::Green,
+             req.remote_addr,
+             CReset,
+             C::Magenta,
+             req_p.display(),
+             CReset,
+             C::Blue,
+             mime_type,
+             CReset);
 
         let flen = req_p.metadata().unwrap().len();
         if self.encoded_temp_dir.is_some() && flen > MIN_ENCODING_SIZE && flen < MAX_ENCODING_SIZE {
@@ -222,9 +247,11 @@ impl HttpHandler {
                 }) {
                 if req.url.path().pop() == Some("") {
                     let r = self.handle_get_file(req, idx);
-                    log!("{} found index file for directory {}",
+                    log!("{} found index file for directory {}{}{}",
                          iter::repeat(' ').take(req.remote_addr.to_string().len()).collect::<String>(),
-                         req_p.display());
+                         C::Magenta
+                         req_p.display(),
+                         CReset);
                     return r;
                 } else {
                     return self.handle_get_dir_index_no_slash(req, e);
@@ -237,7 +264,16 @@ impl HttpHandler {
 
     fn handle_get_dir_index_no_slash(&self, req: &mut Request, idx_ext: &str) -> IronResult<Response> {
         let new_url = req.url.to_string() + "/";
-        log!("Redirecting {} to {} - found index file index.{}", req.remote_addr, new_url, idx_ext);
+        log!("Redirecting {}{}{} to {}{}{} - found index file {}index.{}{}",
+             C::Green,
+             req.remote_addr,
+             CReset,
+             C::Green,
+             new_url,
+             CReset,
+             C::Magenta,
+             idx_ext,
+             CReset);
 
         // We redirect here because if we don't and serve the index right away funky shit happens.
         // Example:
@@ -251,7 +287,13 @@ impl HttpHandler {
     fn handle_get_dir_listing(&self, req: &mut Request, req_p: PathBuf) -> IronResult<Response> {
         let relpath = (url_path(&req.url) + "/").replace("//", "/");
         let is_root = &req.url.path() == &[""];
-        log!("{} was served directory listing for {}", req.remote_addr, req_p.display());
+        log!("{}{}{} was served directory listing for {}{}{}",
+             C::Green,
+             req.remote_addr,
+             CReset,
+             C::Magenta,
+             req_p.display(),
+             CReset);
         self.handle_generated_response_encoding(req,
                                                 status::Ok,
                                                 html_response(DIRECTORY_LISTING_HTML,
@@ -359,12 +401,22 @@ impl HttpHandler {
             })
             .to_string();
 
-        log!("{} tried to {} on {} ({}) but only {} are allowed",
+        log!("{}{}{} tried to {}{}{} on {}{}{} ({}{}{}) but only {}{}{} are allowed",
+             C::Green,
              req.remote_addr,
+             CReset,
+             C::Red,
              req.method,
+             CReset,
+             C::Magenta,
              url_path(&req.url),
+             CReset,
+             C::Blue,
              tpe,
-             allowed_s);
+             CReset,
+             C::Red,
+             allowed_s,
+             CReset);
 
         let resp_text =
             html_response(ERROR_HTML,
@@ -377,7 +429,15 @@ impl HttpHandler {
     }
 
     fn handle_put_partial_content(&self, req: &mut Request) -> IronResult<Response> {
-        log!("{} tried to PUT partial content to {}", req.remote_addr, url_path(&req.url));
+        log!("{}{}{} tried to {}PUT{} partial content to {}{}{}",
+             C::Green,
+             req.remote_addr,
+             CReset,
+             C::Red,
+             CReset,
+             C::Yellow,
+             url_path(&req.url),
+             CReset);
         self.handle_generated_response_encoding(req,
                                                 status::BadRequest,
                                                 html_response(ERROR_HTML,
@@ -389,10 +449,14 @@ impl HttpHandler {
 
     fn handle_put_file(&self, req: &mut Request, req_p: PathBuf) -> IronResult<Response> {
         let existant = req_p.exists();
-        log!("{} {} {}, size: {}B",
+        log!("{}{}{} {} {}{}{}, size: {}B",
+             C::Green,
              req.remote_addr,
+             CReset,
              if existant { "replaced" } else { "created" },
+             C::Magenta,
              req_p.display(),
+             CReset,
              *req.headers.get::<headers::ContentLength>().unwrap());
 
         let &(_, ref temp_dir) = self.writes_temp_dir.as_ref().unwrap();
@@ -427,10 +491,15 @@ impl HttpHandler {
     }
 
     fn handle_delete_path(&self, req: &mut Request, req_p: PathBuf) -> IronResult<Response> {
-        log!("{} deleted {} {}",
+        log!("{}{}{} deleted {}{} {}{}{}",
+             C::Green,
              req.remote_addr,
+             CReset,
+             C::Blue,
              if req_p.is_file() { "file" } else { "directory" },
-             req_p.display());
+             C::Magenta,
+             req_p.display(),
+             CReset);
 
         if req_p.is_file() {
             fs::remove_file(req_p).unwrap();
@@ -442,7 +511,7 @@ impl HttpHandler {
     }
 
     fn handle_trace(&self, req: &mut Request) -> IronResult<Response> {
-        log!("{} requested TRACE", req.remote_addr);
+        log!("{}{}{} requested {}TRACE{} for {}{}{}", C::Green, req.remote_addr, CReset, C::Red, CReset, C::Magenta, url_path(&req.url), CReset);
 
         let mut hdr = req.headers.clone();
         hdr.set(headers::ContentType("message/http".parse().unwrap()));
@@ -456,7 +525,14 @@ impl HttpHandler {
     }
 
     fn handle_forbidden_method(&self, req: &mut Request, switch: &str, desc: &str) -> IronResult<Response> {
-        log!("{} used disabled request method {} grouped under {}", req.remote_addr, req.method, desc);
+        log!("{}{}{} used disabled request method {}{}{} grouped under {}",
+             C::Green,
+             req.remote_addr,
+             CReset,
+             C::Red,
+             req.method,
+             CReset,
+             desc);
         self.handle_generated_response_encoding(req,
                                                 status::Forbidden,
                                                 html_response(ERROR_HTML,
@@ -469,7 +545,13 @@ impl HttpHandler {
     }
 
     fn handle_bad_method(&self, req: &mut Request) -> IronResult<Response> {
-        log!("{} used invalid request method {}", req.remote_addr, req.method);
+        log!("{}{}{} used invalid request method {}{}{}",
+             C::Green,
+             req.remote_addr,
+             CReset,
+             C::Red,
+             req.method,
+             CReset);
         let last_p = format!("<p>Unsupported request method: {}.<br />\nSupported methods: OPTIONS, GET, PUT, DELETE, HEAD and TRACE.</p>",
                              req.method);
         self.handle_generated_response_encoding(req,
@@ -541,7 +623,7 @@ impl HttpHandler {
     fn create_temp_dir(&self, td: &Option<(String, PathBuf)>) {
         let &(ref temp_name, ref temp_dir) = td.as_ref().unwrap();
         if !temp_dir.exists() && fs::create_dir_all(&temp_dir).is_ok() {
-            log!("Created temp dir {}", temp_name);
+            log!("Created temp dir {}{}{}", C::Magenta, temp_name, CReset);
         }
     }
 }
