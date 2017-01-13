@@ -249,7 +249,7 @@ impl HttpHandler {
                     let r = self.handle_get_file(req, idx);
                     log!("{} found index file for directory {}{}{}",
                          iter::repeat(' ').take(req.remote_addr.to_string().len()).collect::<String>(),
-                         C::Magenta
+                         C::Magenta,
                          req_p.display(),
                          CReset);
                     return r;
@@ -268,7 +268,7 @@ impl HttpHandler {
              C::Green,
              req.remote_addr,
              CReset,
-             C::Green,
+             C::Yellow,
              new_url,
              CReset,
              C::Magenta,
@@ -511,7 +511,15 @@ impl HttpHandler {
     }
 
     fn handle_trace(&self, req: &mut Request) -> IronResult<Response> {
-        log!("{}{}{} requested {}TRACE{} for {}{}{}", C::Green, req.remote_addr, CReset, C::Red, CReset, C::Magenta, url_path(&req.url), CReset);
+        log!("{}{}{} requested {}TRACE{} for {}{}{}",
+             C::Green,
+             req.remote_addr,
+             CReset,
+             C::Red,
+             CReset,
+             C::Magenta,
+             url_path(&req.url),
+             CReset);
 
         let mut hdr = req.headers.clone();
         hdr.set(headers::ContentType("message/http".parse().unwrap()));
