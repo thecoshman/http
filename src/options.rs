@@ -67,8 +67,8 @@ impl Options {
                 } else {
                     ("$TEMP".to_string(), temp_dir())
                 };
-                let suffix = format!("http-{}",
-                                     dir_pb.into_os_string().to_str().unwrap().replace(r"\\?\", "").replace(':', "").replace('\\', "/").replace('/', "-"));
+                let suffix = dir_pb.into_os_string().to_str().unwrap().replace(r"\\?\", "").replace(':', "").replace('\\', "/").replace('/', "-");
+                let suffix = format!("http{}{}", if suffix.starts_with('-') { "" } else { "-" }, suffix);
 
                 Some((format!("{}{}{}",
                               temp_s,
