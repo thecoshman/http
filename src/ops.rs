@@ -344,7 +344,6 @@ impl HttpHandler {
                                                                                    rhs.file_name().to_str().unwrap().to_lowercase()))
                                                                     })
                                                                     .fold("".to_string(), |cur, f| {
-                let url = format!("/{}", relpath).replace("//", "/");
                 let is_file = f.file_type().unwrap().is_file();
                 let path = f.path();
                 let fname = f.file_name().into_string().unwrap();
@@ -362,29 +361,29 @@ impl HttpHandler {
                     ""
                 };
 
-                format!("{}<tr><td><a href=\"{}{}\"><img id=\"{}\" src=\"{{{}{}_icon}}\" /></a></td> <td><a href=\"{}{}\">{}{}</a></td> <td>{}</td> \
-                         <td><abbr title=\"{} B\">{}</abbr></td></tr>\n",
+                format!("{}<tr><td><a href=\"{}{}\"><img id=\"{}\" src=\"{{{}{}_icon}}\" /></a></td> <td><a href=\"{1}{2}\">{2}{}</a></td> <td>{}</td> \
+                         <td>{}{}{}{}{}</td></tr>\n",
                         cur,
-                        url,
+                        format!("/{}", relpath).replace("//", "/"),
                         fname,
-                        path.file_stem().map(|p| p.to_str().unwrap()).unwrap_or(&fname),
+                        path.file_name().map(|p| p.to_str().unwrap().replace('.', "_")).as_ref().unwrap_or(&fname),
                         if is_file { "file" } else { "dir" },
                         mime,
-                        url,
-                        fname,
-                        fname,
                         if is_file { "" } else { "/" },
                         file_time_modified(&path).strftime("%F %T").unwrap(),
+                        if is_file { "<abbr title=\"" } else { "" },
                         if is_file {
                             len.to_string()
                         } else {
                             String::new()
                         },
+                        if is_file { " B\">" } else { "" },
                         if is_file {
                             human_readable_size(len)
                         } else {
                             String::new()
-                        })
+                        },
+                        if is_file { "</abbr>" } else { "" })
             })]))
     }
 
