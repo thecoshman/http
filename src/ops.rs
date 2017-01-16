@@ -307,7 +307,7 @@ impl HttpHandler {
                                                                     String::new()
                                                                 } else {
                                                                     format!("<tr><td><a href=\"../\"><img id=\"parent_dir\" \
-                                                                             src=\"{{back_arrow_icon}}\"></img></a></td> <td><a href=\"../\">Parent \
+                                                                             src=\"{{back_arrow_icon}}\" /></a></td> <td><a href=\"../\">Parent \
                                                                              directory</a></td> <td>{}</td> <td></td></tr>",
                                                                             file_time_modified(req_p.parent().unwrap()).strftime("%F %T").unwrap())
                                                                 },
@@ -339,7 +339,7 @@ impl HttpHandler {
                     ""
                 };
 
-                format!("{}<tr><td><a href=\"{}{}\"><img id=\"{}\" src=\"{{{}{}_icon}}\"></img></a></td> <td><a href=\"{}{}\">{}{}</a></td> <td>{}</td> \
+                format!("{}<tr><td><a href=\"{}{}\"><img id=\"{}\" src=\"{{{}{}_icon}}\" /></a></td> <td><a href=\"{}{}\">{}{}</a></td> <td>{}</td> \
                          <td><abbr title=\"{} B\">{}</abbr></td></tr>\n",
                         cur,
                         url,
