@@ -203,11 +203,15 @@ pub fn is_symlink<P: AsRef<Path>>(p: P) -> bool {
 ///
 /// Stolen, adapted and inlined from [fielsize.js](http://filesizejs.com).
 pub fn human_readable_size(s: u64) -> String {
+    lazy_static! {
+        static ref LN_KIB: f64 = 1024f64.log(f64::consts::E);
+    }
+
     if s == 0 {
         "0 B".to_string()
     } else {
         let num = s as f64;
-        let exp = cmp::min(cmp::max((num.log(f64::consts::E) / 1024f64.log(f64::consts::E)) as i32, 0), 8);
+        let exp = cmp::min(cmp::max((num.log(f64::consts::E) / *LN_KIB) as i32, 0), 8);
 
         let val = num / 2f64.powi(exp * 10);
 
