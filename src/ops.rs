@@ -12,6 +12,7 @@ use iron::modifiers::Header;
 use std::collections::HashMap;
 use self::super::{Options, Error};
 use mime_guess::guess_mime_type_opt;
+use std::io::{self, Read, Seek, SeekFrom};
 use trivial_colours::{Reset as CReset, Colour as C};
 use iron::{headers, status, method, mime, IronResult, Listening, Response, TypeMap, Request, Handler, Iron};
 use self::super::util::{url_path, file_hash, is_symlink, encode_str, encode_file, hash_string, html_response, file_binary, percent_decode, response_encoding,
@@ -104,12 +105,16 @@ impl HttpHandler {
 
     fn handle_get(&self, req: &mut Request) -> IronResult<Response> {
         let (req_p, symlink, url_err) = self.parse_requested_path(req);
+        let file = req_p.is_file();
+        let range = req.headers.get().map(|ref r: &headers::Range| (*r).clone());
 
         if url_err {
             self.handle_invalid_url(req, "<p>Percent-encoding decoded to invalid UTF-8.</p>")
         } else if !req_p.exists() || (symlink && !self.follow_symlinks) {
             self.handle_nonexistant(req, req_p)
-        } else if req_p.is_file() {
+        } else if file && range.is_some() {
+            self.handle_get_file_range(req, req_p, range.unwrap())
+        } else if file {
             self.handle_get_file(req, req_p)
         } else {
             self.handle_get_dir(req, req_p)
@@ -153,6 +158,174 @@ impl HttpHandler {
                                                               &["404 Not Found", &format!("The requested entity \"{}\" doesn't exist.", url_p), ""]))
     }
 
+    fn handle_get_file_range(&self, req: &mut Request, req_p: PathBuf, range: headers::Range) -> IronResult<Response> {
+        match range {
+            headers::Range::Bytes(ref brs) => {
+                if brs.len() == 1 {
+                    let flen = req_p.metadata().unwrap().len();
+                    match brs[0] {
+                        // Cases where from is bigger than to are filtered out by iron so can never happen
+                        headers::ByteRangeSpec::FromTo(from, to) => self.handle_get_file_closed_range(req, req_p, from, to),
+                        headers::ByteRangeSpec::AllFrom(from) => {
+                            if flen < from {
+                                self.handle_get_file_empty_range(req, req_p, from, flen)
+                            } else {
+                                self.handle_get_file_right_opened_range(req, req_p, from)
+                            }
+                        }
+                        headers::ByteRangeSpec::Last(from) => {
+                            if flen < from {
+                                self.handle_get_file_empty_range(req, req_p, from, flen)
+                            } else {
+                                self.handle_get_file_left_opened_range(req, req_p, from)
+                            }
+                        }
+                    }
+                } else {
+                    self.handle_invalid_range(req, req_p, &range, "More than one range is unsupported.")
+                }
+            }
+            headers::Range::Unregistered(..) => self.handle_invalid_range(req, req_p, &range, "Custom ranges are unsupported."),
+        }
+    }
+
+    fn handle_get_file_closed_range(&self, req: &mut Request, req_p: PathBuf, from: u64, to: u64) -> IronResult<Response> {
+        let mime_type = guess_mime_type_opt(&req_p).unwrap_or_else(|| if file_binary(&req_p) {
+            "application/octet-stream".parse().unwrap()
+        } else {
+            "text/plain".parse().unwrap()
+        });
+        log!("{}{}{} was served byte range {}-{} of file {}{}{} as {}{}{}",
+             C::Green,
+             req.remote_addr,
+             CReset,
+             from,
+             to,
+             C::Magenta,
+             req_p.display(),
+             CReset,
+             C::Blue,
+             mime_type,
+             CReset);
+
+        let mut buf = vec![0; (to + 1 - from) as usize];
+        let mut f = File::open(&req_p).unwrap();
+        f.seek(SeekFrom::Start(from)).unwrap();
+        f.read(&mut buf).unwrap();
+
+        Ok(Response::with((status::PartialContent,
+                           (Header(headers::Server(USER_AGENT.to_string())),
+                            Header(headers::LastModified(headers::HttpDate(file_time_modified(&req_p)))),
+                            Header(headers::ContentRange(headers::ContentRangeSpec::Bytes {
+                                range: Some((from, to)),
+                                instance_length: Some(f.metadata().unwrap().len()),
+                            })),
+                            Header(headers::AcceptRanges(vec![headers::RangeUnit::Bytes]))),
+                           buf,
+                           mime_type)))
+    }
+
+    fn handle_get_file_right_opened_range(&self, req: &mut Request, req_p: PathBuf, from: u64) -> IronResult<Response> {
+        let mime_type = guess_mime_type_opt(&req_p).unwrap_or_else(|| if file_binary(&req_p) {
+            "application/octet-stream".parse().unwrap()
+        } else {
+            "text/plain".parse().unwrap()
+        });
+        log!("{}{}{} was served file {}{}{} from byte {} as {}{}{}",
+             C::Green,
+             req.remote_addr,
+             CReset,
+             C::Magenta,
+             req_p.display(),
+             CReset,
+             from,
+             C::Blue,
+             mime_type,
+             CReset);
+
+        let flen = req_p.metadata().unwrap().len();
+        self.handle_get_file_opened_range(req_p, SeekFrom::Start(from), from, flen - from, mime_type)
+    }
+
+    fn handle_get_file_left_opened_range(&self, req: &mut Request, req_p: PathBuf, from: u64) -> IronResult<Response> {
+        let mime_type = guess_mime_type_opt(&req_p).unwrap_or_else(|| if file_binary(&req_p) {
+            "application/octet-stream".parse().unwrap()
+        } else {
+            "text/plain".parse().unwrap()
+        });
+        log!("{}{}{} was served last {} bytes of file {}{}{} as {}{}{}",
+             C::Green,
+             req.remote_addr,
+             CReset,
+             from,
+             C::Magenta,
+             req_p.display(),
+             CReset,
+             C::Blue,
+             mime_type,
+             CReset);
+
+        let flen = req_p.metadata().unwrap().len();
+        self.handle_get_file_opened_range(req_p, SeekFrom::End(-(from as i64)), flen - from, from, mime_type)
+    }
+
+    fn handle_get_file_opened_range(&self, req_p: PathBuf, s: SeekFrom, b_from: u64, clen: u64, mt: Mime) -> IronResult<Response> {
+        let mut f = File::open(&req_p).unwrap();
+        let flen = f.metadata().unwrap().len();
+        f.seek(s).unwrap();
+
+        Ok(Response::with((status::PartialContent,
+                           f,
+                           (Header(headers::Server(USER_AGENT.to_string())),
+                            Header(headers::LastModified(headers::HttpDate(file_time_modified(&req_p)))),
+                            Header(headers::ContentRange(headers::ContentRangeSpec::Bytes {
+                                range: Some((b_from, flen - 1)),
+                                instance_length: Some(flen),
+                            })),
+                            Header(headers::ContentLength(clen)),
+                            Header(headers::AcceptRanges(vec![headers::RangeUnit::Bytes]))),
+                           mt)))
+    }
+
+    fn handle_invalid_range(&self, req: &mut Request, req_p: PathBuf, range: &headers::Range, reason: &str) -> IronResult<Response> {
+        self.handle_generated_response_encoding(req,
+                                                status::RangeNotSatisfiable,
+                                                html_response(ERROR_HTML,
+                                                              &["416 Range Not Satisfiable",
+                                                                &format!("Requested range <samp>{}</samp> could not be fullfilled for file {}.",
+                                                                         range,
+                                                                         req_p.display()),
+                                                                reason]))
+    }
+
+    fn handle_get_file_empty_range(&self, req: &mut Request, req_p: PathBuf, from: u64, to: u64) -> IronResult<Response> {
+        let mime_type = guess_mime_type_opt(&req_p).unwrap_or_else(|| if file_binary(&req_p) {
+            "application/octet-stream".parse().unwrap()
+        } else {
+            "text/plain".parse().unwrap()
+        });
+        log!("{}{}{} was served an empty range from file {}{}{} as {}{}{}",
+             C::Green,
+             req.remote_addr,
+             CReset,
+             C::Magenta,
+             req_p.display(),
+             CReset,
+             C::Blue,
+             mime_type,
+             CReset);
+
+        Ok(Response::with((status::NoContent,
+                           Header(headers::Server(USER_AGENT.to_string())),
+                           Header(headers::LastModified(headers::HttpDate(file_time_modified(&req_p)))),
+                           Header(headers::ContentRange(headers::ContentRangeSpec::Bytes {
+                               range: Some((from, to)),
+                               instance_length: Some(req_p.metadata().unwrap().len()),
+                           })),
+                           Header(headers::AcceptRanges(vec![headers::RangeUnit::Bytes])),
+                           mime_type)))
+    }
+
     fn handle_get_file(&self, req: &mut Request, req_p: PathBuf) -> IronResult<Response> {
         let mime_type = guess_mime_type_opt(&req_p).unwrap_or_else(|| if file_binary(&req_p) {
             "application/octet-stream".parse().unwrap()
@@ -178,6 +351,7 @@ impl HttpHandler {
             Ok(Response::with((status::Ok,
                                Header(headers::Server(USER_AGENT.to_string())),
                                Header(headers::LastModified(headers::HttpDate(file_time_modified(&req_p)))),
+                               Header(headers::AcceptRanges(vec![headers::RangeUnit::Bytes])),
                                req_p,
                                mime_type)))
         }
@@ -199,6 +373,7 @@ impl HttpHandler {
                         return Ok(Response::with((status::Ok,
                                                   Header(headers::Server(USER_AGENT.to_string())),
                                                   Header(headers::ContentEncoding(vec![encoding])),
+                                                  Header(headers::AcceptRanges(vec![headers::RangeUnit::Bytes])),
                                                   resp_p.as_path(),
                                                   mt)));
                     }
@@ -206,6 +381,7 @@ impl HttpHandler {
                         return Ok(Response::with((status::Ok,
                                                   Header(headers::Server(USER_AGENT.to_string())),
                                                   Header(headers::LastModified(headers::HttpDate(file_time_modified(&resp_p)))),
+                                                  Header(headers::AcceptRanges(vec![headers::RangeUnit::Bytes])),
                                                   resp_p.as_path(),
                                                   mt)));
                     }
@@ -239,6 +415,7 @@ impl HttpHandler {
                     return Ok(Response::with((status::Ok,
                                               Header(headers::Server(USER_AGENT.to_string())),
                                               Header(headers::ContentEncoding(vec![encoding])),
+                                              Header(headers::AcceptRanges(vec![headers::RangeUnit::Bytes])),
                                               resp_p.as_path(),
                                               mt)));
                 }
@@ -252,6 +429,7 @@ impl HttpHandler {
         Ok(Response::with((status::Ok,
                            Header(headers::Server(USER_AGENT.to_string())),
                            Header(headers::LastModified(headers::HttpDate(file_time_modified(&req_p)))),
+                           Header(headers::AcceptRanges(vec![headers::RangeUnit::Bytes])),
                            req_p,
                            mt)))
     }
