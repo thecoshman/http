@@ -33,6 +33,9 @@ pub static MIN_ENCODING_SIZE: u64 = 1024;
 /// The maximal size at which to encode filesystem files.
 pub static MAX_ENCODING_SIZE: u64 = 100 * 1024 * 1024;
 
+/// The minimal size gain at which to preserve encoded filesystem files.
+pub static MIN_ENCODING_GAIN: f64 = 1.1;
+
 
 /// Find best supported encoding to use, or `None` for identity.
 pub fn response_encoding(requested: &mut [QualityItem<Encoding>]) -> Option<Encoding> {

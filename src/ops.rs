@@ -16,7 +16,7 @@ use trivial_colours::{Reset as CReset, Colour as C};
 use iron::{headers, status, method, mime, IronResult, Listening, Response, TypeMap, Request, Handler, Iron};
 use self::super::util::{url_path, file_hash, is_symlink, encode_str, encode_file, hash_string, html_response, file_binary, percent_decode, response_encoding,
                         detect_file_as_dir, encoding_extension, file_time_modified, human_readable_size, USER_AGENT, ERROR_HTML, INDEX_EXTENSIONS,
-                        MAX_ENCODING_SIZE, MIN_ENCODING_SIZE, DIRECTORY_LISTING_HTML, BLACKLISTED_ENCODING_EXTENSIONS};
+                        MIN_ENCODING_GAIN, MAX_ENCODING_SIZE, MIN_ENCODING_SIZE, DIRECTORY_LISTING_HTML, BLACKLISTED_ENCODING_EXTENSIONS};
 
 
 macro_rules! log {
@@ -41,7 +41,7 @@ pub struct HttpHandler {
     pub writes_temp_dir: Option<(String, PathBuf)>,
     pub encoded_temp_dir: Option<(String, PathBuf)>,
     cache_gen: RwLock<CacheT<Vec<u8>>>,
-    cache_fs: RwLock<CacheT<PathBuf>>,
+    cache_fs: RwLock<CacheT<(PathBuf, bool)>>,
 }
 
 impl HttpHandler {
@@ -189,17 +189,27 @@ impl HttpHandler {
             let cache_key = (file_hash(&req_p), encoding.to_string());
 
             {
-                if let Some(resp_p) = self.cache_fs.read().unwrap().get(&cache_key) {
-                    log!("{} encoded as {} for {:.1}% ratio (cached)",
-                         iter::repeat(' ').take(req.remote_addr.to_string().len()).collect::<String>(),
-                         encoding,
-                         ((req_p.metadata().unwrap().len() as f64) / (resp_p.metadata().unwrap().len() as f64)) * 100f64);
+                match self.cache_fs.read().unwrap().get(&cache_key) {
+                    Some(&(ref resp_p, true)) => {
+                        log!("{} encoded as {} for {:.1}% ratio (cached)",
+                             iter::repeat(' ').take(req.remote_addr.to_string().len()).collect::<String>(),
+                             encoding,
+                             ((req_p.metadata().unwrap().len() as f64) / (resp_p.metadata().unwrap().len() as f64)) * 100f64);
 
-                    return Ok(Response::with((status::Ok,
-                                              Header(headers::Server(USER_AGENT.to_string())),
-                                              Header(headers::ContentEncoding(vec![encoding])),
-                                              resp_p.as_path(),
-                                              mt)));
+                        return Ok(Response::with((status::Ok,
+                                                  Header(headers::Server(USER_AGENT.to_string())),
+                                                  Header(headers::ContentEncoding(vec![encoding])),
+                                                  resp_p.as_path(),
+                                                  mt)));
+                    }
+                    Some(&(ref resp_p, false)) => {
+                        return Ok(Response::with((status::Ok,
+                                                  Header(headers::Server(USER_AGENT.to_string())),
+                                                  Header(headers::LastModified(headers::HttpDate(file_time_modified(&resp_p)))),
+                                                  resp_p.as_path(),
+                                                  mt)));
+                    }
+                    None => (),
                 }
             }
 
@@ -212,19 +222,26 @@ impl HttpHandler {
             };
 
             if encode_file(&req_p, &resp_p, &encoding) {
-                log!("{} encoded as {} for {:.1}% ratio",
-                     iter::repeat(' ').take(req.remote_addr.to_string().len()).collect::<String>(),
-                     encoding,
-                     ((req_p.metadata().unwrap().len() as f64) / (resp_p.metadata().unwrap().len() as f64)) * 100f64);
+                let gain = (req_p.metadata().unwrap().len() as f64) / (resp_p.metadata().unwrap().len() as f64);
+                if gain < MIN_ENCODING_GAIN {
+                    let mut cache = self.cache_fs.write().unwrap();
+                    cache.insert(cache_key, (req_p.clone(), false));
+                    fs::remove_file(resp_p).unwrap();
+                } else {
+                    log!("{} encoded as {} for {:.1}% ratio",
+                         iter::repeat(' ').take(req.remote_addr.to_string().len()).collect::<String>(),
+                         encoding,
+                         gain * 100f64);
 
-                let mut cache = self.cache_fs.write().unwrap();
-                cache.insert(cache_key, resp_p.clone());
+                    let mut cache = self.cache_fs.write().unwrap();
+                    cache.insert(cache_key, (resp_p.clone(), true));
 
-                return Ok(Response::with((status::Ok,
-                                          Header(headers::Server(USER_AGENT.to_string())),
-                                          Header(headers::ContentEncoding(vec![encoding])),
-                                          resp_p.as_path(),
-                                          mt)));
+                    return Ok(Response::with((status::Ok,
+                                              Header(headers::Server(USER_AGENT.to_string())),
+                                              Header(headers::ContentEncoding(vec![encoding])),
+                                              resp_p.as_path(),
+                                              mt)));
+                }
             } else {
                 log!("{} failed to encode as {}, sending identity",
                      iter::repeat(' ').take(req.remote_addr.to_string().len()).collect::<String>(),
