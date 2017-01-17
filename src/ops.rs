@@ -306,9 +306,13 @@ impl HttpHandler {
                                                                 &if is_root {
                                                                     String::new()
                                                                 } else {
-                                                                    format!("<tr><td><a href=\"../\"><img id=\"parent_dir\" \
-                                                                             src=\"{{back_arrow_icon}}\" /></a></td> <td><a href=\"../\">Parent \
+                                                                    let rel_noslash = &relpath[0..relpath.len() - 1];
+                                                                    let slash_idx = rel_noslash.rfind('/');
+                                                                    format!("<tr><td><a href=\"/{}{}\"><img id=\"parent_dir\" \
+                                                                             src=\"{{back_arrow_icon}}\" /></a></td> <td><a href=\"/{0}{1}\">Parent \
                                                                              directory</a></td> <td>{}</td> <td></td></tr>",
+                                                                            slash_idx.map(|i| &rel_noslash[0..i]).unwrap_or(""),
+                                                                            if slash_idx.is_some() { "/" } else { "" },
                                                                             file_time_modified(req_p.parent().unwrap()).strftime("%F %T").unwrap())
                                                                 },
                                                                 &req_p.read_dir()
