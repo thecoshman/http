@@ -1,6 +1,7 @@
 use md6;
 use time::now;
 use std::{iter, io};
+use unicase::UniCase;
 use iron::mime::Mime;
 use std::sync::RwLock;
 use lazysort::SortedBy;
@@ -15,7 +16,7 @@ use trivial_colours::{Reset as CReset, Colour as C};
 use iron::{headers, status, method, mime, IronResult, Listening, Response, TypeMap, Request, Handler, Iron};
 use self::super::util::{url_path, file_hash, is_symlink, encode_str, encode_file, hash_string, html_response, file_binary, percent_decode, response_encoding,
                         detect_file_as_dir, encoding_extension, file_time_modified, human_readable_size, USER_AGENT, ERROR_HTML, INDEX_EXTENSIONS,
-                        MAX_ENCODING_SIZE, MIN_ENCODING_SIZE, DIRECTORY_LISTING_HTML};
+                        MAX_ENCODING_SIZE, MIN_ENCODING_SIZE, DIRECTORY_LISTING_HTML, BLACKLISTED_ENCODING_EXTENSIONS};
 
 
 macro_rules! log {
@@ -170,7 +171,8 @@ impl HttpHandler {
              CReset);
 
         let flen = req_p.metadata().unwrap().len();
-        if self.encoded_temp_dir.is_some() && flen > MIN_ENCODING_SIZE && flen < MAX_ENCODING_SIZE {
+        if self.encoded_temp_dir.is_some() && flen > MIN_ENCODING_SIZE && flen < MAX_ENCODING_SIZE &&
+           req_p.extension().and_then(|s| s.to_str()).map(|s| !BLACKLISTED_ENCODING_EXTENSIONS.contains(&UniCase(s))).unwrap_or(true) {
             self.handle_get_file_encoded(req, req_p, mime_type)
         } else {
             Ok(Response::with((status::Ok,

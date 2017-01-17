@@ -4,8 +4,10 @@ use flate2::Compression as Flate2Compression;
 use iron::headers::{QualityItem, Encoding};
 use bzip2::Compression as BzCompression;
 use brotli2::write::BrotliEncoder;
+use std::collections::BTreeSet;
 use bzip2::write::BzEncoder;
 use std::io::{self, Write};
+use unicase::UniCase;
 use std::path::Path;
 use std::fs::File;
 use md6::Md6;
@@ -16,6 +18,12 @@ lazy_static! {
     pub static ref SUPPORTED_ENCODINGS: Vec<Encoding> = {
         let es = vec![Encoding::Gzip, Encoding::Deflate, Encoding::EncodingExt("br".to_string()), Encoding::EncodingExt("bzip2".to_string())];
         [es.clone(), es.into_iter().map(|e| Encoding::EncodingExt(format!("x-{}", e))).collect()].into_iter().flat_map(|e| e.clone()).collect()
+    };
+
+    /// The list of extensions not to encode.
+    pub static ref BLACKLISTED_ENCODING_EXTENSIONS: BTreeSet<UniCase<&'static str>> = {
+        let raw = include_str!("../../assets/encoding_blacklist");
+        raw.split("\n").map(str::trim).filter(|s| !s.is_empty() && !s.starts_with('#')).map(UniCase).collect()
     };
 }
 
