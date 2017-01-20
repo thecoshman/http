@@ -5,6 +5,7 @@ description = "Host These Things Please - a basic http server for hosting a fold
 repository = "https://github.com/thecoshman/http"
 readme = "README.md"
 keywords = ["http", "server", "https", "file", "directory"]
+categories = ["network-programming", "web-programming::http-server"]
 license = "MIT"
 # Remember to also update in appveyor.yml
 version = "1.0.0"
