@@ -6,7 +6,9 @@ repository = "https://github.com/thecoshman/http"
 readme = "README.md"
 keywords = ["http", "server", "https", "file", "directory"]
 license = "MIT"
+# Remember to also update in appveyor.yml
 version = "1.0.0"
+# Remember to also update in http.md
 authors = ["thecoshman <thecoshman@gmail.com>",
            "nabijaczleweli <nabijaczleweli@gmail.com>"]
 
