@@ -1,6 +1,6 @@
 use md6;
+use std::iter;
 use time::now;
-use std::{iter, io};
 use unicase::UniCase;
 use iron::mime::Mime;
 use std::sync::RwLock;

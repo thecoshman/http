@@ -44,6 +44,16 @@ fn actual_main() -> i32 {
 }
 
 fn result_main() -> Result<(), Error> {
+    {
+        use std::path::Path;
+
+        let mut pb = Path::new("asdf");
+        pb.push("fdsa/capitalism");
+        println!("{}", pb.display());
+
+        return Ok(());
+    }
+
     let opts = Options::parse();
 
     let responder = try!(if let Some(p) = opts.port {
