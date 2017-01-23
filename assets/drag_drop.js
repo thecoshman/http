@@ -4,18 +4,22 @@ window.addEventListener("load", () => {
   let body = document.getElementsByTagName("body")[0];
 
   body.addEventListener("dragover", (ev) => {
-    if(SUPPORTED_TYPES.find(el => ev.dataTransfer.types.includes(el)))
+    if(SUPPORTED_TYPES.find(el => ev.dataTransfer.types.contains(el)))
       ev.preventDefault();
   });
 
   body.addEventListener("drop", (ev) => {
-    if(SUPPORTED_TYPES.find(el => ev.dataTransfer.types.includes(el))) {
+    if(SUPPORTED_TYPES.find(el => ev.dataTransfer.types.contains(el))) {
       ev.preventDefault();
+
+      let url = document.URL;
+      if(url[url.length - 1] != "/")
+        url += "/";
 
       for(let i = ev.dataTransfer.files.length - 1; i >= 0; --i) {
         let file = ev.dataTransfer.files[i];
         let request = new XMLHttpRequest();
-        request.open('PUT', document.URL + file.name);
+        request.open('PUT', url + file.name);
         request.send(file);
       }
     }
