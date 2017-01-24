@@ -60,7 +60,10 @@ fn result_main() -> Result<(), Error> {
         ops::try_ports(ops::HttpHandler::new(&opts), util::PORT_SCAN_LOWEST, util::PORT_SCAN_HIGHEST)
     });
 
-    println!("{}Hosting \"{}\" on port {}...", trivial_colours::Reset, opts.hosted_directory.0, responder.socket.port());
+    println!("{}Hosting \"{}\" on port {}...",
+             trivial_colours::Reset,
+             opts.hosted_directory.0,
+             responder.socket.port());
     println!("Ctrl-C to stop.");
     println!();
 

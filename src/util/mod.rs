@@ -142,7 +142,8 @@ pub fn url_path(url: &Url) -> String {
         "/".to_string()
     } else {
         path.into_iter().fold("".to_string(),
-                              |cur, pp| format!("{}/{}", cur, percent_decode(pp).unwrap_or(Cow::Borrowed("<incorrect UTF8>"))))[1..]
+                              |cur, pp| format!("{}/{}", cur, percent_decode(pp).unwrap_or(Cow::Borrowed("<incorrect UTF8>"))))
+            [1..]
             .to_string()
     }
 }
