@@ -2,5 +2,5 @@ extern crate embed_resource;
 
 
 fn main() {
-    embed_resource::compile("http-manifest.rc", Some("http-manifest"), None);
+    embed_resource::compile("http-manifest.rc");
 }

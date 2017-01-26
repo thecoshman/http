@@ -1,8 +1,3 @@
-#[cfg(target_os="windows")]
-#[link(name="http-manifest", kind="static")]
-extern "C" {}
-
-
 extern crate trivial_colours;
 #[macro_use]
 extern crate lazy_static;
