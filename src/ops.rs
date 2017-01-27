@@ -493,42 +493,32 @@ impl HttpHandler {
              C::Magenta,
              req_p.display(),
              CReset);
-        self.handle_generated_response_encoding(req,
-                                                status::Ok,
-                                                html_response(DIRECTORY_LISTING_HTML,
-                                                              &[&relpath,
-                                                                &if self.writes_temp_dir.is_some() {
-                                                                    r#"<script type="text/javascript">{drag_drop}</script>"#.to_string()
-                                                                } else {
-                                                                    String::new()
-                                                                },
-                                                                &if is_root {
-                                                                    String::new()
-                                                                } else {
-                                                                    let rel_noslash = &relpath[0..relpath.len() - 1];
-                                                                    let slash_idx = rel_noslash.rfind('/');
-                                                                    format!("<tr><td><a href=\"/{}{}\"><img id=\"parent_dir\" \
-                                                                             src=\"{{back_arrow_icon}}\" /></a></td> <td><a href=\"/{0}{1}\">Parent \
-                                                                             directory</a></td> <td>{}</td> <td></td></tr>",
-                                                                            slash_idx.map(|i| &rel_noslash[0..i]).unwrap_or(""),
-                                                                            if slash_idx.is_some() { "/" } else { "" },
-                                                                            file_time_modified(req_p.parent()
-                                                                                    .expect("Failed to get requested directory's parent directory"))
-                                                                                .strftime("%F %T")
-                                                                                .unwrap())
-                                                                },
-                                                                &req_p.read_dir()
-                                                                    .expect("Failed to read requested directory")
-                                                                    .map(|p| p.expect("Failed to iterate over trequested directory"))
-                                                                    .filter(|f| self.follow_symlinks || !is_symlink(f.path()))
-                                                                    .sorted_by(|lhs, rhs| {
-                                                                        (lhs.file_type().expect("Failed to get file type").is_file(),
-                                                                         lhs.file_name().to_str().expect("Failed to get file name").to_lowercase())
-                                                                            .cmp(&(rhs.file_type().expect("Failed to get file type").is_file(),
-                                                                                   rhs.file_name().to_str().expect("Failed to get file name").to_lowercase()))
-                                                                    })
-                                                                    .fold("".to_string(), |cur, f| {
-                let is_file = f.file_type().expect("Failed to get file tye").is_file();
+
+        let parent_s = if is_root {
+            String::new()
+        } else {
+            let rel_noslash = &relpath[0..relpath.len() - 1];
+            let slash_idx = rel_noslash.rfind('/');
+            format!("<tr><td><a href=\"/{up_path}{up_path_slash}\"><img id=\"parent_dir\" src=\"{{back_arrow_icon}}\" /></a></td> \
+                     <td><a href=\"/{up_path}{up_path_slash}\">Parent directory</a></td> <td>{}</td> <td></td></tr>",
+                    file_time_modified(req_p.parent()
+                            .expect("Failed to get requested directory's parent directory"))
+                        .strftime("%F %T")
+                        .unwrap(),
+                    up_path = slash_idx.map(|i| &rel_noslash[0..i]).unwrap_or(""),
+                    up_path_slash = if slash_idx.is_some() { "/" } else { "" })
+        };
+        let list_s = req_p.read_dir()
+            .expect("Failed to read requested directory")
+            .map(|p| p.expect("Failed to iterate over trequested directory"))
+            .filter(|f| self.follow_symlinks || !is_symlink(f.path()))
+            .sorted_by(|lhs, rhs| {
+                (lhs.file_type().expect("Failed to get file type").is_file(), lhs.file_name().to_str().expect("Failed to get file name").to_lowercase())
+                    .cmp(&(rhs.file_type().expect("Failed to get file type").is_file(),
+                           rhs.file_name().to_str().expect("Failed to get file name").to_lowercase()))
+            })
+            .fold("".to_string(), |cur, f| {
+                let is_file = f.file_type().expect("Failed to get file type").is_file();
                 let path = f.path();
                 let fname = f.file_name().into_string().expect("Failed to get file name");
                 let len = f.metadata().expect("Failed to get file metadata").len();
@@ -544,12 +534,9 @@ impl HttpHandler {
                 } else {
                     ""
                 };
-
-                format!("{}<tr><td><a href=\"{}{}\"><img id=\"{}\" src=\"{{{}{}_icon}}\" /></a></td> <td><a href=\"{1}{2}\">{2}{}</a></td> <td>{}</td> \
-                         <td>{}{}{}{}{}</td></tr>\n",
+                format!("{}<tr><td><a href=\"{path}{fname}\"><img id=\"{}\" src=\"{{{}{}_icon}}\" /></a></td> \
+                           <td><a href=\"{path}{fname}\">{fname}{}</a></td> <td>{}</td> <td>{}{}{}{}{}</td></tr>\n",
                         cur,
-                        format!("/{}", relpath).replace("//", "/"),
-                        fname,
                         path.file_name().map(|p| p.to_str().expect("Filename not UTF-8").replace('.', "_")).as_ref().unwrap_or(&fname),
                         if is_file { "file" } else { "dir" },
                         mime,
@@ -567,8 +554,22 @@ impl HttpHandler {
                         } else {
                             String::new()
                         },
-                        if is_file { "</abbr>" } else { "" })
-            })]))
+                        if is_file { "</abbr>" } else { "" },
+                        path = format!("/{}", relpath).replace("//", "/"),
+                        fname = fname)
+            });
+
+        self.handle_generated_response_encoding(req,
+                                                status::Ok,
+                                                html_response(DIRECTORY_LISTING_HTML,
+                                                              &[&relpath[..],
+                                                                &if self.writes_temp_dir.is_some() {
+                                                                    r#"<script type="text/javascript">{drag_drop}</script>"#
+                                                                } else {
+                                                                    ""
+                                                                },
+                                                                &parent_s[..],
+                                                                &list_s[..]]))
     }
 
     fn handle_put(&self, req: &mut Request) -> IronResult<Response> {
