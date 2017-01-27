@@ -164,7 +164,7 @@ pub fn percent_decode(s: &str) -> Option<Cow<str>> {
 
 /// Get the timestamp of the file's last modification as a `time::Tm`.
 pub fn file_time_modified(f: &Path) -> Tm {
-    match f.metadata().unwrap().modified().unwrap().elapsed() {
+    match f.metadata().expect("Failed to get file metadata").modified().expect("Failed to get file last modified date").elapsed() {
         Ok(dur) => time::now() - Duration::from_std(dur).unwrap(),
         Err(ste) => time::now() + Duration::from_std(ste.duration()).unwrap(),
     }

@@ -162,7 +162,7 @@ impl HttpHandler {
         match range {
             headers::Range::Bytes(ref brs) => {
                 if brs.len() == 1 {
-                    let flen = req_p.metadata().unwrap().len();
+                    let flen = req_p.metadata().expect("Failed to get requested file metadata").len();
                     match brs[0] {
                         // Cases where from is bigger than to are filtered out by iron so can never happen
                         headers::ByteRangeSpec::FromTo(from, to) => self.handle_get_file_closed_range(req, req_p, from, to),
@@ -209,16 +209,16 @@ impl HttpHandler {
              CReset);
 
         let mut buf = vec![0; (to + 1 - from) as usize];
-        let mut f = File::open(&req_p).unwrap();
-        f.seek(SeekFrom::Start(from)).unwrap();
-        f.read(&mut buf).unwrap();
+        let mut f = File::open(&req_p).expect("Failed to open requested file");
+        f.seek(SeekFrom::Start(from)).expect("Failed to seek requested file");
+        f.read(&mut buf).expect("Failed to read requested file");
 
         Ok(Response::with((status::PartialContent,
                            (Header(headers::Server(USER_AGENT.to_string())),
                             Header(headers::LastModified(headers::HttpDate(file_time_modified(&req_p)))),
                             Header(headers::ContentRange(headers::ContentRangeSpec::Bytes {
                                 range: Some((from, to)),
-                                instance_length: Some(f.metadata().unwrap().len()),
+                                instance_length: Some(f.metadata().expect("Failed to get requested file metadata").len()),
                             })),
                             Header(headers::AcceptRanges(vec![headers::RangeUnit::Bytes]))),
                            buf,
@@ -243,7 +243,7 @@ impl HttpHandler {
              mime_type,
              CReset);
 
-        let flen = req_p.metadata().unwrap().len();
+        let flen = req_p.metadata().expect("Failed to get requested file metadata").len();
         self.handle_get_file_opened_range(req_p, SeekFrom::Start(from), from, flen - from, mime_type)
     }
 
@@ -265,14 +265,14 @@ impl HttpHandler {
              mime_type,
              CReset);
 
-        let flen = req_p.metadata().unwrap().len();
+        let flen = req_p.metadata().expect("Failed to get requested file metadata").len();
         self.handle_get_file_opened_range(req_p, SeekFrom::End(-(from as i64)), flen - from, from, mime_type)
     }
 
     fn handle_get_file_opened_range(&self, req_p: PathBuf, s: SeekFrom, b_from: u64, clen: u64, mt: Mime) -> IronResult<Response> {
-        let mut f = File::open(&req_p).unwrap();
-        let flen = f.metadata().unwrap().len();
-        f.seek(s).unwrap();
+        let mut f = File::open(&req_p).expect("Failed to open requested file");
+        let flen = f.metadata().expect("Failed to get requested file metadata").len();
+        f.seek(s).expect("Failed to seek requested file");
 
         Ok(Response::with((status::PartialContent,
                            f,
@@ -320,7 +320,7 @@ impl HttpHandler {
                            Header(headers::LastModified(headers::HttpDate(file_time_modified(&req_p)))),
                            Header(headers::ContentRange(headers::ContentRangeSpec::Bytes {
                                range: Some((from, to)),
-                               instance_length: Some(req_p.metadata().unwrap().len()),
+                               instance_length: Some(req_p.metadata().expect("Failed to get requested file metadata").len()),
                            })),
                            Header(headers::AcceptRanges(vec![headers::RangeUnit::Bytes])),
                            mime_type)))
@@ -343,7 +343,7 @@ impl HttpHandler {
              mime_type,
              CReset);
 
-        let flen = req_p.metadata().unwrap().len();
+        let flen = req_p.metadata().expect("Failed to get requested file metadata").len();
         if self.encoded_temp_dir.is_some() && flen > MIN_ENCODING_SIZE && flen < MAX_ENCODING_SIZE &&
            req_p.extension().and_then(|s| s.to_str()).map(|s| !BLACKLISTED_ENCODING_EXTENSIONS.contains(&UniCase(s))).unwrap_or(true) {
             self.handle_get_file_encoded(req, req_p, mime_type)
@@ -363,12 +363,13 @@ impl HttpHandler {
             let cache_key = (file_hash(&req_p), encoding.to_string());
 
             {
-                match self.cache_fs.read().unwrap().get(&cache_key) {
+                match self.cache_fs.read().expect("Filesystem cache read lock poisoned").get(&cache_key) {
                     Some(&(ref resp_p, true)) => {
                         log!("{} encoded as {} for {:.1}% ratio (cached)",
                              iter::repeat(' ').take(req.remote_addr.to_string().len()).collect::<String>(),
                              encoding,
-                             ((req_p.metadata().unwrap().len() as f64) / (resp_p.metadata().unwrap().len() as f64)) * 100f64);
+                             ((req_p.metadata().expect("Failed to get requested file metadata").len() as f64) /
+                              (resp_p.metadata().expect("Failed to get encoded file metadata").len() as f64)) * 100f64);
 
                         return Ok(Response::with((status::Ok,
                                                   Header(headers::Server(USER_AGENT.to_string())),
@@ -398,18 +399,19 @@ impl HttpHandler {
             };
 
             if encode_file(&req_p, &resp_p, &encoding) {
-                let gain = (req_p.metadata().unwrap().len() as f64) / (resp_p.metadata().unwrap().len() as f64);
+                let gain = (req_p.metadata().expect("Failed to get requested file metadata").len() as f64) /
+                           (resp_p.metadata().expect("Failed to get encoded file metadata").len() as f64);
                 if gain < MIN_ENCODING_GAIN {
-                    let mut cache = self.cache_fs.write().unwrap();
+                    let mut cache = self.cache_fs.write().expect("Filesystem cache write lock poisoned");
                     cache.insert(cache_key, (req_p.clone(), false));
-                    fs::remove_file(resp_p).unwrap();
+                    fs::remove_file(resp_p).expect("Failed to remove too big encoded file");
                 } else {
                     log!("{} encoded as {} for {:.1}% ratio",
                          iter::repeat(' ').take(req.remote_addr.to_string().len()).collect::<String>(),
                          encoding,
                          gain * 100f64);
 
-                    let mut cache = self.cache_fs.write().unwrap();
+                    let mut cache = self.cache_fs.write().expect("Filesystem cache write lock poisoned");
                     cache.insert(cache_key, (resp_p.clone(), true));
 
                     return Ok(Response::with((status::Ok,
@@ -510,22 +512,26 @@ impl HttpHandler {
                                                                              directory</a></td> <td>{}</td> <td></td></tr>",
                                                                             slash_idx.map(|i| &rel_noslash[0..i]).unwrap_or(""),
                                                                             if slash_idx.is_some() { "/" } else { "" },
-                                                                            file_time_modified(req_p.parent().unwrap()).strftime("%F %T").unwrap())
+                                                                            file_time_modified(req_p.parent()
+                                                                                    .expect("Failed to get requested directory's parent directory"))
+                                                                                .strftime("%F %T")
+                                                                                .unwrap())
                                                                 },
                                                                 &req_p.read_dir()
-                                                                    .unwrap()
-                                                                    .map(Result::unwrap)
+                                                                    .expect("Failed to read requested directory")
+                                                                    .map(|p| p.expect("Failed to iterate over trequested directory"))
                                                                     .filter(|f| self.follow_symlinks || !is_symlink(f.path()))
                                                                     .sorted_by(|lhs, rhs| {
-                                                                        (lhs.file_type().unwrap().is_file(), lhs.file_name().to_str().unwrap().to_lowercase())
-                                                                            .cmp(&(rhs.file_type().unwrap().is_file(),
-                                                                                   rhs.file_name().to_str().unwrap().to_lowercase()))
+                                                                        (lhs.file_type().expect("Failed to get file type").is_file(),
+                                                                         lhs.file_name().to_str().expect("Failed to get file name").to_lowercase())
+                                                                            .cmp(&(rhs.file_type().expect("Failed to get file type").is_file(),
+                                                                                   rhs.file_name().to_str().expect("Failed to get file name").to_lowercase()))
                                                                     })
                                                                     .fold("".to_string(), |cur, f| {
-                let is_file = f.file_type().unwrap().is_file();
+                let is_file = f.file_type().expect("Failed to get file tye").is_file();
                 let path = f.path();
-                let fname = f.file_name().into_string().unwrap();
-                let len = f.metadata().unwrap().len();
+                let fname = f.file_name().into_string().expect("Failed to get file name");
+                let len = f.metadata().expect("Failed to get file metadata").len();
                 let mime = if is_file {
                     match guess_mime_type_opt(&path) {
                         Some(mime::Mime(mime::TopLevel::Image, ..)) |
@@ -544,7 +550,7 @@ impl HttpHandler {
                         cur,
                         format!("/{}", relpath).replace("//", "/"),
                         fname,
-                        path.file_name().map(|p| p.to_str().unwrap().replace('.', "_")).as_ref().unwrap_or(&fname),
+                        path.file_name().map(|p| p.to_str().expect("Filename not UTF-8").replace('.', "_")).as_ref().unwrap_or(&fname),
                         if is_file { "file" } else { "dir" },
                         mime,
                         if is_file { "" } else { "/" },
@@ -657,14 +663,15 @@ impl HttpHandler {
              C::Magenta,
              req_p.display(),
              CReset,
-             *req.headers.get::<headers::ContentLength>().unwrap());
+             *req.headers.get::<headers::ContentLength>().expect("No Content-Length header"));
 
         let &(_, ref temp_dir) = self.writes_temp_dir.as_ref().unwrap();
-        let temp_file_p = temp_dir.join(req_p.file_name().unwrap());
+        let temp_file_p = temp_dir.join(req_p.file_name().expect("Failed to get requested file's filename"));
 
-        io::copy(&mut req.body, &mut File::create(&temp_file_p).unwrap()).unwrap();
-        let _ = fs::create_dir_all(req_p.parent().unwrap());
-        fs::copy(&temp_file_p, req_p).unwrap();
+        io::copy(&mut req.body, &mut File::create(&temp_file_p).expect("Failed to create temp file"))
+            .expect("Failed to write requested data to requested file");
+        let _ = fs::create_dir_all(req_p.parent().expect("Failed to get requested file's parent directory"));
+        fs::copy(&temp_file_p, req_p).expect("Failed to copy temp file to requested file");
 
         Ok(Response::with((if existant {
                                status::NoContent
@@ -702,9 +709,9 @@ impl HttpHandler {
              CReset);
 
         if req_p.is_file() {
-            fs::remove_file(req_p).unwrap();
+            fs::remove_file(req_p).expect("Failed to remove requested file");
         } else {
-            fs::remove_dir_all(req_p).unwrap();
+            fs::remove_dir_all(req_p).expect("Failed to remove requested directory");
         }
 
         Ok(Response::with((status::NoContent, Header(headers::Server(USER_AGENT.to_string())))))
@@ -770,10 +777,10 @@ impl HttpHandler {
     fn handle_generated_response_encoding(&self, req: &mut Request, st: status::Status, resp: String) -> IronResult<Response> {
         if let Some(encoding) = req.headers.get_mut::<headers::AcceptEncoding>().and_then(|es| response_encoding(&mut **es)) {
             let mut cache_key = ([0u8; 32], encoding.to_string());
-            md6::hash(256, resp.as_bytes(), &mut cache_key.0).unwrap();
+            md6::hash(256, resp.as_bytes(), &mut cache_key.0).expect("Failed to hash generated response");
 
             {
-                if let Some(enc_resp) = self.cache_gen.read().unwrap().get(&cache_key) {
+                if let Some(enc_resp) = self.cache_gen.read().expect("Generated file cache read lock poisoned").get(&cache_key) {
                     log!("{} encoded as {} for {:.1}% ratio (cached)",
                          iter::repeat(' ').take(req.remote_addr.to_string().len()).collect::<String>(),
                          encoding,
@@ -793,7 +800,7 @@ impl HttpHandler {
                      encoding,
                      ((resp.len() as f64) / (enc_resp.len() as f64)) * 100f64);
 
-                let mut cache = self.cache_gen.write().unwrap();
+                let mut cache = self.cache_gen.write().expect("Generated file cache read lock poisoned");
                 cache.insert(cache_key.clone(), enc_resp);
 
                 return Ok(Response::with((st,
