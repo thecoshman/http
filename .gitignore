@@ -7,6 +7,7 @@
 !rustfmt.toml
 !build.rs
 !http-manifest.rc
+!install.*
 !*.md
 !src
 !src/**

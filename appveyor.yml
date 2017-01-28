@@ -11,10 +11,12 @@ install:
   - set PATH=C:\msys64\mingw64\bin;C:\msys64\usr\bin;%PATH%;C:\Users\appveyor\.cargo\bin
   - bash -lc "pacman --needed --noconfirm -Sy pacman-mirrors"
   - bash -lc "pacman --noconfirm -Sy"
-  - bash -lc "pacman --noconfirm -S mingw-w64-x86_64-toolchain"
+  - bash -lc "pacman --noconfirm -S mingw-w64-x86_64-toolchain mingw-w64-x86_64-nsis"
   -
   - curl -SL https://win.rustup.rs/ -oC:\rustup-init.exe
   - C:\rustup-init.exe -y --default-host="x86_64-pc-windows-gnu"
+  -
+  - curl -SOL https://cdn.rawgit.com/nabijaczleweli/880a4b42368c610dc5de041d73bbea58/raw/d84dfb47245c7c44af34940d957c17099dc38c2b/EnvVarUpdate.nsh
 
 build: off
 build_script:
@@ -22,6 +24,7 @@ build_script:
   - cargo build --verbose --release
   - cp target\release\http.exe http-v1.0.0.exe
   - strip --strip-all --remove-section=.comment --remove-section=.note http-v1.0.0.exe
+  - makensis -DHTTP_VERSION=v1.0.0 "/X!include \"EnvVarUpdate.nsh\"" install.nsi
 
 test: off
 test_script:
@@ -29,12 +32,13 @@ test_script:
 
 artifacts:
   - path: http-v1.0.0.exe
+  - path: http v1.0.0 installer.exe
 
 deploy:
   provider: GitHub
-  artifact: http-v1.0.0.exe
+  artifact: /http.*v1.0.0.*\.exe/
   auth_token:
-    secure: NwgKYz+j4CQUDokMd0JcRUw0kNh1jRCfUs4r3DE6bzodobCqZZyERcEAftWuNylG
+    secure: ZTXvCrv9y01s7Hd60w8W7NaouPnPoaw9YJt9WhWQ2Pep8HLvCikt9Exjkz8SGP9P
   on:
     appveyor_repo_tag: true
 
