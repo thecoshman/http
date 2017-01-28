@@ -2,6 +2,7 @@ window.addEventListener("load", () => {
   const SUPPORTED_TYPES = ["Files", "application/x-moz-file"];
 
   let body = document.getElementsByTagName("body")[0];
+  let remaining_files = 0;
 
   body.addEventListener("dragover", (ev) => {
     if(SUPPORTED_TYPES.find(el => (ev.dataTransfer.types.contains || ev.dataTransfer.types.includes).call(ev.dataTransfer.types, el)))
@@ -12,21 +13,53 @@ window.addEventListener("load", () => {
     if(SUPPORTED_TYPES.find(el => (ev.dataTransfer.types.contains || ev.dataTransfer.types.includes).call(ev.dataTransfer.types, el))) {
       ev.preventDefault();
 
-      let remaining_files = ev.dataTransfer.files.length;
       let url = document.URL;
-      if(url[url.length - 1] != "/")
-        url += "/";
+      if(url[url.length - 1] == "/")
+        url = url.substr(0, url.length - 1);
 
       for(let i = ev.dataTransfer.files.length - 1; i >= 0; --i) {
-        let file = ev.dataTransfer.files[i];
-        let request = new XMLHttpRequest();
-        request.addEventListener("loadend", (e) => {
-          if(--remaining_files === 0)
-            window.location.reload();
-        });
-        request.open("PUT", url + file.name);
-        request.send(file);
+        if(!ev.dataTransfer.items[i].webkitGetAsEntry)
+          ++remaining_files;
+        else
+          recurse_count(ev.dataTransfer.items[i].webkitGetAsEntry());
+      }
+
+      for(let i = ev.dataTransfer.files.length - 1; i >= 0; --i) {
+        if(!ev.dataTransfer.items[i].webkitGetAsEntry) {
+          let file = ev.dataTransfer.files[i];
+          upload_file(base_url + "/" + file.name, file);
+        } else
+          recurse_upload(ev.dataTransfer.items[i].webkitGetAsEntry(), url);
       }
     }
   });
+
+  function upload_file(req_url, file) {
+    let request = new XMLHttpRequest();
+    request.addEventListener("loadend", (e) => {
+      if(--remaining_files === 0)
+        window.location.reload();
+    });
+    request.open("PUT", req_url);
+    request.send(file);
+  }
+
+  function recurse_upload(entry, base_url) {
+    if(entry.isFile) {
+      if(entry.file)
+        entry.file((f) => upload_file(base_url + entry.fullPath, f));
+      else
+        upload_file(base_url + entry.fullPath, entry.getFile());
+    } else
+      entry.createReader().readEntries((e) => {
+        e.forEach((f) => recurse_upload(f, base_url));
+      });
+  }
+
+  function recurse_count(entry) {
+    if(entry.isFile) {
+      ++remaining_files;
+    } else
+      entry.createReader().readEntries((e) => e.forEach(recurse_count));
+  }
 });
