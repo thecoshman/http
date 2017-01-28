@@ -29,7 +29,7 @@ url = "1.2"
 md6 = "1.1"
 
 [dependencies.trivial_colours]
-version = "0.2"
+version = "0.3"
 default-features = false
 
 
