@@ -7,6 +7,7 @@ readme = "README.md"
 keywords = ["http", "server", "https", "file", "directory"]
 categories = ["network-programming", "web-programming::http-server"]
 license = "MIT"
+build = "build.rs"
 # Remember to also update in appveyor.yml
 version = "1.0.0"
 # Remember to also update in http.md
@@ -31,6 +32,9 @@ md6 = "1.1"
 [dependencies.trivial_colours]
 version = "0.3"
 default-features = false
+
+[target.'cfg(all(windows, target_env = "msvc"))'.build-dependencies]
+winreg = { version = "0.4", default-features = false }
 
 
 [[bin]]

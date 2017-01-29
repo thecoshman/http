@@ -5,6 +5,8 @@
 !LICENSE
 !Cargo.toml
 !rustfmt.toml
+!build.rs
+!http-manifest.rc
 !*.md
 !src
 !src/**
