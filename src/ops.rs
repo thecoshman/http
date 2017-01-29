@@ -465,7 +465,8 @@ impl HttpHandler {
             let rel_noslash = &relpath[0..relpath.len() - 1];
             let slash_idx = rel_noslash.rfind('/');
             format!("<tr><td><a href=\"/{up_path}{up_path_slash}\"><img id=\"parent_dir\" src=\"{{back_arrow_icon}}\" /></a></td> \
-                     <td><a href=\"/{up_path}{up_path_slash}\">Parent directory</a></td> <td>{}</td> <td></td></tr>",
+                         <td><a href=\"/{up_path}{up_path_slash}\">Parent directory</a></td> <td><a href=\"/{up_path}{up_path_slash}\">{}</a></td> \
+                         <td></td></tr>",
                     file_time_modified(req_p.parent()
                             .expect("Failed to get requested directory's parent directory"))
                         .strftime("%F %T")
@@ -487,6 +488,7 @@ impl HttpHandler {
                 let path = f.path();
                 let fname = f.file_name().into_string().expect("Failed to get file name");
                 let len = f.metadata().expect("Failed to get file metadata").len();
+                let abspath = format!("/{}", relpath).replace("//", "/");
                 let mime = if is_file {
                     match guess_mime_type_opt(&path) {
                         Some(mime::Mime(mime::TopLevel::Image, ..)) |
@@ -499,15 +501,19 @@ impl HttpHandler {
                 } else {
                     ""
                 };
+
                 format!("{}<tr><td><a href=\"{path}{fname}\"><img id=\"{}\" src=\"{{{}{}_icon}}\" /></a></td> \
-                           <td><a href=\"{path}{fname}\">{fname}{}</a></td> <td>{}</td> <td>{}{}{}{}{}</td></tr>\n",
+                           <td><a href=\"{path}{fname}\">{fname}{}</a></td> <td><a href=\"{path}{fname}\">{}</a></td> <td>{}{}{}{}{}{}{}{}</a></td></tr>\n",
                         cur,
                         path.file_name().map(|p| p.to_str().expect("Filename not UTF-8").replace('.', "_")).as_ref().unwrap_or(&fname),
                         if is_file { "file" } else { "dir" },
                         mime,
                         if is_file { "" } else { "/" },
                         file_time_modified(&path).strftime("%F %T").unwrap(),
-                        if is_file { "<abbr title=\"" } else { "" },
+                        if is_file { "<a href=\"" } else { "" },
+                        if is_file { &abspath } else { "" },
+                        if is_file { &fname } else { "" },
+                        if is_file { "\"><abbr title=\"" } else { "" },
                         if is_file {
                             len.to_string()
                         } else {
@@ -520,7 +526,7 @@ impl HttpHandler {
                             String::new()
                         },
                         if is_file { "</abbr>" } else { "" },
-                        path = format!("/{}", relpath).replace("//", "/"),
+                        path = abspath,
                         fname = fname)
             });
 
