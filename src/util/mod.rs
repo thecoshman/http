@@ -55,7 +55,7 @@ lazy_static! {
             Cow::Owned(format!("data:{};base64,{}",
                                get_mime_type_str("gif").unwrap(),
                                base64::encode(include_bytes!("../../assets/icons/back_arrow_icon.gif")))));
-        ass.insert("drag_drop", Cow::Borrowed(include_str!("../../assets/drag_drop.js")));
+        ass.insert("upload", Cow::Borrowed(include_str!("../../assets/upload.js")));
         ass
     };
 }

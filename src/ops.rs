@@ -529,12 +529,20 @@ impl HttpHandler {
                                                 html_response(DIRECTORY_LISTING_HTML,
                                                               &[&relpath[..],
                                                                 &if self.writes_temp_dir.is_some() {
-                                                                    r#"<script type="text/javascript">{drag_drop}</script>"#
+                                                                    r#"<script type="text/javascript">{upload}</script>"#
                                                                 } else {
                                                                     ""
                                                                 },
                                                                 &parent_s[..],
-                                                                &list_s[..]]))
+                                                                &list_s[..],
+                                                                &if self.writes_temp_dir.is_some() {
+                                                                    "<hr /> \
+                                                                     <p> \
+                                                                       Drag&amp;Drop to upload or <input id=\"file_upload\" type=\"file\" multiple />. \
+                                                                     </p>"
+                                                                } else {
+                                                                    ""
+                                                                }]))
     }
 
     fn handle_put(&self, req: &mut Request) -> IronResult<Response> {
