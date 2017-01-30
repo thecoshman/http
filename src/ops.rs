@@ -503,7 +503,7 @@ impl HttpHandler {
                 };
 
                 format!("{}<tr><td><a href=\"{path}{fname}\"><img id=\"{}\" src=\"{{{}{}_icon}}\" /></a></td> \
-                           <td><a href=\"{path}{fname}\">{fname}{}</a></td> <td><a href=\"{path}{fname}\">{}</a></td> <td>{}{}{}{}{}{}{}{}</a></td></tr>\n",
+                           <td><a href=\"{path}{fname}\">{fname}{}</a></td> <td><a href=\"{path}{fname}\">{}</a></td> <td>{}{}{}{}{}{}{}{}</td></tr>\n",
                         cur,
                         path.file_name().map(|p| p.to_str().expect("Filename not UTF-8").replace('.', "_")).as_ref().unwrap_or(&fname),
                         if is_file { "file" } else { "dir" },
@@ -525,7 +525,7 @@ impl HttpHandler {
                         } else {
                             String::new()
                         },
-                        if is_file { "</abbr>" } else { "" },
+                        if is_file { "</abbr></a>" } else { "" },
                         path = abspath,
                         fname = fname)
             });
