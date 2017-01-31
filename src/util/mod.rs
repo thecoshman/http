@@ -166,11 +166,11 @@ pub fn percent_decode(s: &str) -> Option<Cow<str>> {
     percent_encoding::percent_decode(s.as_bytes()).decode_utf8().ok()
 }
 
-/// Get the timestamp of the file's last modification as a `time::Tm`.
+/// Get the timestamp of the file's last modification as a `time::Tm` in UTC.
 pub fn file_time_modified(f: &Path) -> Tm {
     match f.metadata().expect("Failed to get file metadata").modified().expect("Failed to get file last modified date").elapsed() {
-        Ok(dur) => time::now() - Duration::from_std(dur).unwrap(),
-        Err(ste) => time::now() + Duration::from_std(ste.duration()).unwrap(),
+        Ok(dur) => time::now_utc() - Duration::from_std(dur).unwrap(),
+        Err(ste) => time::now_utc() + Duration::from_std(ste.duration()).unwrap(),
     }
 }
 

@@ -470,7 +470,8 @@ impl HttpHandler {
             let rel_noslash = &relpath[0..relpath.len() - 1];
             let slash_idx = rel_noslash.rfind('/');
             format!("<a href=\"/{up_path}{up_path_slash}\" class=\"list entry top\"><span class=\"back_arrow_icon\">Parent directory</span></a> \
-                     <a href=\"/{up_path}{up_path_slash}\" class=\"list entry bottom\"><span class=\"marker\">@</span><span class=\"datetime\">{}</span></a>",
+                     <a href=\"/{up_path}{up_path_slash}\" class=\"list entry bottom\"><span class=\"marker\">@</span>\
+                       <span class=\"datetime\">{} UTC</span></a>",
                     file_time_modified(req_p.parent()
                             .expect("Failed to get requested directory's parent directory"))
                         .strftime("%F %T")
@@ -493,7 +494,7 @@ impl HttpHandler {
                 let path = f.path();
 
                 format!("{}<a href=\"{path}{fname}\" class=\"list entry top\"><span class=\"{}{}_icon\" id=\"{}\">{fname}{}</span></a> \
-                         <a href=\"{path}{fname}\" class=\"list entry bottom\"><span class=\"marker\">@</span><span class=\"datetime\">{}</span> \
+                         <a href=\"{path}{fname}\" class=\"list entry bottom\"><span class=\"marker\">@</span><span class=\"datetime\">{} UTC</span> \
                          {}{}{}</a>\n",
                         cur,
                         if is_file { "file" } else { "dir" },
