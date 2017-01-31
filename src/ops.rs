@@ -15,9 +15,10 @@ use mime_guess::guess_mime_type_opt;
 use std::io::{self, Read, Seek, SeekFrom};
 use trivial_colours::{Reset as CReset, Colour as C};
 use iron::{headers, status, method, mime, IronResult, Listening, Response, TypeMap, Request, Handler, Iron};
-use self::super::util::{url_path, file_hash, is_symlink, encode_str, encode_file, hash_string, html_response, file_binary, percent_decode, response_encoding,
-                        detect_file_as_dir, encoding_extension, file_time_modified, human_readable_size, USER_AGENT, ERROR_HTML, INDEX_EXTENSIONS,
-                        MIN_ENCODING_GAIN, MAX_ENCODING_SIZE, MIN_ENCODING_SIZE, DIRECTORY_LISTING_HTML, BLACKLISTED_ENCODING_EXTENSIONS};
+use self::super::util::{url_path, file_hash, is_symlink, encode_str, encode_file, hash_string, html_response, file_binary, client_mobile, percent_decode,
+                        file_icon_suffix, response_encoding, detect_file_as_dir, encoding_extension, file_time_modified, human_readable_size, USER_AGENT,
+                        ERROR_HTML, INDEX_EXTENSIONS, MIN_ENCODING_GAIN, MAX_ENCODING_SIZE, MIN_ENCODING_SIZE, DIRECTORY_LISTING_HTML,
+                        MOBILE_DIRECTORY_LISTING_HTML, BLACKLISTED_ENCODING_EXTENSIONS};
 
 
 macro_rules! log {
@@ -433,7 +434,11 @@ impl HttpHandler {
             }
         }
 
-        self.handle_get_dir_listing(req, req_p)
+        if client_mobile(&req.headers) {
+            self.handle_get_mobile_dir_listing(req, req_p)
+        } else {
+            self.handle_get_dir_listing(req, req_p)
+        }
     }
 
     fn handle_get_dir_index_no_slash(&self, req: &mut Request, idx_ext: &str) -> IronResult<Response> {
@@ -450,6 +455,82 @@ impl HttpHandler {
         //   - With following slash:
         //     https://cloud.githubusercontent.com/assets/6709544/21442028/a50918c4-c89b-11e6-8936-c29896947f6a.png
         Ok(Response::with((status::MovedPermanently, Header(headers::Server(USER_AGENT.to_string())), Header(headers::Location(new_url)))))
+    }
+
+    fn handle_get_mobile_dir_listing(&self, req: &mut Request, req_p: PathBuf) -> IronResult<Response> {
+        let relpath = (url_path(&req.url) + "/").replace("//", "/");
+        let is_root = &req.url.path() == &[""];
+        log!("{green}{}{reset} was served mobile directory listing for {magenta}{}{reset}",
+             req.remote_addr,
+             req_p.display());
+
+        let parent_s = if is_root {
+            String::new()
+        } else {
+            let rel_noslash = &relpath[0..relpath.len() - 1];
+            let slash_idx = rel_noslash.rfind('/');
+            format!("<a href=\"/{up_path}{up_path_slash}\" class=\"list entry top\"><span class=\"back_arrow_icon\">Parent directory</span></a> \
+                     <a href=\"/{up_path}{up_path_slash}\" class=\"list entry bottom\"><span class=\"marker\">@</span><span class=\"datetime\">{}</span></a>",
+                    file_time_modified(req_p.parent()
+                            .expect("Failed to get requested directory's parent directory"))
+                        .strftime("%F %T")
+                        .unwrap(),
+                    up_path = slash_idx.map(|i| &rel_noslash[0..i]).unwrap_or(""),
+                    up_path_slash = if slash_idx.is_some() { "/" } else { "" })
+        };
+        let list_s = req_p.read_dir()
+            .expect("Failed to read requested directory")
+            .map(|p| p.expect("Failed to iterate over trequested directory"))
+            .filter(|f| self.follow_symlinks || !is_symlink(f.path()))
+            .sorted_by(|lhs, rhs| {
+                (lhs.file_type().expect("Failed to get file type").is_file(), lhs.file_name().to_str().expect("Failed to get file name").to_lowercase())
+                    .cmp(&(rhs.file_type().expect("Failed to get file type").is_file(),
+                           rhs.file_name().to_str().expect("Failed to get file name").to_lowercase()))
+            })
+            .fold("".to_string(), |cur, f| {
+                let is_file = f.file_type().expect("Failed to get file type").is_file();
+                let fname = f.file_name().into_string().expect("Failed to get file name");
+                let path = f.path();
+
+                format!("{}<a href=\"{path}{fname}\" class=\"list entry top\"><span class=\"{}{}_icon\" id=\"{}\">{fname}{}</span></a> \
+                         <a href=\"{path}{fname}\" class=\"list entry bottom\"><span class=\"marker\">@</span><span class=\"datetime\">{}</span> \
+                         {}{}{}</a>\n",
+                        cur,
+                        if is_file { "file" } else { "dir" },
+                        file_icon_suffix(&path, is_file),
+                        path.file_name().map(|p| p.to_str().expect("Filename not UTF-8").replace('.', "_")).as_ref().unwrap_or(&fname),
+                        if is_file { "" } else { "/" },
+                        file_time_modified(&path).strftime("%F %T").unwrap(),
+                        if is_file { "<span class=\"size\">" } else { "" },
+                        if is_file {
+                            human_readable_size(f.metadata().expect("Failed to get file metadata").len())
+                        } else {
+                            String::new()
+                        },
+                        if is_file { "</span>" } else { "" },
+                        path = format!("/{}", relpath).replace("//", "/"),
+                        fname = fname)
+            });
+
+        self.handle_generated_response_encoding(req,
+                                                status::Ok,
+                                                html_response(MOBILE_DIRECTORY_LISTING_HTML,
+                                                              &[&relpath[..],
+                                                                if is_root { "" } else { "/" },
+                                                                &if self.writes_temp_dir.is_some() {
+                                                                    r#"<script type="text/javascript">{upload}</script>"#
+                                                                } else {
+                                                                    ""
+                                                                },
+                                                                &parent_s[..],
+                                                                &list_s[..],
+                                                                &if self.writes_temp_dir.is_some() {
+                                                                    "<span class=\"list heading top top-border bottom\"> \
+                                                                       Upload files: <input id=\"file_upload\" type=\"file\" multiple /> \
+                                                                     </span>"
+                                                                } else {
+                                                                    ""
+                                                                }]))
     }
 
     fn handle_get_dir_listing(&self, req: &mut Request, req_p: PathBuf) -> IronResult<Response> {
@@ -484,27 +565,16 @@ impl HttpHandler {
             })
             .fold("".to_string(), |cur, f| {
                 let is_file = f.file_type().expect("Failed to get file type").is_file();
-                let path = f.path();
                 let fname = f.file_name().into_string().expect("Failed to get file name");
+                let path = f.path();
                 let len = f.metadata().expect("Failed to get file metadata").len();
-                let mime = if is_file {
-                    match guess_mime_type_opt(&path) {
-                        Some(mime::Mime(mime::TopLevel::Image, ..)) |
-                        Some(mime::Mime(mime::TopLevel::Video, ..)) => "_image",
-                        Some(mime::Mime(mime::TopLevel::Text, ..)) => "_text",
-                        Some(mime::Mime(mime::TopLevel::Application, ..)) => "_binary",
-                        None => if file_binary(&path) { "" } else { "_text" },
-                        _ => "",
-                    }
-                } else {
-                    ""
-                };
+
                 format!("{}<tr><td><a href=\"{path}{fname}\"><img id=\"{}\" src=\"{{{}{}_icon}}\" /></a></td> \
                            <td><a href=\"{path}{fname}\">{fname}{}</a></td> <td>{}</td> <td>{}{}{}{}{}</td></tr>\n",
                         cur,
                         path.file_name().map(|p| p.to_str().expect("Filename not UTF-8").replace('.', "_")).as_ref().unwrap_or(&fname),
                         if is_file { "file" } else { "dir" },
-                        mime,
+                        file_icon_suffix(&path, is_file),
                         if is_file { "" } else { "/" },
                         file_time_modified(&path).strftime("%F %T").unwrap(),
                         if is_file { "<abbr title=\"" } else { "" },

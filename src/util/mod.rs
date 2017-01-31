@@ -6,15 +6,16 @@ mod content_encoding;
 use base64;
 use std::f64;
 use std::cmp;
-use iron::Url;
 use std::fs::File;
 use std::path::Path;
 use std::borrow::Cow;
 use url::percent_encoding;
+use iron::headers::UserAgent;
 use std::collections::HashMap;
 use time::{self, Duration, Tm};
+use iron::{mime, Headers, Url};
 use std::io::{BufReader, BufRead};
-use mime_guess::get_mime_type_str;
+use mime_guess::{guess_mime_type_opt, get_mime_type_str};
 
 pub use self::content_encoding::*;
 
@@ -24,6 +25,9 @@ pub static ERROR_HTML: &'static str = include_str!("../../assets/error.html");
 
 /// The HTML page to use as template for a requested directory's listing.
 pub static DIRECTORY_LISTING_HTML: &'static str = include_str!("../../assets/directory_listing.html");
+
+/// The HTML page to use as template for a requested directory's listing for mobile devices.
+pub static MOBILE_DIRECTORY_LISTING_HTML: &'static str = include_str!("../../assets/directory_listing_mobile.html");
 
 lazy_static! {
     /// Collection of data to be injected into generated responses.
@@ -222,5 +226,26 @@ pub fn human_readable_size(s: u64) -> String {
                 val.round()
             }
             .to_string() + " " + ["B", "KiB", "MiB", "GiB", "TiB", "PiB", "EiB", "ZiB", "YiB"][cmp::max(exp, 0) as usize]
+    }
+}
+
+/// Check if, given the request headers, the client should be considered a mobile device.
+pub fn client_mobile(hdr: &Headers) -> bool {
+    hdr.get::<UserAgent>().map(|s| s.contains("Mobi") || s.contains("mobi")).unwrap_or(false)
+}
+
+/// Get the suffix for the icon to use to represent the given file.
+pub fn file_icon_suffix<P: AsRef<Path>>(f: P, is_file: bool) -> &'static str {
+    if is_file {
+        match guess_mime_type_opt(&f) {
+            Some(mime::Mime(mime::TopLevel::Image, ..)) |
+            Some(mime::Mime(mime::TopLevel::Video, ..)) => "_image",
+            Some(mime::Mime(mime::TopLevel::Text, ..)) => "_text",
+            Some(mime::Mime(mime::TopLevel::Application, ..)) => "_binary",
+            None => if file_binary(&f) { "" } else { "_text" },
+            _ => "",
+        }
+    } else {
+        ""
     }
 }
