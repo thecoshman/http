@@ -1,4 +1,4 @@
-window.addEventListener("load", () => {
+window.addEventListener("load", function() {
   const SUPPORTED_TYPES = ["Files", "application/x-moz-file"];
 
   let body = document.getElementsByTagName("body")[0];
@@ -8,13 +8,17 @@ window.addEventListener("load", () => {
   if(url[url.length - 1] == "/")
     url = url.substr(0, url.length - 1);
 
-  body.addEventListener("dragover", (ev) => {
-    if(SUPPORTED_TYPES.find(el => (ev.dataTransfer.types.contains || ev.dataTransfer.types.includes).call(ev.dataTransfer.types, el)))
+  body.addEventListener("dragover", function(ev) {
+    if(SUPPORTED_TYPES.find(function(el) {
+      return (ev.dataTransfer.types.contains || ev.dataTransfer.types.includes).call(ev.dataTransfer.types, el);
+    }))
       ev.preventDefault();
   });
 
-  body.addEventListener("drop", (ev) => {
-    if(SUPPORTED_TYPES.find(el => (ev.dataTransfer.types.contains || ev.dataTransfer.types.includes).call(ev.dataTransfer.types, el))) {
+  body.addEventListener("drop", function(ev) {
+    if(SUPPORTED_TYPES.find(function(el) {
+      return (ev.dataTransfer.types.contains || ev.dataTransfer.types.includes).call(ev.dataTransfer.types, el);
+    })) {
       ev.preventDefault();
 
       for(let i = ev.dataTransfer.files.length - 1; i >= 0; --i) {
@@ -34,7 +38,7 @@ window.addEventListener("load", () => {
     }
   });
 
-  file_upload.addEventListener("change", () => {
+  file_upload.addEventListener("change", function() {
     remaining_files += file_upload.files.length;
 
     for(let i = file_upload.files.length - 1; i >= 0; --i) {
@@ -45,7 +49,7 @@ window.addEventListener("load", () => {
 
   function upload_file(req_url, file) {
     let request = new XMLHttpRequest();
-    request.addEventListener("loadend", (e) => {
+    request.addEventListener("loadend", function(e) {
       if(--remaining_files === 0)
         window.location.reload();
     });
@@ -56,12 +60,16 @@ window.addEventListener("load", () => {
   function recurse_upload(entry, base_url) {
     if(entry.isFile) {
       if(entry.file)
-        entry.file((f) => upload_file(base_url + entry.fullPath, f));
+        entry.file(function(f) {
+          upload_file(base_url + entry.fullPath, f);
+        });
       else
         upload_file(base_url + entry.fullPath, entry.getFile());
     } else
-      entry.createReader().readEntries((e) => {
-        e.forEach((f) => recurse_upload(f, base_url));
+      entry.createReader().readEntries(function(e) {
+        e.forEach(function(f) {
+          recurse_upload(f, base_url)
+        });
       });
   }
 
@@ -69,6 +77,8 @@ window.addEventListener("load", () => {
     if(entry.isFile) {
       ++remaining_files;
     } else
-      entry.createReader().readEntries((e) => e.forEach(recurse_count));
+      entry.createReader().readEntries(function(e) {
+        e.forEach(recurse_count);
+      });
   }
 });
