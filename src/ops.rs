@@ -548,7 +548,7 @@ impl HttpHandler {
             let slash_idx = rel_noslash.rfind('/');
             format!("<tr><td><a href=\"/{up_path}{up_path_slash}\"><img id=\"parent_dir\" src=\"{{back_arrow_icon}}\" /></a></td> \
                          <td><a href=\"/{up_path}{up_path_slash}\">Parent directory</a></td> <td><a href=\"/{up_path}{up_path_slash}\">{}</a></td> \
-                         <td></td></tr>",
+                         <td><a href=\"/{up_path}{up_path_slash}\">&nbsp;</a></td></tr>",
                     file_time_modified(req_p.parent()
                             .expect("Failed to get requested directory's parent directory"))
                         .strftime("%F %T")
