@@ -547,7 +547,8 @@ impl HttpHandler {
             let rel_noslash = &relpath[0..relpath.len() - 1];
             let slash_idx = rel_noslash.rfind('/');
             format!("<tr><td><a href=\"/{up_path}{up_path_slash}\"><img id=\"parent_dir\" src=\"{{back_arrow_icon}}\" /></a></td> \
-                         <td><a href=\"/{up_path}{up_path_slash}\">Parent directory</a></td> <td><a href=\"/{up_path}{up_path_slash}\">{}</a></td> \
+                         <td><a href=\"/{up_path}{up_path_slash}\">Parent directory</a></td> \
+                         <td><a href=\"/{up_path}{up_path_slash}\" class=\"datetime\">{}</a></td> \
                          <td><a href=\"/{up_path}{up_path_slash}\">&nbsp;</a></td></tr>",
                     file_time_modified(req_p.parent()
                             .expect("Failed to get requested directory's parent directory"))
@@ -573,7 +574,7 @@ impl HttpHandler {
                 let abspath = format!("/{}", relpath).replace("//", "/");
 
                 format!("{}<tr><td><a href=\"{path}{fname}\"><img id=\"{}\" src=\"{{{}{}_icon}}\" /></a></td> \
-                           <td><a href=\"{path}{fname}\">{fname}{}</a></td> <td><a href=\"{path}{fname}\">{}</a></td> \
+                           <td><a href=\"{path}{fname}\">{fname}{}</a></td> <td><a href=\"{path}{fname}\" class=\"datetime\">{}</a></td> \
                            <td><a href=\"{path}{fname}\">{}{}{}{}{}</a></td></tr>\n",
                         cur,
                         path.file_name().map(|p| p.to_str().expect("Filename not UTF-8").replace('.', "_")).as_ref().unwrap_or(&fname),
