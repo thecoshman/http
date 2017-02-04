@@ -11,7 +11,7 @@
 //! ```
 
 
-use clap::{AppSettings, Arg};
+use clap::{AppSettings, Arg, App};
 use std::path::PathBuf;
 use std::env::temp_dir;
 use std::str::FromStr;
@@ -40,7 +40,10 @@ pub struct Options {
 impl Options {
     /// Parse `env`-wide command-line arguments into an `Options` instance
     pub fn parse() -> Options {
-        let matches = app_from_crate!()
+        let matches = App::new("http")
+            .version(crate_version!())
+            .author(crate_authors!("\n"))
+            .about(crate_description!())
             .setting(AppSettings::ColoredHelp)
             .arg(Arg::from_usage("[DIR] 'Directory to host. Default: current working directory'")
                 .validator(|s| Options::filesystem_dir_validator(s, "Directory to host")))
