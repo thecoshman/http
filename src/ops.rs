@@ -546,7 +546,7 @@ impl HttpHandler {
         } else {
             let rel_noslash = &relpath[0..relpath.len() - 1];
             let slash_idx = rel_noslash.rfind('/');
-            format!("<tr><td><a href=\"/{up_path}{up_path_slash}\"><img id=\"parent_dir\" src=\"{{back_arrow_icon}}\" /></a></td> \
+            format!("<tr><td><a href=\"/{up_path}{up_path_slash}\"><img id=\"parent_dir\" src=\"{{back_arrow_icon}}\" alt=\"\" /></a></td> \
                          <td><a href=\"/{up_path}{up_path_slash}\">Parent directory</a></td> \
                          <td><a href=\"/{up_path}{up_path_slash}\" class=\"datetime\">{}</a></td> \
                          <td><a href=\"/{up_path}{up_path_slash}\">&nbsp;</a></td></tr>",
@@ -573,7 +573,7 @@ impl HttpHandler {
                 let len = f.metadata().expect("Failed to get file metadata").len();
                 let abspath = format!("/{}", relpath).replace("//", "/");
 
-                format!("{}<tr><td><a href=\"{path}{fname}\"><img id=\"{}\" src=\"{{{}{}_icon}}\" /></a></td> \
+                format!("{}<tr><td><a href=\"{path}{fname}\"><img id=\"{}\" src=\"{{{}{}_icon}}\" alt=\"\" /></a></td> \
                            <td><a href=\"{path}{fname}\">{fname}{}</a></td> <td><a href=\"{path}{fname}\" class=\"datetime\">{}</a></td> \
                            <td><a href=\"{path}{fname}\">{}{}{}{}{}</a></td></tr>\n",
                         cur,
