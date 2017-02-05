@@ -32,7 +32,7 @@ pub static MOBILE_DIRECTORY_LISTING_HTML: &'static str = include_str!("../../ass
 lazy_static! {
     /// Collection of data to be injected into generated responses.
     pub static ref ASSETS: HashMap<&'static str, Cow<'static, str>> = {
-        let mut ass = HashMap::with_capacity(11);
+        let mut ass = HashMap::with_capacity(10);
         ass.insert("favicon",
             Cow::Owned(format!("data:{};base64,{}", get_mime_type_str("ico").unwrap(), base64::encode(include_bytes!("../../assets/favicon.ico")))));
         ass.insert("dir_icon",
@@ -62,7 +62,6 @@ lazy_static! {
         ass.insert("date", Cow::Borrowed(include_str!("../../assets/date.js")));
         ass.insert("upload", Cow::Borrowed(include_str!("../../assets/upload.js")));
         ass.insert("adjust_tz", Cow::Borrowed(include_str!("../../assets/adjust_tz.js")));
-        ass.insert("adjust_tz_mobile", Cow::Borrowed(include_str!("../../assets/adjust_tz_mobile.js")));
         ass
     };
 }
