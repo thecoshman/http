@@ -126,7 +126,7 @@ impl HttpHandler {
     fn handle_get(&self, req: &mut Request) -> IronResult<Response> {
         let (req_p, symlink, url_err) = self.parse_requested_path(req);
         let file = req_p.is_file();
-        let range = req.headers.get().map(|ref r: &headers::Range| (*r).clone());
+        let range = req.headers.get().map(|r: &headers::Range| (*r).clone());
 
         if url_err {
             self.handle_invalid_url(req, "<p>Percent-encoding decoded to invalid UTF-8.</p>")
@@ -213,7 +213,7 @@ impl HttpHandler {
         let mut buf = vec![0; (to + 1 - from) as usize];
         let mut f = File::open(&req_p).expect("Failed to open requested file");
         f.seek(SeekFrom::Start(from)).expect("Failed to seek requested file");
-        f.read(&mut buf).expect("Failed to read requested file");
+        f.read_exact(&mut buf).expect("Failed to read requested file");
 
         Ok(Response::with((status::PartialContent,
                            (Header(headers::Server(USER_AGENT.to_string())),
@@ -359,7 +359,7 @@ impl HttpHandler {
                     Some(&(ref resp_p, false)) => {
                         return Ok(Response::with((status::Ok,
                                                   Header(headers::Server(USER_AGENT.to_string())),
-                                                  Header(headers::LastModified(headers::HttpDate(file_time_modified(&resp_p)))),
+                                                  Header(headers::LastModified(headers::HttpDate(file_time_modified(resp_p)))),
                                                   Header(headers::AcceptRanges(vec![headers::RangeUnit::Bytes])),
                                                   resp_p.as_path(),
                                                   mt)));
@@ -518,14 +518,14 @@ impl HttpHandler {
                                                 html_response(MOBILE_DIRECTORY_LISTING_HTML,
                                                               &[&relpath[..],
                                                                 if is_root { "" } else { "/" },
-                                                                &if self.writes_temp_dir.is_some() {
+                                                                if self.writes_temp_dir.is_some() {
                                                                     r#"<script type="text/javascript">{upload}</script>"#
                                                                 } else {
                                                                     ""
                                                                 },
                                                                 &parent_s[..],
                                                                 &list_s[..],
-                                                                &if self.writes_temp_dir.is_some() {
+                                                                if self.writes_temp_dir.is_some() {
                                                                     "<span class=\"list heading top top-border bottom\"> \
                                                                        Upload files: <input id=\"file_upload\" type=\"file\" multiple /> \
                                                                      </span>"
@@ -603,14 +603,14 @@ impl HttpHandler {
                                                 status::Ok,
                                                 html_response(DIRECTORY_LISTING_HTML,
                                                               &[&relpath[..],
-                                                                &if self.writes_temp_dir.is_some() {
+                                                                if self.writes_temp_dir.is_some() {
                                                                     r#"<script type="text/javascript">{upload}</script>"#
                                                                 } else {
                                                                     ""
                                                                 },
                                                                 &parent_s[..],
                                                                 &list_s[..],
-                                                                &if self.writes_temp_dir.is_some() {
+                                                                if self.writes_temp_dir.is_some() {
                                                                     "<hr /> \
                                                                      <p> \
                                                                        Drag&amp;Drop to upload or <input id=\"file_upload\" type=\"file\" multiple />. \
