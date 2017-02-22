@@ -1,3 +1,4 @@
+extern crate hyper_native_tls;
 extern crate trivial_colours;
 #[macro_use]
 extern crate lazy_static;
@@ -29,6 +30,7 @@ use iron::Iron;
 use std::io::stderr;
 use std::process::exit;
 use std::sync::{Arc, Mutex, Condvar};
+use hyper_native_tls::NativeTlsServer;
 
 
 fn main() {
@@ -49,8 +51,18 @@ fn result_main() -> Result<(), Error> {
     let opts = Options::parse();
 
     let mut responder = try!(if let Some(p) = opts.port {
-        Iron::new(ops::HttpHandler::new(&opts))
-            .http(("0.0.0.0", p))
+        if let Some(&((ref id, _), ref pw)) = opts.tls_data.as_ref() {
+                Iron::new(ops::HttpHandler::new(&opts)).https(("0.0.0.0", p),
+                                                              try!(NativeTlsServer::new(id, pw).map_err(|_| {
+                    Error::Io {
+                        desc: "TLS certificate",
+                        op: "open",
+                        more: None,
+                    }
+                })))
+            } else {
+                Iron::new(ops::HttpHandler::new(&opts)).http(("0.0.0.0", p))
+            }
             .map_err(|_| {
                 Error::Io {
                     desc: "server",
@@ -59,13 +71,18 @@ fn result_main() -> Result<(), Error> {
                 }
             })
     } else {
-        ops::try_ports(ops::HttpHandler::new(&opts), util::PORT_SCAN_LOWEST, util::PORT_SCAN_HIGHEST)
+        ops::try_ports(ops::HttpHandler::new(&opts), util::PORT_SCAN_LOWEST, util::PORT_SCAN_HIGHEST, &opts.tls_data)
     });
 
-    println!("{}Hosting \"{}\" on port {}...",
-             trivial_colours::Reset,
-             opts.hosted_directory.0,
-             responder.socket.port());
+    print!("{}Hosting \"{}\" on port {} with",
+           trivial_colours::Reset,
+           opts.hosted_directory.0,
+           responder.socket.port());
+    if let Some(&((_, ref id), _)) = opts.tls_data.as_ref() {
+        println!(" TLS ceritificate from \"{}\"...", id);
+    } else {
+        println!("out TLS...");
+    }
     println!("Ctrl-C to stop.");
     println!();
 

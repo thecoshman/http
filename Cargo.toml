@@ -15,6 +15,7 @@ authors = ["thecoshman <thecoshman@gmail.com>",
            "nabijaczleweli <nabijaczleweli@gmail.com>"]
 
 [dependencies]
+hyper-native-tls = "0.2"
 lazy_static = "0.2"
 mime_guess = "1.8"
 lazysort = "0.1"
@@ -25,7 +26,6 @@ flate2 = "0.2"
 bzip2 = "0.3"
 ctrlc = "3.0"
 clap = "2.20"
-iron = "0.5"
 time = "0.1"
 url = "1.4"
 md6 = "1.1"
@@ -33,6 +33,10 @@ md6 = "1.1"
 [dependencies.trivial_colours]
 version = "0.3"
 default-features = false
+
+[dependencies.iron]
+version = "0.5"
+features = ["hyper-native-tls"]
 
 [build-dependencies]
 embed-resource = "1.1"

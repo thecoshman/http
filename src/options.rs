@@ -35,6 +35,8 @@ pub struct Options {
     pub allow_writes: bool,
     /// Whether to encode filesystem files. Default: true
     pub encode_fs: bool,
+    /// Data for HTTPS, identity file and password. Default: `None`
+    pub tls_data: Option<((PathBuf, String), String)>,
 }
 
 impl Options {
@@ -54,6 +56,8 @@ impl Options {
             .arg(Arg::from_usage("-w --allow-write 'Allow for write operations. Default: false'"))
             .arg(Arg::from_usage("-i --no-indices 'Always generate dir listings even if index files are available. Default: false'"))
             .arg(Arg::from_usage("-e --no-encode 'Do not encode filesystem files. Default: false'"))
+            .arg(Arg::from_usage("--ssl [TLS_IDENTITY_PASSWIRD] 'Data for HTTPS, identity file and password. In the form of identity_file,password'")
+                .validator(Options::identity_validator))
             .get_matches();
 
         let w = matches.is_present("allow-write");
@@ -88,6 +92,12 @@ impl Options {
             check_indices: !matches.is_present("no-indices"),
             allow_writes: w,
             encode_fs: e,
+            tls_data: if let Some(idpwd) = matches.value_of("ssl") {
+                let comma_idx = idpwd.find(',').unwrap();
+                Some(((fs::canonicalize(&idpwd[0..comma_idx]).unwrap(), idpwd[0..comma_idx].to_string()), idpwd[comma_idx + 1..].to_string()))
+            } else {
+                None
+            },
         }
     }
 
@@ -96,6 +106,15 @@ impl Options {
             Ok(())
         } else {
             Err(format!("{} \"{}\" not actualy a directory", prefix, s))
+        })
+    }
+
+    fn identity_validator(s: String) -> Result<(), String> {
+        let comma_idx = try!(s.find(',').ok_or_else(|| format!("{} is not in the form 'identity_file,password'", s)));
+        fs::canonicalize(&s[0..comma_idx]).map_err(|_| format!("TLS identity file \"{}\" not found", &s[0..comma_idx])).and_then(|f| if f.is_file() {
+            Ok(())
+        } else {
+            Err(format!("TLS identity file \"{}\" not actualy a file", &s[0..comma_idx]))
         })
     }
 

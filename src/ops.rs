@@ -12,6 +12,7 @@ use iron::modifiers::Header;
 use std::collections::HashMap;
 use self::super::{Options, Error};
 use mime_guess::guess_mime_type_opt;
+use hyper_native_tls::NativeTlsServer;
 use std::io::{self, Read, Seek, SeekFrom};
 use trivial_colours::{Reset as CReset, Colour as C};
 use iron::{headers, status, method, mime, IronResult, Listening, Response, TypeMap, Request, Handler, Iron};
@@ -890,11 +891,23 @@ impl Clone for HttpHandler {
 /// # extern crate iron;
 /// # use https::ops::try_ports;
 /// # use iron::{status, Response};
-/// let server = try_ports(|req| Ok(Response::with((status::Ok, "Abolish the burgeoisie!"))), 8000, 8100).unwrap();
+/// let server = try_ports(|req| Ok(Response::with((status::Ok, "Abolish the burgeoisie!"))), 8000, 8100, None).unwrap();
 /// ```
-pub fn try_ports<H: Handler + Clone>(hndlr: H, from: u16, up_to: u16) -> Result<Listening, Error> {
+pub fn try_ports<H: Handler + Clone>(hndlr: H, from: u16, up_to: u16, tls_data: &Option<((PathBuf, String), String)>) -> Result<Listening, Error> {
     for port in from..up_to + 1 {
-        match Iron::new(hndlr.clone()).http(("0.0.0.0", port)) {
+        let ir = Iron::new(hndlr.clone());
+        match if let Some(&((ref id, _), ref pw)) = tls_data.as_ref() {
+            ir.https(("0.0.0.0", port),
+                     try!(NativeTlsServer::new(id, pw).map_err(|_| {
+                Error::Io {
+                    desc: "TLS certificate",
+                    op: "open",
+                    more: None,
+                }
+            })))
+        } else {
+            ir.http(("0.0.0.0", port))
+        } {
             Ok(server) => return Ok(server),
             Err(error) => {
                 if !error.to_string().contains("port") {
