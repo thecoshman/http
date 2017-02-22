@@ -78,6 +78,14 @@ impl HttpHandler {
         }
     }
 
+    pub fn clean_temp_dirs(temp_dir: &Option<(String, PathBuf)>) {
+        for (temp_name, temp_dir) in ["writes", "encoded"].into_iter().flat_map(|tn| HttpHandler::temp_subdir(temp_dir, true, tn)) {
+            if temp_dir.exists() && fs::remove_dir_all(&temp_dir).is_ok() {
+                log!("Deleted temp dir {magenta}{}{reset}", temp_name);
+            }
+        }
+    }
+
     fn temp_subdir(td: &Option<(String, PathBuf)>, flag: bool, name: &str) -> Option<(String, PathBuf)> {
         if flag && td.is_some() {
             let &(ref temp_name, ref temp_dir) = td.as_ref().unwrap();

@@ -8,6 +8,7 @@ extern crate unicase;
 extern crate base64;
 extern crate flate2;
 extern crate bzip2;
+extern crate ctrlc;
 #[macro_use]
 extern crate clap;
 extern crate iron;
@@ -27,6 +28,7 @@ pub use options::Options;
 use iron::Iron;
 use std::io::stderr;
 use std::process::exit;
+use std::sync::{Arc, Mutex, Condvar};
 
 
 fn main() {
@@ -46,7 +48,7 @@ fn actual_main() -> i32 {
 fn result_main() -> Result<(), Error> {
     let opts = Options::parse();
 
-    let responder = try!(if let Some(p) = opts.port {
+    let mut responder = try!(if let Some(p) = opts.port {
         Iron::new(ops::HttpHandler::new(&opts))
             .http(("0.0.0.0", p))
             .map_err(|_| {
@@ -66,6 +68,19 @@ fn result_main() -> Result<(), Error> {
              responder.socket.port());
     println!("Ctrl-C to stop.");
     println!();
+
+    let end_handler = Arc::new(Condvar::new());
+    ctrlc::set_handler({
+            let r = end_handler.clone();
+            move || r.notify_one()
+        })
+        .unwrap();
+    let mx = Mutex::new(false);
+    let _ = end_handler.wait(mx.lock().unwrap()).unwrap();
+    responder.close().unwrap();
+
+    // This is necessary because the server isn't Drop::drop()ped when the responder is
+    ops::HttpHandler::clean_temp_dirs(&opts.temp_directory);
 
     Ok(())
 }
