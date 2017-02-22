@@ -15,7 +15,8 @@ See [the manpage](http.md) for full list.
   * [x] Multitude of information in directory indices
   * [x] Serving index files like `index.{html,htm,shtml}` from directories (disableable via `-i` switch)
   * [x] Drag&Drop to upload files (with `-w` specified)
-  * [x] Encoding of generated and filesystem-originating responses (disableable via `-e` switch)
+  * [x] Smart encoding of generated and filesystem-originating responses (disableable via `-e` switch)
+  * [x] Full Range header support
 
 ## [Manpage](http.md)
 
