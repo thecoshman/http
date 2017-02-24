@@ -79,7 +79,7 @@ fn result_main() -> Result<(), Error> {
            opts.hosted_directory.0,
            responder.socket.port());
     if let Some(&((_, ref id), _)) = opts.tls_data.as_ref() {
-        println!(" TLS ceritificate from \"{}\"...", id);
+        println!(" TLS certificate from \"{}\"...", id);
     } else {
         println!("out TLS...");
     }

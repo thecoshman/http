@@ -56,7 +56,7 @@ impl Options {
             .arg(Arg::from_usage("-w --allow-write 'Allow for write operations. Default: false'"))
             .arg(Arg::from_usage("-i --no-indices 'Always generate dir listings even if index files are available. Default: false'"))
             .arg(Arg::from_usage("-e --no-encode 'Do not encode filesystem files. Default: false'"))
-            .arg(Arg::from_usage("--ssl [TLS_IDENTITY_PASSWIRD] 'Data for HTTPS, identity file and password. In the form of identity_file,password'")
+            .arg(Arg::from_usage("--ssl [TLS_IDENTITY_PASSWORD] 'Data for HTTPS, identity file and password. In the form of identity_file,password'")
                 .validator(Options::identity_validator))
             .get_matches();
 
