@@ -490,7 +490,7 @@ impl HttpHandler {
         };
         let list_s = req_p.read_dir()
             .expect("Failed to read requested directory")
-            .map(|p| p.expect("Failed to iterate over trequested directory"))
+            .map(|p| p.expect("Failed to iterate over requested directory"))
             .filter(|f| self.follow_symlinks || !is_symlink(f.path()))
             .sorted_by(|lhs, rhs| {
                 (lhs.file_type().expect("Failed to get file type").is_file(), lhs.file_name().to_str().expect("Failed to get file name").to_lowercase())
@@ -502,13 +502,14 @@ impl HttpHandler {
                 let fname = f.file_name().into_string().expect("Failed to get file name");
                 let path = f.path();
 
-                format!("{}<a href=\"{path}{fname}\" class=\"list entry top\"><span class=\"{}{}_icon\" id=\"{}\">{fname}{}</span></a> \
+                format!("{}<a href=\"{path}{fname}\" class=\"list entry top\"><span class=\"{}{}_icon\" id=\"{}\">{}{}</span></a> \
                          <a href=\"{path}{fname}\" class=\"list entry bottom\"><span class=\"marker\">@</span><span class=\"datetime\">{} UTC</span> \
                          {}{}{}</a>\n",
                         cur,
                         if is_file { "file" } else { "dir" },
                         file_icon_suffix(&path, is_file),
                         path.file_name().map(|p| p.to_str().expect("Filename not UTF-8").replace('.', "_")).as_ref().unwrap_or(&fname),
+                        fname,
                         if is_file { "" } else { "/" },
                         file_time_modified(&path).strftime("%F %T").unwrap(),
                         if is_file { "<span class=\"size\">" } else { "" },
@@ -518,8 +519,8 @@ impl HttpHandler {
                             String::new()
                         },
                         if is_file { "</span>" } else { "" },
-                        path = format!("/{}", relpath).replace("//", "/"),
-                        fname = fname)
+                        path = format!("/{}", relpath).replace("//", "/").replace('%', "%25").replace('#', "%23"),
+                        fname = fname.replace('%', "%25").replace('#', "%23"))
             });
 
         self.handle_generated_response_encoding(req,
@@ -568,7 +569,7 @@ impl HttpHandler {
         };
         let list_s = req_p.read_dir()
             .expect("Failed to read requested directory")
-            .map(|p| p.expect("Failed to iterate over trequested directory"))
+            .map(|p| p.expect("Failed to iterate over requested directory"))
             .filter(|f| self.follow_symlinks || !is_symlink(f.path()))
             .sorted_by(|lhs, rhs| {
                 (lhs.file_type().expect("Failed to get file type").is_file(), lhs.file_name().to_str().expect("Failed to get file name").to_lowercase())
@@ -580,15 +581,15 @@ impl HttpHandler {
                 let fname = f.file_name().into_string().expect("Failed to get file name");
                 let path = f.path();
                 let len = f.metadata().expect("Failed to get file metadata").len();
-                let abspath = format!("/{}", relpath).replace("//", "/");
 
                 format!("{}<tr><td><a href=\"{path}{fname}\" id=\"{}\" class=\"{}{}_icon\"></a></td> \
-                           <td><a href=\"{path}{fname}\">{fname}{}</a></td> <td><a href=\"{path}{fname}\" class=\"datetime\">{}</a></td> \
+                           <td><a href=\"{path}{fname}\">{}{}</a></td> <td><a href=\"{path}{fname}\" class=\"datetime\">{}</a></td> \
                            <td><a href=\"{path}{fname}\">{}{}{}{}{}</a></td></tr>\n",
                         cur,
                         path.file_name().map(|p| p.to_str().expect("Filename not UTF-8").replace('.', "_")).as_ref().unwrap_or(&fname),
                         if is_file { "file" } else { "dir" },
                         file_icon_suffix(&path, is_file),
+                        fname,
                         if is_file { "" } else { "/" },
                         file_time_modified(&path).strftime("%F %T").unwrap(),
                         if is_file { "<abbr title=\"" } else { "&nbsp;" },
@@ -604,8 +605,8 @@ impl HttpHandler {
                             String::new()
                         },
                         if is_file { "</abbr>" } else { "" },
-                        path = abspath,
-                        fname = fname)
+                        path = format!("/{}", relpath).replace("//", "/").replace('%', "%25").replace('#', "%23"),
+                        fname = fname.replace('%', "%25").replace('#', "%23"))
             });
 
         self.handle_generated_response_encoding(req,
