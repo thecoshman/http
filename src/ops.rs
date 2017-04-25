@@ -1,7 +1,9 @@
 use md6;
 use std::iter;
 use time::now;
+use serde_json;
 use std::borrow::Cow;
+use serde::Serialize;
 use unicase::UniCase;
 use iron::mime::Mime;
 use std::sync::RwLock;
@@ -17,11 +19,12 @@ use hyper_native_tls::NativeTlsServer;
 use std::io::{self, SeekFrom, Write, Read, Seek};
 use trivial_colours::{Reset as CReset, Colour as C};
 use std::process::{ExitStatus, Command, Child, Stdio};
+use rfsapi::{RawFsApiHeader, FilesetData, RawFileData};
 use iron::{headers, status, method, mime, IronResult, Listening, Response, TypeMap, Request, Handler, Iron};
 use self::super::util::{url_path, file_hash, is_symlink, encode_str, encode_file, hash_string, html_response, file_binary, client_mobile, percent_decode,
-                        file_icon_suffix, response_encoding, detect_file_as_dir, encoding_extension, file_time_modified, human_readable_size, USER_AGENT,
-                        ERROR_HTML, INDEX_EXTENSIONS, MIN_ENCODING_GAIN, MAX_ENCODING_SIZE, MIN_ENCODING_SIZE, DIRECTORY_LISTING_HTML,
-                        MOBILE_DIRECTORY_LISTING_HTML, BLACKLISTED_ENCODING_EXTENSIONS};
+                        file_icon_suffix, response_encoding, detect_file_as_dir, encoding_extension, file_time_modified, get_raw_fs_metadata,
+                        human_readable_size, USER_AGENT, ERROR_HTML, INDEX_EXTENSIONS, MIN_ENCODING_GAIN, MAX_ENCODING_SIZE, MIN_ENCODING_SIZE,
+                        DIRECTORY_LISTING_HTML, MOBILE_DIRECTORY_LISTING_HTML, BLACKLISTED_ENCODING_EXTENSIONS};
 
 
 macro_rules! log {
@@ -137,15 +140,20 @@ impl HttpHandler {
         let (req_p, symlink, url_err) = self.parse_requested_path(req);
         let file = req_p.is_file();
         let range = req.headers.get().map(|r: &headers::Range| (*r).clone());
+        let raw_fs = req.headers.get().map(|r: &RawFsApiHeader| r.0).unwrap_or(false);
 
         if url_err {
             self.handle_invalid_url(req, "<p>Percent-encoding decoded to invalid UTF-8.</p>")
         } else if !req_p.exists() || (symlink && !self.follow_symlinks) {
             self.handle_nonexistant(req, req_p)
+        } else if file && raw_fs {
+            self.handle_get_raw_fs_file(req, req_p)
         } else if file && range.is_some() {
             self.handle_get_file_range(req, req_p, range.unwrap())
         } else if file {
             self.handle_get_file(req, req_p)
+        } else if raw_fs {
+            self.handle_get_raw_fs_dir(req, req_p)
         } else {
             self.handle_get_dir(req, req_p)
         }
@@ -174,6 +182,19 @@ impl HttpHandler {
                                                 status::NotFound,
                                                 html_response(ERROR_HTML,
                                                               &["404 Not Found", &format!("The requested entity \"{}\" doesn't exist.", url_p), ""]))
+    }
+
+    fn handle_get_raw_fs_file(&self, req: &mut Request, req_p: PathBuf) -> IronResult<Response> {
+        log!("{green}{}{reset} was served metadata for file {magenta}{}{reset}",
+             req.remote_addr,
+             req_p.display());
+        self.handle_raw_fs_api_response(status::Ok,
+                                        &FilesetData {
+                                            writes_supported: self.writes_temp_dir.is_some(),
+                                            is_root: false,
+                                            is_file: true,
+                                            files: vec![get_raw_fs_metadata(&req_p)],
+                                        })
     }
 
     fn handle_get_file_range(&self, req: &mut Request, req_p: PathBuf, range: headers::Range) -> IronResult<Response> {
@@ -424,6 +445,37 @@ impl HttpHandler {
                            mt)))
     }
 
+    fn handle_get_raw_fs_dir(&self, req: &mut Request, req_p: PathBuf) -> IronResult<Response> {
+        log!("{green}{}{reset} was served metadata for directory {magenta}{}{reset}",
+             req.remote_addr,
+             req_p.display());
+        self.handle_raw_fs_api_response(status::Ok,
+                                        &FilesetData {
+                                            writes_supported: self.writes_temp_dir.is_some(),
+                                            is_root: req.url.path() == [""],
+                                            is_file: false,
+                                            files: req_p.read_dir()
+                                                .expect("Failed to read requested directory")
+                                                .map(|p| p.expect("Failed to iterate over requested directory"))
+                                                .filter(|f| self.follow_symlinks || !is_symlink(f.path()))
+                                                .map(|f| {
+                    let is_file = f.file_type().expect("Failed to get file type").is_file();
+                    if is_file {
+                        get_raw_fs_metadata(f.path())
+                    } else {
+                        RawFileData {
+                            mime_type: "text/directory".parse().unwrap(),
+                            name: f.file_name().into_string().expect("Failed to get file name"),
+                            last_modified: file_time_modified(&f.path()),
+                            size: 0,
+                            is_file: false,
+                        }
+                    }
+                })
+                                                .collect(),
+                                        })
+    }
+
     fn handle_get_dir(&self, req: &mut Request, req_p: PathBuf) -> IronResult<Response> {
         if self.check_indices {
             let mut idx = req_p.join("index");
@@ -561,10 +613,7 @@ impl HttpHandler {
                          <td><a href=\"/{up_path}{up_path_slash}\">Parent directory</a></td> \
                          <td><a href=\"/{up_path}{up_path_slash}\" class=\"datetime\">{}</a></td> \
                          <td><a href=\"/{up_path}{up_path_slash}\">&nbsp;</a></td></tr>",
-                    file_time_modified(req_p.parent()
-                            .expect("Failed to get requested directory's parent directory"))
-                        .strftime("%F %T")
-                        .unwrap(),
+                    file_time_modified(req_p.parent().expect("Failed to get requested directory's parent directory")).strftime("%F %T").unwrap(),
                     up_path = slash_idx.map(|i| &rel_noslash[0..i]).unwrap_or(""),
                     up_path_slash = if slash_idx.is_some() { "/" } else { "" })
         };
@@ -753,7 +802,11 @@ impl HttpHandler {
         if req_p.is_file() {
             fs::remove_file(req_p).expect("Failed to remove requested file");
         } else {
-            fs::remove_dir_all(req_p).expect(if symlink {"Failed to remove requested symlink"} else {"Failed to remove requested directory"});
+            fs::remove_dir_all(req_p).expect(if symlink {
+                "Failed to remove requested symlink"
+            } else {
+                "Failed to remove requested directory"
+            });
         }
 
         Ok(Response::with((status::NoContent, Header(headers::Server(USER_AGENT.to_string())))))
@@ -846,6 +899,14 @@ impl HttpHandler {
         Ok(Response::with((st, Header(headers::Server(USER_AGENT.to_string())), "text/html;charset=utf-8".parse::<mime::Mime>().unwrap(), resp)))
     }
 
+    fn handle_raw_fs_api_response<R: Serialize>(&self, st: status::Status, resp: &R) -> IronResult<Response> {
+        Ok(Response::with((st,
+                           Header(headers::Server(USER_AGENT.to_string())),
+                           Header(RawFsApiHeader(true)),
+                           "application/json;charset=utf-8".parse::<mime::Mime>().unwrap(),
+                           serde_json::to_string(&resp).unwrap())))
+    }
+
     fn parse_requested_path(&self, req: &Request) -> (PathBuf, bool, bool) {
         self.parse_requested_path_custom_symlink(req, true)
     }
@@ -857,7 +918,6 @@ impl HttpHandler {
             } else {
                 err = true;
             }
-
             while let Ok(newlink) = cur.read_link() {
                 sk = true;
                 if follow_symlinks {
@@ -866,7 +926,6 @@ impl HttpHandler {
                     break;
                 }
             }
-
             (cur, sk, err)
         })
     }

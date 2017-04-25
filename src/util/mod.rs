@@ -9,6 +9,7 @@ use std::cmp;
 use std::fs::File;
 use std::path::Path;
 use std::borrow::Cow;
+use rfsapi::RawFileData;
 use url::percent_encoding;
 use iron::headers::UserAgent;
 use std::collections::HashMap;
@@ -249,5 +250,23 @@ pub fn file_icon_suffix<P: AsRef<Path>>(f: P, is_file: bool) -> &'static str {
         }
     } else {
         ""
+    }
+}
+
+/// Get the metadata of the specified file.
+///
+/// The specified path must point to a file.
+pub fn get_raw_fs_metadata<P: AsRef<Path>>(f: P) -> RawFileData {
+    let f = f.as_ref();
+    RawFileData {
+        mime_type: guess_mime_type_opt(f).unwrap_or_else(|| if file_binary(f) {
+            "application/octet-stream".parse().unwrap()
+        } else {
+            "text/plain".parse().unwrap()
+        }),
+        name: f.file_name().unwrap().to_str().expect("Failed to get requested file name").to_string(),
+        last_modified: file_time_modified(f),
+        size: f.metadata().expect("Failed to get requested file metadata").len(),
+        is_file: true,
     }
 }
