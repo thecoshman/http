@@ -123,30 +123,28 @@ fn encoding_idx(enc: &Encoding) -> Option<usize> {
 }
 
 macro_rules! encode_fn {
-    ($str_fn_name:ident, $file_fn_name:ident, $enc_tp:ident, $comp_lvl:expr, $setup:expr) => {
+    ($str_fn_name:ident, $file_fn_name:ident, $enc_tp:ident, $comp_lvl:expr, $constructor:expr) => {
         fn $str_fn_name(dt: &str) -> Option<Vec<u8>> {
-            let mut cmp = $enc_tp::new(Vec::new(), $comp_lvl);
-            $setup(&mut cmp);
+            let mut cmp = $constructor(Vec::new());
             cmp.write_all(dt.as_bytes()).ok().and_then(|_| cmp.finish().ok())
         }
 
         fn $file_fn_name(mut inf: File, outf: File) -> bool {
-            let mut cmp = $enc_tp::new(outf, $comp_lvl);
-            $setup(&mut cmp);
+            let mut cmp = $constructor(outf);
             io::copy(&mut inf, &mut cmp).and_then(|_| cmp.finish()).is_ok()
         }
     };
 
     ($str_fn_name:ident, $file_fn_name:ident, $enc_tp:ident, $comp_lvl:expr) => {
-        encode_fn!($str_fn_name, $file_fn_name, $enc_tp, $comp_lvl, |_| ());
+        encode_fn!($str_fn_name, $file_fn_name, $enc_tp, $comp_lvl, |into| $enc_tp::new(into, $comp_lvl));
     }
 }
 
 encode_fn!(encode_str_gzip, encode_file_gzip, GzEncoder, Flate2Compression::Default);
 encode_fn!(encode_str_deflate, encode_file_deflate, DeflateEncoder, Flate2Compression::Default);
-encode_fn!(encode_str_brotli, encode_file_brotli, BrotliEncoder, 0, setup_brotli);
+encode_fn!(encode_str_brotli,
+           encode_file_brotli,
+           BrotliEncoder,
+           0,
+           |into| BrotliEncoder::from_params(into, BrotliCompressParams::new().mode(BrotliCompressMode::Text)));
 encode_fn!(encode_str_bzip2, encode_file_bzip2, BzEncoder, BzCompression::Default);
-
-fn setup_brotli<W: Write>(cmp: &mut BrotliEncoder<W>) {
-    cmp.set_params(BrotliCompressParams::new().mode(BrotliCompressMode::Text));
-}
