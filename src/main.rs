@@ -95,7 +95,7 @@ fn result_main() -> Result<(), Error> {
             move || r.notify_one()
         })
         .unwrap();
-    let mx = Mutex::new(false);
+    let mx = Mutex::new(());
     let _ = end_handler.wait(mx.lock().unwrap()).unwrap();
     responder.close().unwrap();
 

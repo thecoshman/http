@@ -81,7 +81,7 @@ impl Options {
 
                 (format!("{}{}{}",
                          temp_s,
-                         if temp_s.ends_with("/") || temp_s.ends_with(r"\") {
+                         if temp_s.ends_with('/') || temp_s.ends_with('\\') {
                              ""
                          } else {
                              "/"

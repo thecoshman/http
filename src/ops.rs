@@ -93,7 +93,7 @@ impl HttpHandler {
         if flag {
             Some((format!("{}{}{}",
                           temp_name,
-                          if temp_name.ends_with("/") || temp_name.ends_with(r"\") {
+                          if temp_name.ends_with('/') || temp_name.ends_with('\\') {
                               ""
                           } else {
                               "/"
@@ -469,7 +469,7 @@ impl HttpHandler {
 
     fn handle_get_mobile_dir_listing(&self, req: &mut Request, req_p: PathBuf) -> IronResult<Response> {
         let relpath = (url_path(&req.url) + "/").replace("//", "/");
-        let is_root = &req.url.path() == &[""];
+        let is_root = req.url.path() == [""];
         log!("{green}{}{reset} was served mobile directory listing for {magenta}{}{reset}",
              req.remote_addr,
              req_p.display());
@@ -547,7 +547,7 @@ impl HttpHandler {
 
     fn handle_get_dir_listing(&self, req: &mut Request, req_p: PathBuf) -> IronResult<Response> {
         let relpath = (url_path(&req.url) + "/").replace("//", "/");
-        let is_root = &req.url.path() == &[""];
+        let is_root = req.url.path() == [""];
         log!("{green}{}{reset} was served directory listing for {magenta}{}{reset}",
              req.remote_addr,
              req_p.display());
@@ -910,6 +910,7 @@ impl Clone for HttpHandler {
 /// let server = try_ports(|req| Ok(Response::with((status::Ok, "Abolish the burgeoisie!"))), 8000, 8100, None).unwrap();
 /// ```
 pub fn try_ports<H: Handler + Clone>(hndlr: H, from: u16, up_to: u16, tls_data: &Option<((String, PathBuf), String)>) -> Result<Listening, Error> {
+    let hndlr = hndlr;
     for port in from..up_to + 1 {
         let ir = Iron::new(hndlr.clone());
         match if let Some(&((_, ref id), ref pw)) = tls_data.as_ref() {
