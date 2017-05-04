@@ -40,9 +40,12 @@ pass parameters like what port to use.
 
     Default: $TEMP.
 
-  --ssl [TLS_IDENTITY_FILE,PASSWORD]
+  --ssl [TLS_IDENTITY_FILE]
 
-    TLS identity file to use to encrypt as, plus the password to unlock it.
+    TLS identity file to use to encrypt as.
+
+    The password is taken from the HTTP_SSL_PASS environment variable, or empty
+    if that variable doesn't exist.
 
     Default: None.
 
@@ -153,7 +156,7 @@ pass parameters like what port to use.
       Starting server failed: port taken.
       <EOF>
 
-  `http --ssl cert/http8k.p12,pwd`
+  `HTTP_SSL_PASS=pwd http --ssl cert/http8k.p12`
 
     As in the first example, but encrypt with the identity file cert/http8k.p12
     unlocked with password "pwd".
