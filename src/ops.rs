@@ -976,7 +976,7 @@ pub fn generate_tls_data(temp_dir: &(String, PathBuf)) -> Result<((String, PathB
     }
 
     let mut child = try!(Command::new("openssl")
-        .args(&["req", "-x509", "-naewkey", "rsa:4096", "-nodes", "-keyout", "tls.key", "-out", "tls.crt", "-days", "3650", "-utf8"])
+        .args(&["req", "-x509", "-newkey", "rsa:4096", "-nodes", "-keyout", "tls.key", "-out", "tls.crt", "-days", "3650", "-utf8"])
         .current_dir(&tls_dir)
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
