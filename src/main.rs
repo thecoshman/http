@@ -70,7 +70,7 @@ fn result_main() -> Result<(), Error> {
                 Error::Io {
                     desc: "server",
                     op: "start",
-                    more: Some("port taken"),
+                    more: Some("port taken".to_string()),
                 }
             })
     } else {

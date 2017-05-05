@@ -16,7 +16,7 @@ pub enum Error {
         /// This should be lowercase and imperative ("create", "open").
         op: &'static str,
         /// Additional data.
-        more: Option<&'static str>,
+        more: Option<String>,
     },
 }
 
@@ -39,7 +39,7 @@ impl Error {
     /// ```
     pub fn print_error<W: Write>(&self, err_out: &mut W) {
         match *self {
-            Error::Io { desc, op, more } => {
+            Error::Io { desc, op, ref more } => {
                 // Strip the last 'e', if any, so we get correct inflection for continuous times
                 let op = uppercase_first(if op.ends_with('e') {
                     &op[..op.len() - 1]
@@ -47,7 +47,7 @@ impl Error {
                     op
                 });
                 write!(err_out, "{}ing {} failed", op, desc).unwrap();
-                if let Some(more) = more {
+                if let &Some(ref more) = more {
                     write!(err_out, ": {}", more).unwrap();
                 }
                 writeln!(err_out, ".").unwrap();
