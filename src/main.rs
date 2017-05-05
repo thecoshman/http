@@ -48,7 +48,10 @@ fn actual_main() -> i32 {
 }
 
 fn result_main() -> Result<(), Error> {
-    let opts = Options::parse();
+    let mut opts = Options::parse();
+    if opts.generate_tls {
+        opts.tls_data = Some(try!(ops::generate_tls_data(&opts.temp_directory)));
+    }
 
     let mut responder = try!(if let Some(p) = opts.port {
         if let Some(&((ref id, _), ref pw)) = opts.tls_data.as_ref() {
@@ -78,7 +81,7 @@ fn result_main() -> Result<(), Error> {
            trivial_colours::Reset,
            opts.hosted_directory.0,
            responder.socket.port());
-    if let Some(&((_, ref id), _)) = opts.tls_data.as_ref() {
+    if let Some(&((ref id, _), _)) = opts.tls_data.as_ref() {
         println!(" TLS certificate from \"{}\"...", id);
     } else {
         println!("out TLS...");

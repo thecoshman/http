@@ -11,9 +11,10 @@ use std::default::Default;
 use iron::modifiers::Header;
 use std::collections::HashMap;
 use self::super::{Options, Error};
+use std::process::{Command, Stdio};
 use mime_guess::guess_mime_type_opt;
 use hyper_native_tls::NativeTlsServer;
-use std::io::{self, Read, Seek, SeekFrom};
+use std::io::{self, SeekFrom, Write, Read, Seek};
 use trivial_colours::{Reset as CReset, Colour as C};
 use iron::{headers, status, method, mime, IronResult, Listening, Response, TypeMap, Request, Handler, Iron};
 use self::super::util::{url_path, file_hash, is_symlink, encode_str, encode_file, hash_string, html_response, file_binary, client_mobile, percent_decode,
@@ -79,7 +80,7 @@ impl HttpHandler {
         }
     }
 
-    pub fn clean_temp_dirs(temp_dir: &Option<(String, PathBuf)>) {
+    pub fn clean_temp_dirs(temp_dir: &(String, PathBuf)) {
         for (temp_name, temp_dir) in ["writes", "encoded"].into_iter().flat_map(|tn| HttpHandler::temp_subdir(temp_dir, true, tn)) {
             if temp_dir.exists() && fs::remove_dir_all(&temp_dir).is_ok() {
                 log!("Deleted temp dir {magenta}{}{reset}", temp_name);
@@ -87,9 +88,8 @@ impl HttpHandler {
         }
     }
 
-    fn temp_subdir(td: &Option<(String, PathBuf)>, flag: bool, name: &str) -> Option<(String, PathBuf)> {
-        if flag && td.is_some() {
-            let &(ref temp_name, ref temp_dir) = td.as_ref().unwrap();
+    fn temp_subdir(&(ref temp_name, ref temp_dir): &(String, PathBuf), flag: bool, name: &str) -> Option<(String, PathBuf)> {
+        if flag {
             Some((format!("{}{}{}",
                           temp_name,
                           if temp_name.ends_with("/") || temp_name.ends_with(r"\") {
@@ -894,10 +894,10 @@ impl Clone for HttpHandler {
 /// # use iron::{status, Response};
 /// let server = try_ports(|req| Ok(Response::with((status::Ok, "Abolish the burgeoisie!"))), 8000, 8100, None).unwrap();
 /// ```
-pub fn try_ports<H: Handler + Clone>(hndlr: H, from: u16, up_to: u16, tls_data: &Option<((PathBuf, String), String)>) -> Result<Listening, Error> {
+pub fn try_ports<H: Handler + Clone>(hndlr: H, from: u16, up_to: u16, tls_data: &Option<((String, PathBuf), String)>) -> Result<Listening, Error> {
     for port in from..up_to + 1 {
         let ir = Iron::new(hndlr.clone());
-        match if let Some(&((ref id, _), ref pw)) = tls_data.as_ref() {
+        match if let Some(&((_, ref id), ref pw)) = tls_data.as_ref() {
             ir.https(("0.0.0.0", port),
                      try!(NativeTlsServer::new(id, pw).map_err(|_| {
                 Error::Io {
@@ -927,4 +927,67 @@ pub fn try_ports<H: Handler + Clone>(hndlr: H, from: u16, up_to: u16, tls_data: 
         op: "start",
         more: Some("no free ports"),
     })
+}
+
+/// Generate a passwordless self-signed scertificate in the specified directory with the filenames `"tls.*"`.
+///
+/// # Examples
+///
+/// ```
+/// # use https::ops::generate_tls_data;
+/// let ((ident_name, ident_file), pass) = generate_tls_data(&(".".to_string(), ".".into())).unwrap();
+/// assert_eq!(ident_name, "./tls.p12");
+/// assert!(ident_file.exists());
+/// assert_eq!(pass, "");
+/// ```
+pub fn generate_tls_data(temp_dir: &(String, PathBuf)) -> Result<((String, PathBuf), String), Error> {
+    fn err(which: bool, op: &'static str, more: Option<&'static str>) -> Error {
+        Error::Io {
+            desc: if which {
+                "TLS key generation process"
+            } else {
+                "TLS identity generation process"
+            },
+            op: op,
+            more: more,
+        }
+    }
+
+    let mut child = try!(Command::new("openssl")
+        .args(&["req", "-x509", "-newkey", "rsa:4096", "-nodes", "-keyout", "tls.key", "-out", "tls.crt", "-days", "3650", "-utf8"])
+        .current_dir(&temp_dir.1)
+        .stdin(Stdio::piped())
+        .stdout(Stdio::null())
+        .stderr(Stdio::null())
+        .spawn()
+        .map_err(|_| err(true, "spawn", None)));
+    try!(child.stdin
+        .as_mut()
+        .unwrap()
+        .write_all(concat!("PL\r\nhttp\r\n",
+                           env!("CARGO_PKG_VERSION"),
+                           "\r\nthecoshman&nabijaczleweli\r\nнаб\r\nhttp/",
+                           env!("CARGO_PKG_VERSION"),
+                           "\r\nnabijaczleweli@gmail.com\r\n")
+            .as_bytes())
+        .map_err(|_| err(true, "pipe", None)));
+    let es = try!(child.wait().map_err(|_| err(true, "wait", None)));
+    if !es.success() {
+        return Err(err(true, "exit", Some("nonzero exit code")));
+    }
+
+    let mut child = try!(Command::new("openssl")
+        .args(&["pkcs12", "-export", "-out", "tls.p12", "-inkey", "tls.key", "-in", "tls.crt", "-passin", "pass:", "-passout", "pass:"])
+        .current_dir(&temp_dir.1)
+        .stdin(Stdio::null())
+        .stdout(Stdio::null())
+        .stderr(Stdio::null())
+        .spawn()
+        .map_err(|_| err(false, "spawn", None)));
+    let es = try!(child.wait().map_err(|_| err(false, "wait", None)));
+    if !es.success() {
+        return Err(err(false, "exit", Some("nonzero exit code")));
+    }
+
+    Ok(((format!("{}/tls.p12", temp_dir.0), temp_dir.1.join("tls.p12")), String::new()))
 }
