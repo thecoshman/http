@@ -81,7 +81,7 @@ impl HttpHandler {
     }
 
     pub fn clean_temp_dirs(temp_dir: &(String, PathBuf)) {
-        for (temp_name, temp_dir) in ["writes", "encoded"].into_iter().flat_map(|tn| HttpHandler::temp_subdir(temp_dir, true, tn)) {
+        for (temp_name, temp_dir) in ["writes", "encoded", "tls"].into_iter().flat_map(|tn| HttpHandler::temp_subdir(temp_dir, true, tn)) {
             if temp_dir.exists() && fs::remove_dir_all(&temp_dir).is_ok() {
                 log!("Deleted temp dir {magenta}{}{reset}", temp_name);
             }
@@ -929,14 +929,15 @@ pub fn try_ports<H: Handler + Clone>(hndlr: H, from: u16, up_to: u16, tls_data: 
     })
 }
 
-/// Generate a passwordless self-signed scertificate in the specified directory with the filenames `"tls.*"`.
+/// Generate a passwordless self-signed certificate in the `"tls"` subdirectory of the specified directory
+/// with the filenames `"tls.*"`.
 ///
 /// # Examples
 ///
 /// ```
 /// # use https::ops::generate_tls_data;
 /// let ((ident_name, ident_file), pass) = generate_tls_data(&(".".to_string(), ".".into())).unwrap();
-/// assert_eq!(ident_name, "./tls.p12");
+/// assert_eq!(ident_name, "./tls/tls.p12");
 /// assert!(ident_file.exists());
 /// assert_eq!(pass, "");
 /// ```
@@ -953,9 +954,18 @@ pub fn generate_tls_data(temp_dir: &(String, PathBuf)) -> Result<((String, PathB
         }
     }
 
+    let tls_dir = temp_dir.1.join("tls");
+    if !tls_dir.exists() && fs::create_dir_all(&tls_dir).is_err() {
+        return Err(Error::Io {
+            desc: "temporary directory",
+            op: "create",
+            more: None,
+        });
+    }
+
     let mut child = try!(Command::new("openssl")
         .args(&["req", "-x509", "-newkey", "rsa:4096", "-nodes", "-keyout", "tls.key", "-out", "tls.crt", "-days", "3650", "-utf8"])
-        .current_dir(&temp_dir.1)
+        .current_dir(&tls_dir)
         .stdin(Stdio::piped())
         .stdout(Stdio::null())
         .stderr(Stdio::null())
@@ -978,7 +988,7 @@ pub fn generate_tls_data(temp_dir: &(String, PathBuf)) -> Result<((String, PathB
 
     let mut child = try!(Command::new("openssl")
         .args(&["pkcs12", "-export", "-out", "tls.p12", "-inkey", "tls.key", "-in", "tls.crt", "-passin", "pass:", "-passout", "pass:"])
-        .current_dir(&temp_dir.1)
+        .current_dir(&tls_dir)
         .stdin(Stdio::null())
         .stdout(Stdio::null())
         .stderr(Stdio::null())
@@ -989,5 +999,5 @@ pub fn generate_tls_data(temp_dir: &(String, PathBuf)) -> Result<((String, PathB
         return Err(err(false, "exit", Some("nonzero exit code")));
     }
 
-    Ok(((format!("{}/tls.p12", temp_dir.0), temp_dir.1.join("tls.p12")), String::new()))
+    Ok(((format!("{}/tls/tls.p12", temp_dir.0), tls_dir.join("tls.p12")), String::new()))
 }

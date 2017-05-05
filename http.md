@@ -49,6 +49,13 @@ pass parameters like what port to use.
 
     Default: None.
 
+  --gen-ssl
+
+    Generate a passwordless, single-use TLS self-signed certificate
+    and use it for this session.
+
+    Exclusive with --ssl. Default: false.
+
   -s --no-follow-symlinks
 
     Don't follow symlinks when requesting file access.
@@ -163,6 +170,14 @@ pass parameters like what port to use.
 
     Assuming password is correct, example output change:
       Hosting "." on port 8000 TLS certificate from "cert/http8k.p12"...
+
+  `http --gen-ssl`
+
+    As in the first example, but encrypt with a newly created self-signed
+    identity file.
+
+    Example output change:
+      Hosting "." on port 8000 TLS certificate from "$TEMP/http-P-Rust-http/tls/tls.p12"...
 
 ## AUTHOR
 
