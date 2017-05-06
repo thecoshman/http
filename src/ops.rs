@@ -726,27 +726,33 @@ impl HttpHandler {
             return self.handle_forbidden_method(req, "-w", "write requests");
         }
 
-        let (req_p, symlink, url_err) = self.parse_requested_path(req);
+        let (req_p, symlink, url_err) = self.parse_requested_path_custom_symlink(req, false);
 
         if url_err {
             self.handle_invalid_url(req, "<p>Percent-encoding decoded to invalid UTF-8.</p>")
         } else if !req_p.exists() || (symlink && !self.follow_symlinks) {
             self.handle_nonexistant(req, req_p)
         } else {
-            self.handle_delete_path(req, req_p)
+            self.handle_delete_path(req, req_p, symlink)
         }
     }
 
-    fn handle_delete_path(&self, req: &mut Request, req_p: PathBuf) -> IronResult<Response> {
+    fn handle_delete_path(&self, req: &mut Request, req_p: PathBuf, symlink: bool) -> IronResult<Response> {
         log!("{green}{}{reset} deleted {blue}{} {magenta}{}{reset}",
              req.remote_addr,
-             if req_p.is_file() { "file" } else { "directory" },
+             if req_p.is_file() {
+                 "file"
+             } else if symlink {
+                 "symlink"
+             } else {
+                 "directory"
+             },
              req_p.display());
 
         if req_p.is_file() {
             fs::remove_file(req_p).expect("Failed to remove requested file");
         } else {
-            fs::remove_dir_all(req_p).expect("Failed to remove requested directory");
+            fs::remove_dir_all(req_p).expect(if symlink {"Failed to remove requested symlink"} else {"Failed to remove requested directory"});
         }
 
         Ok(Response::with((status::NoContent, Header(headers::Server(USER_AGENT.to_string())))))
@@ -840,6 +846,10 @@ impl HttpHandler {
     }
 
     fn parse_requested_path(&self, req: &Request) -> (PathBuf, bool, bool) {
+        self.parse_requested_path_custom_symlink(req, true)
+    }
+
+    fn parse_requested_path_custom_symlink(&self, req: &Request, follow_symlinks: bool) -> (PathBuf, bool, bool) {
         req.url.path().into_iter().filter(|p| !p.is_empty()).fold((self.hosted_directory.1.clone(), false, false), |(mut cur, mut sk, mut err), pp| {
             if let Some(pp) = percent_decode(pp) {
                 cur.push(&*pp);
@@ -848,8 +858,12 @@ impl HttpHandler {
             }
 
             while let Ok(newlink) = cur.read_link() {
-                cur = newlink;
                 sk = true;
+                if follow_symlinks {
+                    cur = newlink;
+                } else {
+                    break;
+                }
             }
 
             (cur, sk, err)
@@ -953,7 +967,7 @@ pub fn generate_tls_data(temp_dir: &(String, PathBuf)) -> Result<((String, PathB
             more: more,
         }
     }
-    fn exit_err(which: bool, process: &mut Child, exitc: &ExitStatus)-> Error {
+    fn exit_err(which: bool, process: &mut Child, exitc: &ExitStatus) -> Error {
         let mut stdout = String::new();
         let mut stderr = String::new();
         if process.stdout.as_mut().unwrap().read_to_string(&mut stdout).is_err() {
@@ -963,7 +977,9 @@ pub fn generate_tls_data(temp_dir: &(String, PathBuf)) -> Result<((String, PathB
             stderr = "<error getting process stderr".to_string();
         }
 
-        err(which, "exit", Some(format!("{};\nstdout: ```\n{}```;\nstderr: ```\n{}```", exitc, stdout, stderr)))
+        err(which,
+            "exit",
+            Some(format!("{};\nstdout: ```\n{}```;\nstderr: ```\n{}```", exitc, stdout, stderr)))
     }
 
     let tls_dir = temp_dir.1.join("tls");
