@@ -1,6 +1,7 @@
 use md6;
 use std::iter;
 use time::now;
+use std::borrow::Cow;
 use unicase::UniCase;
 use iron::mime::Mime;
 use std::sync::RwLock;
@@ -939,7 +940,7 @@ pub fn try_ports<H: Handler + Clone>(hndlr: H, from: u16, up_to: u16, tls_data: 
     Err(Error::Io {
         desc: "server",
         op: "start",
-        more: Some("no free ports".to_string()),
+        more: Some("no free ports".into()),
     })
 }
 
@@ -956,7 +957,7 @@ pub fn try_ports<H: Handler + Clone>(hndlr: H, from: u16, up_to: u16, tls_data: 
 /// assert_eq!(pass, "");
 /// ```
 pub fn generate_tls_data(temp_dir: &(String, PathBuf)) -> Result<((String, PathBuf), String), Error> {
-    fn err(which: bool, op: &'static str, more: Option<String>) -> Error {
+    fn err(which: bool, op: &'static str, more: Option<Cow<'static, str>>) -> Error {
         Error::Io {
             desc: if which {
                 "TLS key generation process"
@@ -979,7 +980,7 @@ pub fn generate_tls_data(temp_dir: &(String, PathBuf)) -> Result<((String, PathB
 
         err(which,
             "exit",
-            Some(format!("{};\nstdout: ```\n{}```;\nstderr: ```\n{}```", exitc, stdout, stderr)))
+            Some(format!("{};\nstdout: ```\n{}```;\nstderr: ```\n{}```", exitc, stdout, stderr).into()))
     }
 
     let tls_dir = temp_dir.1.join("tls");

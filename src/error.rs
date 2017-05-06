@@ -1,4 +1,5 @@
 use self::super::util::uppercase_first;
+use std::borrow::Cow;
 use std::io::Write;
 
 
@@ -16,7 +17,7 @@ pub enum Error {
         /// This should be lowercase and imperative ("create", "open").
         op: &'static str,
         /// Additional data.
-        more: Option<String>,
+        more: Option<Cow<'static, str>>,
     },
 }
 
