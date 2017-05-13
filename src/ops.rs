@@ -1003,11 +1003,11 @@ pub fn generate_tls_data(temp_dir: &(String, PathBuf)) -> Result<((String, PathB
     try!(child.stdin
         .as_mut()
         .unwrap()
-        .write_all(concat!("PL\r\nhttp\r\n",
+        .write_all(concat!("PL\nhttp\n",
                            env!("CARGO_PKG_VERSION"),
-                           "\r\nthecoshman&nabijaczleweli\r\nнаб\r\nhttp/",
+                           "\nthecoshman&nabijaczleweli\nнаб\nhttp/",
                            env!("CARGO_PKG_VERSION"),
-                           "\r\nnabijaczleweli@gmail.com\r\n")
+                           "\nnabijaczleweli@gmail.com\n")
             .as_bytes())
         .map_err(|_| err(true, "pipe", None)));
     let es = try!(child.wait().map_err(|_| err(true, "wait", None)));
