@@ -354,7 +354,7 @@ impl HttpHandler {
 
         let flen = req_p.metadata().expect("Failed to get requested file metadata").len();
         if self.encoded_temp_dir.is_some() && flen > MIN_ENCODING_SIZE && flen < MAX_ENCODING_SIZE &&
-           req_p.extension().and_then(|s| s.to_str()).map(|s| !BLACKLISTED_ENCODING_EXTENSIONS.contains(&UniCase(s))).unwrap_or(true) {
+           req_p.extension().and_then(|s| s.to_str()).map(|s| !BLACKLISTED_ENCODING_EXTENSIONS.contains(&UniCase::new(s))).unwrap_or(true) {
             self.handle_get_file_encoded(req, req_p, mime_type)
         } else {
             Ok(Response::with((status::Ok,

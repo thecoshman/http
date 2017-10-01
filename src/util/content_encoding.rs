@@ -1,4 +1,4 @@
-use brotli2::stream::{CompressMode as BrotliCompressMode, CompressParams as BrotliCompressParams};
+use brotli2::{CompressMode as BrotliCompressMode, CompressParams as BrotliCompressParams};
 use flate2::write::{DeflateEncoder, GzEncoder};
 use flate2::Compression as Flate2Compression;
 use iron::headers::{QualityItem, Encoding};
@@ -23,7 +23,7 @@ lazy_static! {
     /// The list of extensions not to encode.
     pub static ref BLACKLISTED_ENCODING_EXTENSIONS: BTreeSet<UniCase<&'static str>> = {
         let raw = include_str!("../../assets/encoding_blacklist");
-        raw.split('\n').map(str::trim).filter(|s| !s.is_empty() && !s.starts_with('#')).map(UniCase).collect()
+        raw.split('\n').map(str::trim).filter(|s| !s.is_empty() && !s.starts_with('#')).map(UniCase::new).collect()
     };
 }
 
