@@ -50,3 +50,9 @@ name = "http"
 path = "src/main.rs"
 test = false
 doc = false
+
+[[bin]]
+name = "httplz"
+path = "src/main.rs"
+test = false
+doc = false
