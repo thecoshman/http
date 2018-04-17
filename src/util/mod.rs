@@ -1,16 +1,17 @@
 //! Module containing various utility functions.
 
 
+mod os;
 mod content_encoding;
 
 use std::f64;
 use std::cmp;
-use std::fs::File;
 use std::path::Path;
 use std::borrow::Cow;
 use rfsapi::RawFileData;
 use url::percent_encoding;
 use iron::headers::UserAgent;
+use std::fs::{FileType, File};
 use std::collections::HashMap;
 use time::{self, Duration, Tm};
 use iron::{mime, Headers, Url};
@@ -115,7 +116,8 @@ pub fn uppercase_first(s: &str) -> String {
 /// assert!(!file_binary("Cargo.toml"));
 /// ```
 pub fn file_binary<P: AsRef<Path>>(path: P) -> bool {
-    File::open(path).and_then(|f| BufReader::new(f).read_line(&mut String::new())).is_err()
+    let path = path.as_ref();
+    path.metadata().map(|m| os::is_device(&m.file_type()) || File::open(path).and_then(|f| BufReader::new(f).read_line(&mut String::new())).is_err()).unwrap_or(true)
 }
 
 /// Fill out an HTML template.
@@ -207,6 +209,11 @@ pub fn detect_file_as_dir(mut p: &Path) -> bool {
 /// Check if a path refers to a symlink in a way that also works on Windows.
 pub fn is_symlink<P: AsRef<Path>>(p: P) -> bool {
     p.as_ref().read_link().is_ok()
+}
+
+/// Check if a path refers to a file in a way that includes Unix devices and Windows symlinks.
+pub fn is_actually_file(tp: &FileType) -> bool {
+    tp.is_file() || os::is_device(tp)
 }
 
 /// Construct string representing a human-readable size.

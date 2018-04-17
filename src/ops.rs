@@ -22,7 +22,7 @@ use std::process::{ExitStatus, Command, Child, Stdio};
 use rfsapi::{RawFsApiHeader, FilesetData, RawFileData};
 use iron::{headers, status, method, mime, IronResult, Listening, Response, TypeMap, Request, Handler, Iron};
 use self::super::util::{url_path, file_hash, is_symlink, encode_str, encode_file, hash_string, html_response, file_binary, client_mobile, percent_decode,
-                        file_icon_suffix, response_encoding, detect_file_as_dir, encoding_extension, file_time_modified, get_raw_fs_metadata,
+                        file_icon_suffix, is_actually_file, response_encoding, detect_file_as_dir, encoding_extension, file_time_modified, get_raw_fs_metadata,
                         human_readable_size, USER_AGENT, ERROR_HTML, INDEX_EXTENSIONS, MIN_ENCODING_GAIN, MAX_ENCODING_SIZE, MIN_ENCODING_SIZE,
                         DIRECTORY_LISTING_HTML, MOBILE_DIRECTORY_LISTING_HTML, BLACKLISTED_ENCODING_EXTENSIONS};
 
@@ -138,7 +138,7 @@ impl HttpHandler {
 
     fn handle_get(&self, req: &mut Request) -> IronResult<Response> {
         let (req_p, symlink, url_err) = self.parse_requested_path(req);
-        let file = req_p.is_file();
+        let file = is_actually_file(&req_p.metadata().expect("Failed to get file metadata").file_type());
         let range = req.headers.get().map(|r: &headers::Range| (*r).clone());
         let raw_fs = req.headers.get().map(|r: &RawFsApiHeader| r.0).unwrap_or(false);
 
@@ -459,7 +459,7 @@ impl HttpHandler {
                                                 .map(|p| p.expect("Failed to iterate over requested directory"))
                                                 .filter(|f| self.follow_symlinks || !is_symlink(f.path()))
                                                 .map(|f| {
-                    let is_file = f.file_type().expect("Failed to get file type").is_file();
+                    let is_file = is_actually_file(&f.file_type().expect("Failed to get file type"));
                     if is_file {
                         get_raw_fs_metadata(f.path())
                     } else {
@@ -546,12 +546,12 @@ impl HttpHandler {
             .map(|p| p.expect("Failed to iterate over requested directory"))
             .filter(|f| self.follow_symlinks || !is_symlink(f.path()))
             .sorted_by(|lhs, rhs| {
-                (lhs.file_type().expect("Failed to get file type").is_file(), lhs.file_name().to_str().expect("Failed to get file name").to_lowercase())
-                    .cmp(&(rhs.file_type().expect("Failed to get file type").is_file(),
+                (is_actually_file(&lhs.file_type().expect("Failed to get file type")), lhs.file_name().to_str().expect("Failed to get file name").to_lowercase())
+                    .cmp(&(is_actually_file(&rhs.file_type().expect("Failed to get file type")),
                            rhs.file_name().to_str().expect("Failed to get file name").to_lowercase()))
             })
             .fold("".to_string(), |cur, f| {
-                let is_file = f.file_type().expect("Failed to get file type").is_file();
+                let is_file = is_actually_file(&f.file_type().expect("Failed to get file type"));
                 let fname = f.file_name().into_string().expect("Failed to get file name");
                 let path = f.path();
 
@@ -622,12 +622,12 @@ impl HttpHandler {
             .map(|p| p.expect("Failed to iterate over requested directory"))
             .filter(|f| self.follow_symlinks || !is_symlink(f.path()))
             .sorted_by(|lhs, rhs| {
-                (lhs.file_type().expect("Failed to get file type").is_file(), lhs.file_name().to_str().expect("Failed to get file name").to_lowercase())
-                    .cmp(&(rhs.file_type().expect("Failed to get file type").is_file(),
+                (is_actually_file(&lhs.file_type().expect("Failed to get file type")), lhs.file_name().to_str().expect("Failed to get file name").to_lowercase())
+                    .cmp(&(is_actually_file(&rhs.file_type().expect("Failed to get file type")),
                            rhs.file_name().to_str().expect("Failed to get file name").to_lowercase()))
             })
             .fold("".to_string(), |cur, f| {
-                let is_file = f.file_type().expect("Failed to get file type").is_file();
+                let is_file = is_actually_file(&f.file_type().expect("Failed to get file type"));
                 let fname = f.file_name().into_string().expect("Failed to get file name");
                 let path = f.path();
                 let len = f.metadata().expect("Failed to get file metadata").len();
@@ -790,7 +790,7 @@ impl HttpHandler {
     fn handle_delete_path(&self, req: &mut Request, req_p: PathBuf, symlink: bool) -> IronResult<Response> {
         log!("{green}{}{reset} deleted {blue}{} {magenta}{}{reset}",
              req.remote_addr,
-             if req_p.is_file() {
+             if is_actually_file(&req_p.metadata().expect("failed to get file metadata").file_type()) {
                  "file"
              } else if symlink {
                  "symlink"
@@ -799,7 +799,7 @@ impl HttpHandler {
              },
              req_p.display());
 
-        if req_p.is_file() {
+        if is_actually_file(&req_p.metadata().expect("failed to get file metadata").file_type()) {
             fs::remove_file(req_p).expect("Failed to remove requested file");
         } else {
             fs::remove_dir_all(req_p).expect(if symlink {
