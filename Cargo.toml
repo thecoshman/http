@@ -41,6 +41,9 @@ default-features = false
 version = "0.5"
 features = ["hyper-native-tls"]
 
+[target.'cfg(not(target_os = "windows"))'.dependencies.libc]
+version = "0.2"
+
 [build-dependencies]
 embed-resource = "1.1"
 

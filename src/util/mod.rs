@@ -19,6 +19,7 @@ use std::io::{BufReader, BufRead};
 use base64::display::Base64Display;
 use mime_guess::{guess_mime_type_opt, get_mime_type_str};
 
+pub use self::os::*;
 pub use self::content_encoding::*;
 
 
@@ -117,7 +118,9 @@ pub fn uppercase_first(s: &str) -> String {
 /// ```
 pub fn file_binary<P: AsRef<Path>>(path: P) -> bool {
     let path = path.as_ref();
-    path.metadata().map(|m| os::is_device(&m.file_type()) || File::open(path).and_then(|f| BufReader::new(f).read_line(&mut String::new())).is_err()).unwrap_or(true)
+    path.metadata()
+        .map(|m| is_device(&m.file_type()) || File::open(path).and_then(|f| BufReader::new(f).read_line(&mut String::new())).is_err())
+        .unwrap_or(true)
 }
 
 /// Fill out an HTML template.
@@ -213,7 +216,7 @@ pub fn is_symlink<P: AsRef<Path>>(p: P) -> bool {
 
 /// Check if a path refers to a file in a way that includes Unix devices and Windows symlinks.
 pub fn is_actually_file(tp: &FileType) -> bool {
-    tp.is_file() || os::is_device(tp)
+    tp.is_file() || is_device(tp)
 }
 
 /// Construct string representing a human-readable size.

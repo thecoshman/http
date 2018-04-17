@@ -4,6 +4,6 @@ mod windows;
 mod non_windows;
 
 #[cfg(target_os = "windows")]
-pub use self::windows::is_device;
+pub use self::windows::{file_length, is_device};
 #[cfg(not(target_os = "windows"))]
-pub use self::non_windows::is_device;
+pub use self::non_windows::{file_length, is_device};
