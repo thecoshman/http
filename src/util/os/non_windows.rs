@@ -6,12 +6,7 @@ use std::ffi::CString;
 use std::path::Path;
 
 
-/// Return `device size / 512` (`long *` arg)
-///
-/// Extracted from my armv6l machine
-///
-/// Would be probably a good idea to get this at build time from a build script
-const BLKGETSIZE: c_ulong = (0x12 << 8) | 96;
+include!(concat!(env!("OUT_DIR"), "/ioctl-data/ioctl.rs"));
 
 
 /// OS-specific check for fileness

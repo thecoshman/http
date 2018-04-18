@@ -47,6 +47,9 @@ version = "0.2"
 [build-dependencies]
 embed-resource = "1.1"
 
+[target.'cfg(not(target_os = "windows"))'.build-dependencies.gcc]
+version = "0.3"
+
 
 [[bin]]
 name = "http"

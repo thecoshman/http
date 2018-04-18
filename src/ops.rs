@@ -444,8 +444,8 @@ impl HttpHandler {
                            (Header(headers::Server(USER_AGENT.to_string())),
                             Header(headers::LastModified(headers::HttpDate(file_time_modified(&req_p)))),
                             Header(headers::AcceptRanges(vec![headers::RangeUnit::Bytes]))),
-                           req_p,
-                           Header(headers::ContentLength(file_length(&metadata, &req_p))),
+                           req_p.as_path(),
+                           Header(headers::ContentLength(file_length(&req_p.metadata().expect("Failed to get requested file metadata"), &req_p))),
                            mt)))
     }
 
