@@ -13,6 +13,7 @@ use std::fs::{self, File};
 
 
 /// The last line of this, after running it through a preprocessor, will expand to the value of `BLKGETSIZE`
+#[cfg(not(target_os = "windows"))]
 static IOCTL_CHECK_SOURCE: &str = r#"
 #include <linux/fs.h>
 
@@ -20,6 +21,7 @@ BLKGETSIZE
 "#;
 
 /// Replace `{}` with the `BLKGETSIZE` expression from `IOCTL_CHECK_SOURCE`
+#[cfg(not(target_os = "windows"))]
 static IOCTL_INCLUDE_SKELETON: &str = r#"
 /// Return `device size / 512` (`long *` arg)
 static BLKGETSIZE: c_ulong = {};
