@@ -1,19 +1,19 @@
 extern crate embed_resource;
-#[cfg(not(target_os = "windows"))]
+#[cfg(all(not(target_os = "windows"), not(target_os = "osx")))]
 extern crate gcc;
 
-#[cfg(not(target_os = "windows"))]
+#[cfg(all(not(target_os = "windows"), not(target_os = "osx")))]
 use std::env;
-#[cfg(not(target_os = "windows"))]
+#[cfg(all(not(target_os = "windows"), not(target_os = "osx")))]
 use std::io::Write;
-#[cfg(not(target_os = "windows"))]
+#[cfg(all(not(target_os = "windows"), not(target_os = "osx")))]
 use std::path::Path;
-#[cfg(not(target_os = "windows"))]
+#[cfg(all(not(target_os = "windows"), not(target_os = "osx")))]
 use std::fs::{self, File};
 
 
 /// The last line of this, after running it through a preprocessor, will expand to the value of `BLKGETSIZE`
-#[cfg(not(target_os = "windows"))]
+#[cfg(all(not(target_os = "windows"), not(target_os = "osx")))]
 static IOCTL_CHECK_SOURCE: &str = r#"
 #include <linux/fs.h>
 
@@ -21,7 +21,7 @@ BLKGETSIZE
 "#;
 
 /// Replace `{}` with the `BLKGETSIZE` expression from `IOCTL_CHECK_SOURCE`
-#[cfg(not(target_os = "windows"))]
+#[cfg(all(not(target_os = "windows"), not(target_os = "osx")))]
 static IOCTL_INCLUDE_SKELETON: &str = r#"
 /// Return `device size / 512` (`long *` arg)
 static BLKGETSIZE: c_ulong = {};
@@ -37,12 +37,10 @@ fn embed_resources() {
     embed_resource::compile("http-manifest.rc");
 }
 
-#[cfg(target_os = "windows")]
-fn get_ioctl_data() {
+#[cfg(any(target_os = "windows", target_os = "osx"))]
+fn get_ioctl_data() {}
 
-}
-
-#[cfg(not(target_os = "windows"))]
+#[cfg(all(not(target_os = "windows"), not(target_os = "osx")))]
 fn get_ioctl_data() {
     let ioctl_dir = Path::new(&env::var("OUT_DIR").unwrap()).join("ioctl-data");
     fs::create_dir_all(&ioctl_dir).unwrap();
