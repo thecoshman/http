@@ -41,13 +41,13 @@ default-features = false
 version = "0.5"
 features = ["hyper-native-tls"]
 
-[target.'cfg(all(not(target_os = "windows"), not(target_os = "osx")))'.dependencies.libc]
+[target.'cfg(not(any(target_os = "windows", target_os = "macos")))'.dependencies.libc]
 version = "0.2"
 
 [build-dependencies]
 embed-resource = "1.1"
 
-[target.'cfg(all(not(target_os = "windows"), not(target_os = "osx")))'.build-dependencies.gcc]
+[target.'cfg(not(any(target_os = "windows", target_os = "macos")))'.build-dependencies.gcc]
 version = "0.3"
 
 

@@ -16,7 +16,7 @@ extern crate serde;
 #[macro_use]
 extern crate clap;
 extern crate iron;
-#[cfg(not(target_os = "windows"))]
+#[cfg(not(any(target_os = "windows", target_os = "macos")))]
 extern crate libc;
 extern crate time;
 extern crate url;

@@ -1,19 +1,19 @@
 extern crate embed_resource;
-#[cfg(all(not(target_os = "windows"), not(target_os = "osx")))]
+#[cfg(not(any(target_os = "windows", target_os = "macos")))]
 extern crate gcc;
 
-#[cfg(all(not(target_os = "windows"), not(target_os = "osx")))]
+#[cfg(not(any(target_os = "windows", target_os = "macos")))]
 use std::env;
-#[cfg(all(not(target_os = "windows"), not(target_os = "osx")))]
+#[cfg(not(any(target_os = "windows", target_os = "macos")))]
 use std::io::Write;
-#[cfg(all(not(target_os = "windows"), not(target_os = "osx")))]
+#[cfg(not(any(target_os = "windows", target_os = "macos")))]
 use std::path::Path;
-#[cfg(all(not(target_os = "windows"), not(target_os = "osx")))]
+#[cfg(not(any(target_os = "windows", target_os = "macos")))]
 use std::fs::{self, File};
 
 
 /// The last line of this, after running it through a preprocessor, will expand to the value of `BLKGETSIZE`
-#[cfg(all(not(target_os = "windows"), not(target_os = "osx")))]
+#[cfg(not(any(target_os = "windows", target_os = "macos")))]
 static IOCTL_CHECK_SOURCE: &str = r#"
 #include <linux/fs.h>
 
@@ -21,7 +21,7 @@ BLKGETSIZE
 "#;
 
 /// Replace `{}` with the `BLKGETSIZE` expression from `IOCTL_CHECK_SOURCE`
-#[cfg(all(not(target_os = "windows"), not(target_os = "osx")))]
+#[cfg(not(any(target_os = "windows", target_os = "macos")))]
 static IOCTL_INCLUDE_SKELETON: &str = r#"
 /// Return `device size / 512` (`long *` arg)
 static BLKGETSIZE: c_ulong = {};
@@ -40,7 +40,7 @@ fn embed_resources() {
 #[cfg(any(target_os = "windows", target_os = "osx"))]
 fn get_ioctl_data() {}
 
-#[cfg(all(not(target_os = "windows"), not(target_os = "osx")))]
+#[cfg(not(any(target_os = "windows", target_os = "macos")))]
 fn get_ioctl_data() {
     let ioctl_dir = Path::new(&env::var("OUT_DIR").unwrap()).join("ioctl-data");
     fs::create_dir_all(&ioctl_dir).unwrap();
