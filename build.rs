@@ -37,7 +37,7 @@ fn embed_resources() {
     embed_resource::compile("http-manifest.rc");
 }
 
-#[cfg(any(target_os = "windows", target_os = "osx"))]
+#[cfg(any(target_os = "windows", target_os = "macos"))]
 fn get_ioctl_data() {}
 
 #[cfg(not(any(target_os = "windows", target_os = "macos")))]
