@@ -11,12 +11,12 @@ use std::borrow::Cow;
 use rfsapi::RawFileData;
 use url::percent_encoding;
 use iron::headers::UserAgent;
-use std::fs::{FileType, File};
 use std::collections::HashMap;
 use time::{self, Duration, Tm};
 use iron::{mime, Headers, Url};
 use std::io::{BufReader, BufRead};
 use base64::display::Base64Display;
+use std::fs::{self, FileType, File};
 use mime_guess::{guess_mime_type_opt, get_mime_type_str};
 
 pub use self::os::*;
@@ -217,6 +217,29 @@ pub fn is_symlink<P: AsRef<Path>>(p: P) -> bool {
 /// Check if a path refers to a file in a way that includes Unix devices and Windows symlinks.
 pub fn is_actually_file(tp: &FileType) -> bool {
     tp.is_file() || is_device(tp)
+}
+
+/// Check if the specified path is a direct descendant (or an equal) of the specified path.
+pub fn is_descendant_of<Pw: AsRef<Path>, Po: AsRef<Path>>(who: Pw, of_whom: Po) -> bool {
+    let (mut who, of_whom) = if let Ok(p) = fs::canonicalize(who).and_then(|w| fs::canonicalize(of_whom).map(|o| (w, o))) {
+        p
+    } else {
+        return false;
+    };
+
+    if who == of_whom {
+        return true;
+    }
+
+    while let Some(who_p) = who.parent().map(|p| p.to_path_buf()) {
+        who = who_p;
+
+        if who == of_whom {
+            return true;
+        }
+    }
+
+    false
 }
 
 /// Construct string representing a human-readable size.

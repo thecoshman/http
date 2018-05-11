@@ -22,9 +22,9 @@ use std::process::{ExitStatus, Command, Child, Stdio};
 use rfsapi::{RawFsApiHeader, FilesetData, RawFileData};
 use iron::{headers, status, method, mime, IronResult, Listening, Response, TypeMap, Request, Handler, Iron};
 use self::super::util::{url_path, file_hash, is_symlink, encode_str, encode_file, file_length, hash_string, html_response, file_binary, client_mobile,
-                        percent_decode, file_icon_suffix, is_actually_file, response_encoding, detect_file_as_dir, encoding_extension, file_time_modified,
-                        get_raw_fs_metadata, human_readable_size, USER_AGENT, ERROR_HTML, INDEX_EXTENSIONS, MIN_ENCODING_GAIN, MAX_ENCODING_SIZE,
-                        MIN_ENCODING_SIZE, DIRECTORY_LISTING_HTML, MOBILE_DIRECTORY_LISTING_HTML, BLACKLISTED_ENCODING_EXTENSIONS};
+                        percent_decode, file_icon_suffix, is_actually_file, is_descendant_of, response_encoding, detect_file_as_dir, encoding_extension,
+                        file_time_modified, get_raw_fs_metadata, human_readable_size, USER_AGENT, ERROR_HTML, INDEX_EXTENSIONS, MIN_ENCODING_GAIN,
+                        MAX_ENCODING_SIZE, MIN_ENCODING_SIZE, DIRECTORY_LISTING_HTML, MOBILE_DIRECTORY_LISTING_HTML, BLACKLISTED_ENCODING_EXTENSIONS};
 
 
 macro_rules! log {
@@ -64,6 +64,7 @@ type CacheT<Cnt> = HashMap<([u8; 32], String), Cnt>;
 pub struct HttpHandler {
     pub hosted_directory: (String, PathBuf),
     pub follow_symlinks: bool,
+    pub sandbox_symlinks: bool,
     pub check_indices: bool,
     pub writes_temp_dir: Option<(String, PathBuf)>,
     pub encoded_temp_dir: Option<(String, PathBuf)>,
@@ -76,6 +77,7 @@ impl HttpHandler {
         HttpHandler {
             hosted_directory: opts.hosted_directory.clone(),
             follow_symlinks: opts.follow_symlinks,
+            sandbox_symlinks: opts.sandbox_symlinks,
             check_indices: opts.check_indices,
             writes_temp_dir: HttpHandler::temp_subdir(&opts.temp_directory, opts.allow_writes, "writes"),
             encoded_temp_dir: HttpHandler::temp_subdir(&opts.temp_directory, opts.encode_fs, "encoded"),
@@ -144,7 +146,8 @@ impl HttpHandler {
 
         if url_err {
             self.handle_invalid_url(req, "<p>Percent-encoding decoded to invalid UTF-8.</p>")
-        } else if !req_p.exists() || (symlink && !self.follow_symlinks) {
+        } else if !req_p.exists() || (symlink && !self.follow_symlinks) ||
+                  (self.follow_symlinks && self.sandbox_symlinks && !is_descendant_of(&req_p, &self.hosted_directory.1)) {
             self.handle_nonexistant(req, req_p)
         } else if file && raw_fs {
             self.handle_get_raw_fs_file(req, req_p)
@@ -949,6 +952,7 @@ impl Clone for HttpHandler {
         HttpHandler {
             hosted_directory: self.hosted_directory.clone(),
             follow_symlinks: self.follow_symlinks,
+            sandbox_symlinks: self.sandbox_symlinks,
             check_indices: self.check_indices,
             writes_temp_dir: self.writes_temp_dir.clone(),
             encoded_temp_dir: self.encoded_temp_dir.clone(),
