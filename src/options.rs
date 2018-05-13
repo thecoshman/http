@@ -27,7 +27,11 @@ pub struct Options {
     pub port: Option<u16>,
     /// Whether to allow symlinks to be requested. Default: true
     pub follow_symlinks: bool,
-    /// Whether to disallow going out of the descendants of the hosted directory (via symlinks). Default: false
+    /// Whether to disallow going out of the descendants of the hosted directory (via symlinks)
+    ///
+    /// Can only be true if `follow_symlinks` is true.
+    ///
+    /// Default: false
     pub sandbox_symlinks: bool,
     /// The temp directory to write to before copying to hosted directory and to store encoded FS responses.
     /// Default: `"$TEMP/http-[FULL_PATH_TO_HOSTED_DIR]"`
@@ -58,7 +62,8 @@ impl Options {
             .arg(Arg::from_usage("-t --temp-dir [temp] 'Temporary directory. Default: $TEMP'")
                 .validator(|s| Options::filesystem_dir_validator(s, "Temporary directory")))
             .arg(Arg::from_usage("-s --no-follow-symlinks 'Don't follow symlinks. Default: false'"))
-            .arg(Arg::from_usage("-r --sandbox-symlinks 'Restrict/sandbox where symlinks lead to only the direct descendants of the hosted directory. Default: false'"))
+            .arg(Arg::from_usage("-r --sandbox-symlinks 'Restrict/sandbox where symlinks lead to only the direct descendants of the hosted directory. \
+                                  Default: false'"))
             .arg(Arg::from_usage("-w --allow-write 'Allow for write operations. Default: false'"))
             .arg(Arg::from_usage("-i --no-indices 'Always generate dir listings even if index files are available. Default: false'"))
             .arg(Arg::from_usage("-e --no-encode 'Do not encode filesystem files. Default: false'"))
@@ -69,11 +74,12 @@ impl Options {
 
         let dir = matches.value_of("DIR").unwrap_or(".");
         let dir_pb = fs::canonicalize(dir).unwrap();
+        let follow_symlinks = !matches.is_present("no-follow-symlinks");
         Options {
             hosted_directory: (dir.to_string(), dir_pb.clone()),
             port: matches.value_of("port").map(u16::from_str).map(Result::unwrap),
-            follow_symlinks: !matches.is_present("no-follow-symlinks"),
-            sandbox_symlinks: matches.is_present("sandbox-symlinks"),
+            follow_symlinks: follow_symlinks,
+            sandbox_symlinks: follow_symlinks && matches.is_present("sandbox-symlinks"),
             temp_directory: {
                 let (temp_s, temp_pb) = if let Some(tmpdir) = matches.value_of("temp-dir") {
                     (tmpdir.to_string(), fs::canonicalize(tmpdir).unwrap())

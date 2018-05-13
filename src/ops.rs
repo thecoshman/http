@@ -464,7 +464,11 @@ impl HttpHandler {
                                             files: req_p.read_dir()
                                                 .expect("Failed to read requested directory")
                                                 .map(|p| p.expect("Failed to iterate over requested directory"))
-                                                .filter(|f| self.follow_symlinks || !is_symlink(f.path()))
+                                                .filter(|f| {
+                                                    let fp = f.path();
+                                                    !((!self.follow_symlinks && is_symlink(&fp)) ||
+                                                      (self.follow_symlinks && self.sandbox_symlinks && !is_descendant_of(fp, &self.hosted_directory.1)))
+                                                })
                                                 .map(|f| {
                     let is_file = is_actually_file(&f.file_type().expect("Failed to get file type"));
                     if is_file {
@@ -489,7 +493,9 @@ impl HttpHandler {
             if let Some(e) = INDEX_EXTENSIONS.iter()
                 .find(|e| {
                     idx.set_extension(e);
-                    idx.exists()
+                    idx.exists() &&
+                    ((!self.follow_symlinks || !self.sandbox_symlinks) ||
+                     (self.follow_symlinks && self.sandbox_symlinks && is_descendant_of(&req_p, &self.hosted_directory.1)))
                 }) {
                 if req.url.path().pop() == Some("") {
                     let r = self.handle_get_file(req, idx);
@@ -551,7 +557,11 @@ impl HttpHandler {
         let list_s = req_p.read_dir()
             .expect("Failed to read requested directory")
             .map(|p| p.expect("Failed to iterate over requested directory"))
-            .filter(|f| self.follow_symlinks || !is_symlink(f.path()))
+            .filter(|f| {
+                let fp = f.path();
+                !((!self.follow_symlinks && is_symlink(&fp)) ||
+                  (self.follow_symlinks && self.sandbox_symlinks && !is_descendant_of(fp, &self.hosted_directory.1)))
+            })
             .sorted_by(|lhs, rhs| {
                 (is_actually_file(&lhs.file_type().expect("Failed to get file type")),
                  lhs.file_name().to_str().expect("Failed to get file name").to_lowercase())
@@ -628,7 +638,11 @@ impl HttpHandler {
         let list_s = req_p.read_dir()
             .expect("Failed to read requested directory")
             .map(|p| p.expect("Failed to iterate over requested directory"))
-            .filter(|f| self.follow_symlinks || !is_symlink(f.path()))
+            .filter(|f| {
+                let fp = f.path();
+                !((!self.follow_symlinks && is_symlink(&fp)) ||
+                  (self.follow_symlinks && self.sandbox_symlinks && !is_descendant_of(fp, &self.hosted_directory.1)))
+            })
             .sorted_by(|lhs, rhs| {
                 (is_actually_file(&lhs.file_type().expect("Failed to get file type")),
                  lhs.file_name().to_str().expect("Failed to get file name").to_lowercase())
