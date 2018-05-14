@@ -242,6 +242,35 @@ pub fn is_descendant_of<Pw: AsRef<Path>, Po: AsRef<Path>>(who: Pw, of_whom: Po) 
     false
 }
 
+/// Check if the specified path is a direct descendant (or an equal) of the specified path, without without requiring it to
+/// exist in the first place.
+pub fn is_nonexistant_descendant_of<Pw: AsRef<Path>, Po: AsRef<Path>>(who: Pw, of_whom: Po) -> bool {
+    let mut who = fs::canonicalize(&who).unwrap_or_else(|_| who.as_ref().to_path_buf());
+    let of_whom = if let Ok(p) = fs::canonicalize(of_whom) {
+        p
+    } else {
+        return false;
+    };
+
+    if who == of_whom {
+        return true;
+    }
+
+    while let Some(who_p) = who.parent().map(|p| p.to_path_buf()) {
+        who = if let Ok(p) = fs::canonicalize(&who_p) {
+            p
+        } else {
+            who_p
+        };
+
+        if who == of_whom {
+            return true;
+        }
+    }
+
+    false
+}
+
 /// Construct string representing a human-readable size.
 ///
 /// Stolen, adapted and inlined from [fielsize.js](http://filesizejs.com).

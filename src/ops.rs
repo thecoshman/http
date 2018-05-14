@@ -23,8 +23,9 @@ use rfsapi::{RawFsApiHeader, FilesetData, RawFileData};
 use iron::{headers, status, method, mime, IronResult, Listening, Response, TypeMap, Request, Handler, Iron};
 use self::super::util::{url_path, file_hash, is_symlink, encode_str, encode_file, file_length, hash_string, html_response, file_binary, client_mobile,
                         percent_decode, file_icon_suffix, is_actually_file, is_descendant_of, response_encoding, detect_file_as_dir, encoding_extension,
-                        file_time_modified, get_raw_fs_metadata, human_readable_size, USER_AGENT, ERROR_HTML, INDEX_EXTENSIONS, MIN_ENCODING_GAIN,
-                        MAX_ENCODING_SIZE, MIN_ENCODING_SIZE, DIRECTORY_LISTING_HTML, MOBILE_DIRECTORY_LISTING_HTML, BLACKLISTED_ENCODING_EXTENSIONS};
+                        file_time_modified, get_raw_fs_metadata, human_readable_size, is_nonexistant_descendant_of, USER_AGENT, ERROR_HTML, INDEX_EXTENSIONS,
+                        MIN_ENCODING_GAIN, MAX_ENCODING_SIZE, MIN_ENCODING_SIZE, DIRECTORY_LISTING_HTML, MOBILE_DIRECTORY_LISTING_HTML,
+                        BLACKLISTED_ENCODING_EXTENSIONS};
 
 
 macro_rules! log {
@@ -147,7 +148,7 @@ impl HttpHandler {
         if url_err {
             self.handle_invalid_url(req, "<p>Percent-encoding decoded to invalid UTF-8.</p>")
         } else if !req_p.exists() || (symlink && !self.follow_symlinks) ||
-                  (self.follow_symlinks && self.sandbox_symlinks && !is_descendant_of(&req_p, &self.hosted_directory.1)) {
+                  (symlink && self.follow_symlinks && self.sandbox_symlinks && !is_descendant_of(&req_p, &self.hosted_directory.1)) {
             self.handle_nonexistant(req, req_p)
         } else if file && raw_fs {
             self.handle_get_raw_fs_file(req, req_p)
@@ -708,7 +709,7 @@ impl HttpHandler {
             return self.handle_forbidden_method(req, "-w", "write requests");
         }
 
-        let (req_p, _, url_err) = self.parse_requested_path(req);
+        let (req_p, symlink, url_err) = self.parse_requested_path(req);
 
         if url_err {
             self.handle_invalid_url(req, "<p>Percent-encoding decoded to invalid UTF-8.</p>")
@@ -718,6 +719,9 @@ impl HttpHandler {
             self.handle_invalid_url(req, "<p>Attempted to use file as directory.</p>")
         } else if req.headers.has::<headers::ContentRange>() {
             self.handle_put_partial_content(req)
+        } else if (symlink && !self.follow_symlinks) ||
+                  (symlink && self.follow_symlinks && self.sandbox_symlinks && !is_nonexistant_descendant_of(&req_p, &self.hosted_directory.1)) {
+            self.handle_nonexistant(req, req_p)
         } else {
             self.create_temp_dir(&self.writes_temp_dir);
             self.handle_put_file(req, req_p)
@@ -803,7 +807,8 @@ impl HttpHandler {
 
         if url_err {
             self.handle_invalid_url(req, "<p>Percent-encoding decoded to invalid UTF-8.</p>")
-        } else if !req_p.exists() || (symlink && !self.follow_symlinks) {
+        } else if !req_p.exists() || (symlink && !self.follow_symlinks) ||
+                  (symlink && self.follow_symlinks && self.sandbox_symlinks && !is_descendant_of(&req_p, &self.hosted_directory.1)) {
             self.handle_nonexistant(req, req_p)
         } else {
             self.handle_delete_path(req, req_p, symlink)
