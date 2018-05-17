@@ -466,10 +466,15 @@ impl HttpHandler {
                                                 .expect("Failed to read requested directory")
                                                 .map(|p| p.expect("Failed to iterate over requested directory"))
                                                 .filter(|f| {
-                                                    let fp = f.path();
-                                                    !((!self.follow_symlinks && is_symlink(&fp)) ||
-                                                      (self.follow_symlinks && self.sandbox_symlinks && !is_descendant_of(fp, &self.hosted_directory.1)))
-                                                })
+                    let fp = f.path();
+                    let mut symlink = false;
+                    !((!self.follow_symlinks &&
+                       (|| {
+                        symlink = is_symlink(&fp);
+                        symlink
+                    })()) ||
+                      (self.follow_symlinks && self.sandbox_symlinks && symlink && !is_descendant_of(fp, &self.hosted_directory.1)))
+                })
                                                 .map(|f| {
                     let is_file = is_actually_file(&f.file_type().expect("Failed to get file type"));
                     if is_file {
@@ -560,8 +565,12 @@ impl HttpHandler {
             .map(|p| p.expect("Failed to iterate over requested directory"))
             .filter(|f| {
                 let fp = f.path();
-                !((!self.follow_symlinks && is_symlink(&fp)) ||
-                  (self.follow_symlinks && self.sandbox_symlinks && !is_descendant_of(fp, &self.hosted_directory.1)))
+                let mut symlink = false;
+                !((!self.follow_symlinks &&
+                   (|| {
+                    symlink = is_symlink(&fp);
+                    symlink
+                })()) || (self.follow_symlinks && self.sandbox_symlinks && symlink && !is_descendant_of(fp, &self.hosted_directory.1)))
             })
             .sorted_by(|lhs, rhs| {
                 (is_actually_file(&lhs.file_type().expect("Failed to get file type")),
@@ -641,8 +650,12 @@ impl HttpHandler {
             .map(|p| p.expect("Failed to iterate over requested directory"))
             .filter(|f| {
                 let fp = f.path();
-                !((!self.follow_symlinks && is_symlink(&fp)) ||
-                  (self.follow_symlinks && self.sandbox_symlinks && !is_descendant_of(fp, &self.hosted_directory.1)))
+                let mut symlink = false;
+                !((!self.follow_symlinks &&
+                   (|| {
+                    symlink = is_symlink(&fp);
+                    symlink
+                })()) || (self.follow_symlinks && self.sandbox_symlinks && symlink && !is_descendant_of(fp, &self.hosted_directory.1)))
             })
             .sorted_by(|lhs, rhs| {
                 (is_actually_file(&lhs.file_type().expect("Failed to get file type")),
@@ -721,10 +734,11 @@ impl HttpHandler {
             self.handle_put_partial_content(req)
         } else if (symlink && !self.follow_symlinks) ||
                   (symlink && self.follow_symlinks && self.sandbox_symlinks && !is_nonexistant_descendant_of(&req_p, &self.hosted_directory.1)) {
-            self.handle_nonexistant(req, req_p)
+            self.create_temp_dir(&self.writes_temp_dir);
+            self.handle_put_file(req, req_p, false)
         } else {
             self.create_temp_dir(&self.writes_temp_dir);
-            self.handle_put_file(req, req_p)
+            self.handle_put_file(req, req_p, true)
         }
     }
 
@@ -774,11 +788,17 @@ impl HttpHandler {
                                                                 ""]))
     }
 
-    fn handle_put_file(&self, req: &mut Request, req_p: PathBuf) -> IronResult<Response> {
-        let existant = req_p.exists();
+    fn handle_put_file(&self, req: &mut Request, req_p: PathBuf, legal: bool) -> IronResult<Response> {
+        let existant = !legal || req_p.exists();
         log!("{green}{}{reset} {} {magenta}{}{reset}, size: {}B",
              req.remote_addr,
-             if existant { "replaced" } else { "created" },
+             if !legal {
+                 "tried to illegally create"
+             } else if existant {
+                 "replaced"
+             } else {
+                 "created"
+             },
              req_p.display(),
              *req.headers.get::<headers::ContentLength>().expect("No Content-Length header"));
 
@@ -787,13 +807,15 @@ impl HttpHandler {
 
         io::copy(&mut req.body, &mut File::create(&temp_file_p).expect("Failed to create temp file"))
             .expect("Failed to write requested data to requested file");
-        let _ = fs::create_dir_all(req_p.parent().expect("Failed to get requested file's parent directory"));
-        fs::copy(&temp_file_p, req_p).expect("Failed to copy temp file to requested file");
+        if legal {
+            let _ = fs::create_dir_all(req_p.parent().expect("Failed to get requested file's parent directory"));
+            fs::copy(&temp_file_p, req_p).expect("Failed to copy temp file to requested file");
+        }
 
-        Ok(Response::with((if existant {
-                               status::NoContent
-                           } else {
+        Ok(Response::with((if !legal || !existant {
                                status::Created
+                           } else {
+                               status::NoContent
                            },
                            Header(headers::Server(USER_AGENT.to_string())))))
     }
