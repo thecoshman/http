@@ -60,8 +60,16 @@ pass parameters like what port to use.
 
     Don't follow symlinks when requesting file access.
 
-    If a symlink is requested and this is on it will be treated as if it didn't
-    exist.
+    If a symlink is requested and this flag is on it will be treated as if it
+    didn't exist.
+
+  -r --sandbox-symlinks
+
+    Restrict/sandbox where symlinks lead to only the direct descendants
+    of the hosted directory.
+
+    If a file outside the direct descendancy of the hosted reictory requested
+    and this flag is on it will be treated as if it didn't exist.
 
   -w --allow-write
 
@@ -178,6 +186,14 @@ pass parameters like what port to use.
 
     Example output change:
       Hosting "." on port 8000 TLS certificate from "$TEMP/http-P-Rust-http/tls/tls.p12"...
+
+  `http -r`
+
+    As in the first example, but restrict accessible paths
+    to direct descendants of the hosted directory.
+
+    Example output change:
+      127.0.0.1:47916 requested to GET nonexistant entity S:\Rust-target\doc\main.css
 
 ## AUTHOR
 
