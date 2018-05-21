@@ -1,4 +1,4 @@
-version: 1.3.3-{build}
+version: 1.4.0-{build}
 
 skip_tags: false
 
@@ -22,21 +22,21 @@ build: off
 build_script:
   - git submodule update --init --recursive
   - cargo build --verbose --release
-  - cp target\release\http.exe http-v1.3.3.exe
-  - strip --strip-all --remove-section=.comment --remove-section=.note http-v1.3.3.exe
-  - makensis -DHTTP_VERSION=v1.3.3 "/X!include \"EnvVarUpdate.nsh\"" install.nsi
+  - cp target\release\http.exe http-v1.4.0.exe
+  - strip --strip-all --remove-section=.comment --remove-section=.note http-v1.4.0.exe
+  - makensis -DHTTP_VERSION=v1.4.0 "/X!include \"EnvVarUpdate.nsh\"" install.nsi
 
 test: off
 test_script:
   - cargo test --verbose --release
 
 artifacts:
-  - path: http-v1.3.3.exe
-  - path: http v1.3.3 installer.exe
+  - path: http-v1.4.0.exe
+  - path: http v1.4.0 installer.exe
 
 deploy:
   provider: GitHub
-  artifact: /http.*v1.3.3.*\.exe/
+  artifact: /http.*v1.4.0.*\.exe/
   auth_token:
     secure: ZTXvCrv9y01s7Hd60w8W7NaouPnPoaw9YJt9WhWQ2Pep8HLvCikt9Exjkz8SGP9P
   on:
