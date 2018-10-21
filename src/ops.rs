@@ -146,10 +146,8 @@ impl HttpHandler {
             return self.handle_invalid_url(req, "<p>Percent-encoding decoded to invalid UTF-8.</p>");
         }
 
-        if !req_p.exists()
-            || (symlink && !self.follow_symlinks)
-            || (symlink && self.follow_symlinks && self.sandbox_symlinks && !is_descendant_of(&req_p, &self.hosted_directory.1))
-        {
+        if !req_p.exists() || (symlink && !self.follow_symlinks) ||
+           (symlink && self.follow_symlinks && self.sandbox_symlinks && !is_descendant_of(&req_p, &self.hosted_directory.1)) {
             return self.handle_nonexistant(req, req_p);
         }
 
