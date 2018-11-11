@@ -11,7 +11,7 @@ build = "build.rs"
 # Remember to also update in appveyor.yml
 version = "1.4.0"
 # Remember to also update in http.md
-authors = ["thecoshman <thecoshman@gmail.com>",
+authors = ["thecoshman <rust@thecoshman.com>",
            "nabijaczleweli <nabijaczleweli@gmail.com>"]
 
 [dependencies]
