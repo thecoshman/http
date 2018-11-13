@@ -198,7 +198,8 @@ pass parameters like what port to use.
 ## AUTHOR
 
 Written by thecoshman &lt;<rust@thecoshman.com>&gt;,
-       and nabijaczleweli &lt;<nabijaczleweli@gmail.com>&gt;.
+           nabijaczleweli &lt;<nabijaczleweli@gmail.com>&gt;,
+       and pheki.
 
 ## REPORTING BUGS
 
