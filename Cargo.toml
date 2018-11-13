@@ -12,7 +12,7 @@ build = "build.rs"
 version = "1.4.1"
 # Remember to also update in http.md
 authors = ["thecoshman <rust@thecoshman.com>",
-           "nabijaczleweli <nabijaczleweli@gmail.com>"
+           "nabijaczleweli <nabijaczleweli@gmail.com>",
            "pheki"]
 
 [dependencies]
