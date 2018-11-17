@@ -3,6 +3,7 @@
 !.travis.yml
 !appveyor.yml
 !LICENSE
+!Dockerfile
 !Cargo.toml
 !rustfmt.toml
 !build.rs
