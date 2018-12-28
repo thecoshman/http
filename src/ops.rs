@@ -141,25 +141,35 @@ impl HttpHandler {
 
     fn handle_get(&self, req: &mut Request) -> IronResult<Response> {
         let (req_p, symlink, url_err) = self.parse_requested_path(req);
-        let file = is_actually_file(&req_p.metadata().expect("Failed to get file metadata").file_type());
-        let range = req.headers.get().map(|r: &headers::Range| (*r).clone());
-        let raw_fs = req.headers.get().map(|r: &RawFsApiHeader| r.0).unwrap_or(false);
 
         if url_err {
-            self.handle_invalid_url(req, "<p>Percent-encoding decoded to invalid UTF-8.</p>")
-        } else if !req_p.exists() || (symlink && !self.follow_symlinks) ||
-                  (symlink && self.follow_symlinks && self.sandbox_symlinks && !is_descendant_of(&req_p, &self.hosted_directory.1)) {
-            self.handle_nonexistant(req, req_p)
-        } else if file && raw_fs {
-            self.handle_get_raw_fs_file(req, req_p)
-        } else if file && range.is_some() {
-            self.handle_get_file_range(req, req_p, range.unwrap())
-        } else if file {
-            self.handle_get_file(req, req_p)
-        } else if raw_fs {
-            self.handle_get_raw_fs_dir(req, req_p)
+            return self.handle_invalid_url(req, "<p>Percent-encoding decoded to invalid UTF-8.</p>");
+        }
+
+        if !req_p.exists()
+            || (symlink && !self.follow_symlinks)
+            || (symlink && self.follow_symlinks && self.sandbox_symlinks && !is_descendant_of(&req_p, &self.hosted_directory.1))
+        {
+            return self.handle_nonexistant(req, req_p);
+        }
+
+        let is_file = is_actually_file(&req_p.metadata().expect("Failed to get file metadata").file_type());
+        let range = req.headers.get().map(|r: &headers::Range| (*r).clone());
+        let raw_fs = req.headers.get().map(|r: &RawFsApiHeader| r.0).unwrap_or(false);
+        if is_file {
+            if raw_fs {
+                self.handle_get_raw_fs_file(req, req_p)
+            } else if range.is_some() {
+                self.handle_get_file_range(req, req_p, range.unwrap())
+            } else {
+                self.handle_get_file(req, req_p)
+            }
         } else {
-            self.handle_get_dir(req, req_p)
+            if raw_fs {
+                self.handle_get_raw_fs_dir(req, req_p)
+            } else {
+                self.handle_get_dir(req, req_p)
+            }
         }
     }
 
