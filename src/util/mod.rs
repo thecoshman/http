@@ -5,11 +5,10 @@ mod os;
 mod content_encoding;
 
 use base64;
-use std::f64;
-use std::cmp;
 use std::path::Path;
 use std::borrow::Cow;
 use rfsapi::RawFileData;
+use std::{cmp, f64, fmt};
 use url::percent_encoding;
 use iron::headers::UserAgent;
 use std::collections::HashMap;
@@ -18,6 +17,8 @@ use iron::{mime, Headers, Url};
 use std::io::{BufReader, BufRead};
 use base64::display::Base64Display;
 use std::fs::{self, FileType, File};
+use iron::headers::{HeaderFormat, Header};
+use iron::error::HttpResult as HyperResult;
 use mime_guess::{guess_mime_type_opt, get_mime_type_str};
 
 pub use self::os::*;
@@ -83,6 +84,30 @@ pub static USER_AGENT: &'static str = concat!("http/", env!("CARGO_PKG_VERSION")
 
 /// Index file extensions to look for if `-i` was not specified.
 pub static INDEX_EXTENSIONS: &'static [&'static str] = &["html", "htm", "shtml"];
+
+
+/// The [WWW-Authenticate header](https://tools.ietf.org/html/rfc7235#section-4.1), without parsing.
+///
+/// We don't ever receive this header, only ever send it, so this is fine.
+#[derive(Debug, Clone, Hash, PartialOrd, Ord, PartialEq, Eq)]
+pub struct WwwAuthenticate(pub String);
+
+impl Header for WwwAuthenticate {
+    fn header_name() -> &'static str {
+        "WWW-Authenticate"
+    }
+
+    /// Dummy impl returning an empty value, since we're only ever sending these
+    fn parse_header(_: &[Vec<u8>]) -> HyperResult<WwwAuthenticate> {
+        Ok(WwwAuthenticate(String::new()))
+    }
+}
+
+impl HeaderFormat for WwwAuthenticate {
+    fn fmt_header(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        f.write_str(&self.0)
+    }
+}
 
 
 /// Uppercase the first character of the supplied string.
