@@ -15,7 +15,13 @@ use clap::{AppSettings, Arg, App};
 use std::env::{self, temp_dir};
 use std::path::PathBuf;
 use std::str::FromStr;
+use regex::Regex;
 use std::fs;
+
+
+lazy_static! {
+    static ref CREDENTIALS_REGEX: Regex = Regex::new("[^:]+(?::[^:]+)?").unwrap();
+}
 
 
 /// Representation of the application's all configurable values.
@@ -46,6 +52,10 @@ pub struct Options {
     pub tls_data: Option<((String, PathBuf), String)>,
     /// Whether to generate a one-off certificate. Default: false
     pub generate_tls: bool,
+    /// Data for authentication, in the form `username[:password]`. Default: `None`
+    pub auth_data: Option<String>,
+    /// Whether to generate a one-off credential set. Default: false
+    pub generate_auth: bool,
 }
 
 impl Options {
@@ -70,6 +80,9 @@ impl Options {
             .arg(Arg::from_usage("--ssl [TLS_IDENTITY] 'Data for HTTPS, identity file. Password in HTTP_SSL_PASS env var, otherwise empty'")
                 .validator(Options::identity_validator))
             .arg(Arg::from_usage("--gen-ssl 'Generate a one-off TLS certificate'").conflicts_with("ssl"))
+            .arg(Arg::from_usage("--auth [USERNAME[:PASSWORD]] 'Data for authentication'")
+                .validator(Options::credentials_validator))
+            .arg(Arg::from_usage("--gen-auth 'Generate a one-off username:password set for authentication'").conflicts_with("auth"))
             .get_matches();
 
         let dir = matches.value_of("DIR").unwrap_or(".");
@@ -104,6 +117,8 @@ impl Options {
             encode_fs: !matches.is_present("no-encode"),
             tls_data: matches.value_of("ssl").map(|id| ((id.to_string(), fs::canonicalize(id).unwrap()), env::var("HTTP_SSL_PASS").unwrap_or(String::new()))),
             generate_tls: matches.is_present("gen-ssl"),
+            auth_data: matches.value_of("auth").map(|a| a.to_string()),
+            generate_auth: matches.is_present("gen-auth"),
         }
     }
 
@@ -121,6 +136,14 @@ impl Options {
         } else {
             Err(format!("TLS identity file \"{}\" not actualy a file", s))
         })
+    }
+
+    fn credentials_validator(s: String) -> Result<(), String> {
+        if CREDENTIALS_REGEX.is_match(&s) {
+            Ok(())
+        } else {
+            Err(format!("Authentication credentials \"{}\" need be in format \"username[:password]\"", s))
+        }
     }
 
     fn u16_validator(s: String) -> Result<(), String> {

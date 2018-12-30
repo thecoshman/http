@@ -13,6 +13,7 @@ extern crate rfsapi;
 extern crate bzip2;
 extern crate ctrlc;
 extern crate serde;
+extern crate regex;
 #[macro_use]
 extern crate clap;
 extern crate iron;
