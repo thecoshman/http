@@ -140,8 +140,8 @@ macro_rules! encode_fn {
     }
 }
 
-encode_fn!(encode_str_gzip, encode_file_gzip, GzEncoder, Flate2Compression::Default);
-encode_fn!(encode_str_deflate, encode_file_deflate, DeflateEncoder, Flate2Compression::Default);
+encode_fn!(encode_str_gzip, encode_file_gzip, GzEncoder, Flate2Compression::default());
+encode_fn!(encode_str_deflate, encode_file_deflate, DeflateEncoder, Flate2Compression::default());
 encode_fn!(encode_str_brotli,
            encode_file_brotli,
            BrotliEncoder,

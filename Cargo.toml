@@ -17,21 +17,21 @@ authors = ["thecoshman <rust@thecoshman.com>",
 
 [dependencies]
 hyper-native-tls = "0.2"
-lazy_static = "0.2"
+lazy_static = "1.2"
 serde_json = "0.9"
 mime_guess = "1.8"
-lazysort = "0.1"
+lazysort = "0.2"
 brotli2 = "0.3"
-unicase = "2.0"
-base64 = "0.7"
-flate2 = "0.2"
+unicase = "2.2"
+base64 = "0.10"
+flate2 = "1.0"
 rfsapi = "0.1"
 bzip2 = "0.3"
-ctrlc = "3.0"
+ctrlc = "3.1"
 serde = "0.9"
-clap = "2.26"
+clap = "2.32"
 time = "0.1"
-url = "1.5"
+url = "1.7"
 md6 = "2.0"
 
 [dependencies.trivial_colours]
@@ -39,7 +39,7 @@ version = "0.3"
 default-features = false
 
 [dependencies.iron]
-version = "0.5"
+version = "0.6"
 features = ["hyper-native-tls"]
 
 [target.'cfg(not(any(target_os = "windows", target_os = "macos")))'.dependencies.libc]
@@ -48,8 +48,8 @@ version = "0.2"
 [build-dependencies]
 embed-resource = "1.1"
 
-[target.'cfg(not(any(target_os = "windows", target_os = "macos")))'.build-dependencies.gcc]
-version = "0.3"
+[target.'cfg(not(any(target_os = "windows", target_os = "macos")))'.build-dependencies.cc]
+version = "1.0"
 
 
 [[bin]]

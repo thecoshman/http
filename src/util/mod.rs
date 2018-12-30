@@ -4,6 +4,7 @@
 mod os;
 mod content_encoding;
 
+use base64;
 use std::f64;
 use std::cmp;
 use std::path::Path;
@@ -39,31 +40,31 @@ lazy_static! {
         ass.insert("favicon",
             Cow::Owned(format!("data:{};base64,{}",
                                get_mime_type_str("ico").unwrap(),
-                               Base64Display::standard(&include_bytes!("../../assets/favicon.ico")[..]))));
+                               Base64Display::with_config(&include_bytes!("../../assets/favicon.ico")[..], base64::STANDARD))));
         ass.insert("dir_icon",
             Cow::Owned(format!("data:{};base64,{}",
                                get_mime_type_str("gif").unwrap(),
-                               Base64Display::standard(&include_bytes!("../../assets/icons/directory_icon.gif")[..]))));
+                               Base64Display::with_config(&include_bytes!("../../assets/icons/directory_icon.gif")[..], base64::STANDARD))));
         ass.insert("file_icon",
             Cow::Owned(format!("data:{};base64,{}",
                                get_mime_type_str("gif").unwrap(),
-                               Base64Display::standard(&include_bytes!("../../assets/icons/file_icon.gif")[..]))));
+                               Base64Display::with_config(&include_bytes!("../../assets/icons/file_icon.gif")[..], base64::STANDARD))));
         ass.insert("file_binary_icon",
             Cow::Owned(format!("data:{};base64,{}",
                                get_mime_type_str("gif").unwrap(),
-                               Base64Display::standard(&include_bytes!("../../assets/icons/file_binary_icon.gif")[..]))));
+                               Base64Display::with_config(&include_bytes!("../../assets/icons/file_binary_icon.gif")[..], base64::STANDARD))));
         ass.insert("file_image_icon",
             Cow::Owned(format!("data:{};base64,{}",
                                get_mime_type_str("gif").unwrap(),
-                               Base64Display::standard(&include_bytes!("../../assets/icons/file_image_icon.gif")[..]))));
+                               Base64Display::with_config(&include_bytes!("../../assets/icons/file_image_icon.gif")[..], base64::STANDARD))));
         ass.insert("file_text_icon",
             Cow::Owned(format!("data:{};base64,{}",
                                get_mime_type_str("gif").unwrap(),
-                               Base64Display::standard(&include_bytes!("../../assets/icons/file_text_icon.gif")[..]))));
+                               Base64Display::with_config(&include_bytes!("../../assets/icons/file_text_icon.gif")[..], base64::STANDARD))));
         ass.insert("back_arrow_icon",
             Cow::Owned(format!("data:{};base64,{}",
                                get_mime_type_str("gif").unwrap(),
-                               Base64Display::standard(&include_bytes!("../../assets/icons/back_arrow_icon.gif")[..]))));
+                               Base64Display::with_config(&include_bytes!("../../assets/icons/back_arrow_icon.gif")[..], base64::STANDARD))));
         ass.insert("date", Cow::Borrowed(include_str!("../../assets/date.js")));
         ass.insert("upload", Cow::Borrowed(include_str!("../../assets/upload.js")));
         ass.insert("adjust_tz", Cow::Borrowed(include_str!("../../assets/adjust_tz.js")));

@@ -1,6 +1,6 @@
 extern crate embed_resource;
 #[cfg(not(any(target_os = "windows", target_os = "macos")))]
-extern crate gcc;
+extern crate cc;
 
 #[cfg(not(any(target_os = "windows", target_os = "macos")))]
 use std::env;
@@ -48,7 +48,7 @@ fn get_ioctl_data() {
     let ioctl_source = ioctl_dir.join("ioctl.c");
     File::create(&ioctl_source).unwrap().write_all(IOCTL_CHECK_SOURCE.as_bytes()).unwrap();
 
-    let ioctl_preprocessed = String::from_utf8(gcc::Build::new().file(ioctl_source).expand()).unwrap();
+    let ioctl_preprocessed = String::from_utf8(cc::Build::new().file(ioctl_source).expand()).unwrap();
     let blkgetsize_expr = ioctl_preprocessed.lines().next_back().unwrap().replace("U", " as c_ulong");
 
     let ioctl_include = ioctl_dir.join("ioctl.rs");
