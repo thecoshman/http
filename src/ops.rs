@@ -1,4 +1,7 @@
 use md6;
+use rand::{Rng, thread_rng};
+use rand::distributions::uniform::Uniform as UniformDistribution;
+use rand::distributions::Alphanumeric as AlphanumericDistribution;
 use std::iter;
 use time::now;
 use serde_json;
@@ -1148,4 +1151,29 @@ pub fn generate_tls_data(temp_dir: &(String, PathBuf)) -> Result<((String, PathB
     }
 
     Ok(((format!("{}/tls/tls.p12", temp_dir.0), tls_dir.join("tls.p12")), String::new()))
+}
+
+/// Generate random username:password auth credentials.
+pub fn generate_auth_data() -> String {
+    static PASSWORD_SET: &[u8] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789~!@#$%^&*()_+`-=[]{}|;',./<>?";
+
+
+    let mut rng = thread_rng();
+    let username_len = rng.sample(UniformDistribution::new(6, 12));
+    let password_len = rng.sample(UniformDistribution::new(10, 25));
+
+    let mut res = String::with_capacity(username_len + 1 + password_len);
+
+    for _ in 0..username_len {
+        res.push(rng.sample(AlphanumericDistribution));
+    }
+
+    res.push(':');
+
+    let password_gen = UniformDistribution::new(0, PASSWORD_SET.len());
+    for _ in 0..password_len {
+        res.push(PASSWORD_SET[rng.sample(password_gen) as usize] as char);
+    }
+
+    res
 }

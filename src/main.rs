@@ -19,6 +19,7 @@ extern crate clap;
 extern crate iron;
 #[cfg(not(any(target_os = "windows", target_os = "macos")))]
 extern crate libc;
+extern crate rand;
 extern crate time;
 extern crate url;
 extern crate md6;
@@ -57,6 +58,9 @@ fn result_main() -> Result<(), Error> {
     let mut opts = Options::parse();
     if opts.generate_tls {
         opts.tls_data = Some(try!(ops::generate_tls_data(&opts.temp_directory)));
+    }
+    if opts.generate_auth {
+        opts.auth_data = Some(ops::generate_auth_data());
     }
 
     let mut responder = try!(if let Some(p) = opts.port {
