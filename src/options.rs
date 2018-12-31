@@ -80,8 +80,7 @@ impl Options {
             .arg(Arg::from_usage("--ssl [TLS_IDENTITY] 'Data for HTTPS, identity file. Password in HTTP_SSL_PASS env var, otherwise empty'")
                 .validator(Options::identity_validator))
             .arg(Arg::from_usage("--gen-ssl 'Generate a one-off TLS certificate'").conflicts_with("ssl"))
-            .arg(Arg::from_usage("--auth [USERNAME[:PASSWORD]] 'Data for authentication'")
-                .validator(Options::credentials_validator))
+            .arg(Arg::from_usage("--auth [USERNAME[:PASSWORD]] 'Data for authentication'").validator(Options::credentials_validator))
             .arg(Arg::from_usage("--gen-auth 'Generate a one-off username:password set for authentication'").conflicts_with("auth"))
             .get_matches();
 

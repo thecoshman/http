@@ -92,10 +92,24 @@ fn result_main() -> Result<(), Error> {
            opts.hosted_directory.0,
            responder.socket.port());
     if let Some(&((ref id, _), _)) = opts.tls_data.as_ref() {
-        println!(" TLS certificate from \"{}\"...", id);
+        print!(" TLS certificate from \"{}\"", id);
     } else {
-        println!("out TLS...");
+        print!("out TLS");
     }
+    print!(" and ");
+    if let Some(ad) = opts.auth_data.as_ref() {
+        let mut itr = ad.split(':');
+        print!("basic authentication using \"{}\" as username and ", itr.next().unwrap());
+        if let Some(p) = itr.next() {
+            print!("\"{}\" as", p);
+        } else {
+            print!("no");
+        }
+        print!(" password");
+    } else {
+        print!("no authentication");
+    }
+    println!("...");
     println!("Ctrl-C to stop.");
     println!();
 
