@@ -24,10 +24,10 @@ use trivial_colours::{Reset as CReset, Colour as C};
 use std::process::{ExitStatus, Command, Child, Stdio};
 use rfsapi::{RawFsApiHeader, FilesetData, RawFileData};
 use iron::{headers, status, method, mime, IronResult, Listening, Response, TypeMap, Request, Handler, Iron};
-use self::super::util::{url_path, file_hash, is_symlink, encode_str, encode_file, file_length, hash_string, html_response, file_binary, client_mobile,
-                        percent_decode, file_icon_suffix, is_actually_file, is_descendant_of, response_encoding, detect_file_as_dir, encoding_extension,
-                        file_time_modified, get_raw_fs_metadata, human_readable_size, is_nonexistant_descendant_of, USER_AGENT, ERROR_HTML, INDEX_EXTENSIONS,
-                        MIN_ENCODING_GAIN, MAX_ENCODING_SIZE, MIN_ENCODING_SIZE, DIRECTORY_LISTING_HTML, MOBILE_DIRECTORY_LISTING_HTML,
+use self::super::util::{WwwAuthenticate, url_path, file_hash, is_symlink, encode_str, encode_file, file_length, hash_string, html_response, file_binary,
+                        client_mobile, percent_decode, file_icon_suffix, is_actually_file, is_descendant_of, response_encoding, detect_file_as_dir,
+                        encoding_extension, file_time_modified, get_raw_fs_metadata, human_readable_size, is_nonexistant_descendant_of, USER_AGENT, ERROR_HTML,
+                        INDEX_EXTENSIONS, MIN_ENCODING_GAIN, MAX_ENCODING_SIZE, MIN_ENCODING_SIZE, DIRECTORY_LISTING_HTML, MOBILE_DIRECTORY_LISTING_HTML,
                         BLACKLISTED_ENCODING_EXTENSIONS};
 
 
@@ -70,6 +70,7 @@ pub struct HttpHandler {
     pub follow_symlinks: bool,
     pub sandbox_symlinks: bool,
     pub check_indices: bool,
+    pub auth_data: Option<(String, Option<String>)>,
     pub writes_temp_dir: Option<(String, PathBuf)>,
     pub encoded_temp_dir: Option<(String, PathBuf)>,
     cache_gen: RwLock<CacheT<Vec<u8>>>,
@@ -83,6 +84,10 @@ impl HttpHandler {
             follow_symlinks: opts.follow_symlinks,
             sandbox_symlinks: opts.sandbox_symlinks,
             check_indices: opts.check_indices,
+            auth_data: opts.auth_data.as_ref().map(|auth| {
+                let mut itr = auth.split(':');
+                (itr.next().unwrap().to_string(), itr.next().map(str::to_string))
+            }),
             writes_temp_dir: HttpHandler::temp_subdir(&opts.temp_directory, opts.allow_writes, "writes"),
             encoded_temp_dir: HttpHandler::temp_subdir(&opts.temp_directory, opts.encode_fs, "encoded"),
             cache_gen: Default::default(),
@@ -117,6 +122,12 @@ impl HttpHandler {
 
 impl Handler for HttpHandler {
     fn handle(&self, req: &mut Request) -> IronResult<Response> {
+        if let Some(auth) = self.auth_data.as_ref() {
+            if let Some(resp) = try!(self.verify_auth(req, auth)) {
+                return Ok(resp);
+            }
+        }
+
         match req.method {
             method::Options => self.handle_options(req),
             method::Get => self.handle_get(req),
@@ -135,6 +146,39 @@ impl Handler for HttpHandler {
 }
 
 impl HttpHandler {
+    fn verify_auth(&self, req: &mut Request, auth: &(String, Option<String>)) -> IronResult<Option<Response>> {
+        match req.headers.get() {
+            Some(headers::Authorization(headers::Basic { username, password })) => {
+                if (&auth.0, &auth.1) == (username, password) {
+                    log!("{green}{}{reset} correctly authorised to {red}{}{reset} {yellow}{}{reset}",
+                         req.remote_addr,
+                         req.method,
+                         req.url);
+
+                    Ok(None)
+                } else {
+                    log!("{green}{}{reset} requested to {red}{}{reset} {yellow}{}{reset} with invalid credentials \"{}{}{}\"",
+                         req.remote_addr,
+                         req.method,
+                         req.url,
+                         username,
+                         if password.is_some() { ":" } else { "" },
+                         password.as_ref().map_or("", |s| &s[..]));
+
+                    Ok(Some(Response::with((status::Unauthorized, Header(WwwAuthenticate("basic".into())), "Supplied credentials invalid."))))
+                }
+            }
+            None => {
+                log!("{green}{}{reset} requested to {red}{}{reset} {yellow}{}{reset} without authorisation",
+                     req.remote_addr,
+                     req.method,
+                     req.url);
+
+                Ok(Some(Response::with((status::Unauthorized, Header(WwwAuthenticate("basic".into())), "Credentials required."))))
+            }
+        }
+    }
+
     fn handle_options(&self, req: &mut Request) -> IronResult<Response> {
         log!("{green}{}{reset} asked for {red}OPTIONS{reset}", req.remote_addr);
         Ok(Response::with((status::NoContent,
@@ -1006,6 +1050,7 @@ impl Clone for HttpHandler {
             follow_symlinks: self.follow_symlinks,
             sandbox_symlinks: self.sandbox_symlinks,
             check_indices: self.check_indices,
+            auth_data: self.auth_data.clone(),
             writes_temp_dir: self.writes_temp_dir.clone(),
             encoded_temp_dir: self.encoded_temp_dir.clone(),
             cache_gen: Default::default(),

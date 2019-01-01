@@ -90,7 +90,7 @@ pub static INDEX_EXTENSIONS: &'static [&'static str] = &["html", "htm", "shtml"]
 ///
 /// We don't ever receive this header, only ever send it, so this is fine.
 #[derive(Debug, Clone, Hash, PartialOrd, Ord, PartialEq, Eq)]
-pub struct WwwAuthenticate(pub String);
+pub struct WwwAuthenticate(pub Cow<'static, str>);
 
 impl Header for WwwAuthenticate {
     fn header_name() -> &'static str {
@@ -99,7 +99,7 @@ impl Header for WwwAuthenticate {
 
     /// Dummy impl returning an empty value, since we're only ever sending these
     fn parse_header(_: &[Vec<u8>]) -> HyperResult<WwwAuthenticate> {
-        Ok(WwwAuthenticate(String::new()))
+        Ok(WwwAuthenticate("".into()))
     }
 }
 
