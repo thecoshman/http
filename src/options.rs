@@ -116,7 +116,14 @@ impl Options {
             encode_fs: !matches.is_present("no-encode"),
             tls_data: matches.value_of("ssl").map(|id| ((id.to_string(), fs::canonicalize(id).unwrap()), env::var("HTTP_SSL_PASS").unwrap_or(String::new()))),
             generate_tls: matches.is_present("gen-ssl"),
-            auth_data: matches.value_of("auth").map(|a| a.to_string()),
+            auth_data: matches.value_of("auth").map(|auth| {
+                if auth.ends_with(':') {
+                        &auth[0..auth.len() - 1]
+                    } else {
+                        auth
+                    }
+                    .to_string()
+            }),
             generate_auth: matches.is_present("gen-auth"),
         }
     }

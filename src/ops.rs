@@ -85,7 +85,7 @@ impl HttpHandler {
             sandbox_symlinks: opts.sandbox_symlinks,
             check_indices: opts.check_indices,
             auth_data: opts.auth_data.as_ref().map(|auth| {
-                let mut itr = auth.split(':');
+                let mut itr = auth.split_terminator(':');
                 (itr.next().unwrap().to_string(), itr.next().map(str::to_string))
             }),
             writes_temp_dir: HttpHandler::temp_subdir(&opts.temp_directory, opts.allow_writes, "writes"),
@@ -149,7 +149,13 @@ impl HttpHandler {
     fn verify_auth(&self, req: &mut Request, auth: &(String, Option<String>)) -> IronResult<Option<Response>> {
         match req.headers.get() {
             Some(headers::Authorization(headers::Basic { username, password })) => {
-                if (&auth.0, &auth.1) == (username, password) {
+                let pwd = if password == &Some(String::new()) {
+                    &None
+                } else {
+                    password
+                };
+
+                if &auth.0 == username && &auth.1 == pwd {
                     log!("{green}{}{reset} correctly authorised to {red}{}{reset} {yellow}{}{reset}",
                          req.remote_addr,
                          req.method,
