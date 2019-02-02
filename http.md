@@ -56,6 +56,27 @@ pass parameters like what port to use.
 
     Exclusive with --ssl. Default: false.
 
+  --auth [USERNAME[:PASSWORD]]
+
+    Data for authentication.
+
+    If specified, will require the specified credentials to access any path
+    on the server.
+
+    Default: None.
+
+  --gen-auth
+
+    Generate a one-off username:password set for authentication.
+
+    The username consists of 6-12 random alphanumeric characters, whereas
+    the password consists of 10-25 random characters from most of the
+    ASCII printable set.
+
+    Functions as if --auth was specified with the generated credentials.
+
+    Exclusive with --auth. Default: false.
+
   -s --no-follow-symlinks
 
     Don't follow symlinks when requesting file access.
@@ -105,7 +126,7 @@ pass parameters like what port to use.
 
     Example output:
       p:\Rust\http> http
-      Hosting "." on port 8000 without TLS...
+      Hosting "." on port 8000 without TLS and no authentication...
       Ctrl-C to stop.
 
       127.0.0.1:47880 was served directory listing for \\?\P:\Rust\http
@@ -165,7 +186,7 @@ pass parameters like what port to use.
     As in the first example, but host on port 6969.
 
     Assuming the port is free, example output change:
-      Hosting "." on port 6969 without TLS...
+      Hosting "." on port 6969 without TLS and no authentication...
 
     If the port is taken, example output change:
       Starting server failed: port taken.
@@ -177,7 +198,7 @@ pass parameters like what port to use.
     unlocked with password "pwd".
 
     Assuming password is correct, example output change:
-      Hosting "." on port 8000 TLS certificate from "cert/http8k.p12"...
+      Hosting "." on port 8000 TLS certificate from "cert/http8k.p12" and no authentication...
 
   `http --gen-ssl`
 
@@ -185,7 +206,42 @@ pass parameters like what port to use.
     identity file.
 
     Example output change:
-      Hosting "." on port 8000 TLS certificate from "$TEMP/http-P-Rust-http/tls/tls.p12"...
+      Hosting "." on port 8000 TLS certificate from "$TEMP/http-P-Rust-http/tls/tls.p12" and no authentication...
+
+  `http --auth Pirate`
+
+    As in the first example, but require all clients to log in with the username "Pirate".
+
+    Example output change:
+      Hosting "." on port 8000 without TLS and basic authentication using "Pirate" as username and no password...
+
+    On unauthed request:
+      127.0.0.1:15141 requested to GET http://127.0.0.1:8005/ without authorisation
+
+    Invalid credentials supplied:
+      127.0.0.1:15142 requested to GET http://127.0.0.1:8005/ with invalid credentials "Pirate:memelord11"
+
+    Valid credentials supplied:
+      127.0.0.1:15142 correctly authorised to GET http://127.0.0.1:8005/
+      127.0.0.1:15142 was served directory listing for \\?\P:\Rust\http
+
+  `http --auth Pirate:memelord42`
+
+    As in the first example, but require all clients to log in with the username "Pirate" and password "memelord42".
+
+    Example output change:
+      Hosting "." on port 8000 without TLS and basic authentication using "Pirate" as username and "memelord42" as password...
+
+    See above for log messages when performing requests.
+
+  `http --gen-auth`
+
+    As in the first example, but generate a username:password pair and require all clients to log in therewith.
+
+    Example output change:
+      Hosting "." on port 8000 without TLS and basic authentication using "RQvjNUKmnD9" as username and ".TM&tb;t29,Eo" as password...
+
+    See above for log messages when performing requests.
 
   `http -r`
 
