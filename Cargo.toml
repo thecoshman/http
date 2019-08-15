@@ -16,7 +16,7 @@ authors = ["thecoshman <rust@thecoshman.com>",
            "pheki"]
 
 [dependencies]
-hyper-native-tls = "0.2"
+hyper-native-tls = "0.3"
 lazy_static = "1.2"
 serde_json = "0.9"
 mime_guess = "1.8"
