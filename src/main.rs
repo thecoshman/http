@@ -66,11 +66,11 @@ fn result_main() -> Result<(), Error> {
     let mut responder = try!(if let Some(p) = opts.port {
         if let Some(&((ref id, _), ref pw)) = opts.tls_data.as_ref() {
                 Iron::new(ops::HttpHandler::new(&opts)).https(("0.0.0.0", p),
-                                                              try!(NativeTlsServer::new(id, pw).map_err(|_| {
+                                                              try!(NativeTlsServer::new(id, pw).map_err(|err| {
                     Error::Io {
                         desc: "TLS certificate",
                         op: "open",
-                        more: None,
+                        more: Some(err.to_string().into()),
                     }
                 })))
             } else {
