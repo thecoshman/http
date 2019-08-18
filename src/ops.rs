@@ -1100,7 +1100,7 @@ pub fn try_ports<H: Handler + Clone>(hndlr: H, from: u16, up_to: u16, tls_data: 
             Ok(server) => return Ok(server),
             Err(error) => {
                 let error_s = error.to_string();
-                if !error_s.contains("port") {
+                if !error_s.contains("port") && !error_s.contains("in use") {
                     return Err(Error {
                         desc: "server",
                         op: "start",
