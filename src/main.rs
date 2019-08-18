@@ -70,7 +70,7 @@ fn result_main() -> Result<(), Error> {
                     Error::Io {
                         desc: "TLS certificate",
                         op: "open",
-                        more: Some(err.to_string().into()),
+                        more: err.to_string().into(),
                     }
                 })))
             } else {
@@ -80,7 +80,7 @@ fn result_main() -> Result<(), Error> {
                 Error::Io {
                     desc: "server",
                     op: "start",
-                    more: Some("port taken".into()),
+                    more: "port taken".into(),
                 }
             })
     } else {

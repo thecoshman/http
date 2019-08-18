@@ -17,7 +17,7 @@ pub enum Error {
         /// This should be lowercase and imperative ("create", "open").
         op: &'static str,
         /// Additional data.
-        more: Option<Cow<'static, str>>,
+        more: Cow<'static, str>,
     },
 }
 
@@ -33,7 +33,7 @@ impl Error {
     /// Error::Io {
     ///     desc: "network",
     ///     op: "write",
-    ///     more: Some("full buffer"),
+    ///     more: "full buffer".into(),
     /// }.print_error(&mut out);
     /// assert_eq!(String::from_iter(out.iter().map(|&i| i as char)),
     ///            "Writing network failed: full buffer.\n".to_string());
@@ -47,10 +47,7 @@ impl Error {
                 } else {
                     op
                 });
-                write!(err_out, "{}ing {} failed", op, desc).unwrap();
-                if let &Some(ref more) = more {
-                    write!(err_out, ": {}", more).unwrap();
-                }
+                write!(err_out, "{}ing {} failed: {}", op, desc, more).unwrap();
                 writeln!(err_out, ".").unwrap();
             }
         }
@@ -65,7 +62,7 @@ impl Error {
     /// assert_eq!(Error::Io {
     ///     desc: "",
     ///     op: "",
-    ///     more: None,
+    ///     more: "".into(),
     /// }.exit_value(), 1);
     /// ```
     pub fn exit_value(&self) -> i32 {
