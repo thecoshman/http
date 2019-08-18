@@ -34,7 +34,6 @@ pub use error::Error;
 pub use options::Options;
 
 use iron::Iron;
-use std::io::stderr;
 use std::process::exit;
 use std::sync::{Arc, Mutex, Condvar};
 use hyper_native_tls::NativeTlsServer;
@@ -47,8 +46,8 @@ fn main() {
 
 fn actual_main() -> i32 {
     if let Err(err) = result_main() {
-        err.print_error(&mut stderr());
-        err.exit_value()
+        eprintln!("{}", err);
+        1
     } else {
         0
     }
@@ -67,7 +66,7 @@ fn result_main() -> Result<(), Error> {
         if let Some(&((ref id, _), ref pw)) = opts.tls_data.as_ref() {
                 Iron::new(ops::HttpHandler::new(&opts)).https(("0.0.0.0", p),
                                                               try!(NativeTlsServer::new(id, pw).map_err(|err| {
-                    Error::Io {
+                    Error {
                         desc: "TLS certificate",
                         op: "open",
                         more: err.to_string().into(),
@@ -77,7 +76,7 @@ fn result_main() -> Result<(), Error> {
                 Iron::new(ops::HttpHandler::new(&opts)).http(("0.0.0.0", p))
             }
             .map_err(|_| {
-                Error::Io {
+                Error {
                     desc: "server",
                     op: "start",
                     more: "port taken".into(),

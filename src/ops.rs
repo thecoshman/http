@@ -1088,7 +1088,7 @@ pub fn try_ports<H: Handler + Clone>(hndlr: H, from: u16, up_to: u16, tls_data: 
         match if let Some(&((_, ref id), ref pw)) = tls_data.as_ref() {
             ir.https(("0.0.0.0", port),
                      try!(NativeTlsServer::new(id, pw).map_err(|err| {
-                Error::Io {
+                Error {
                     desc: "TLS certificate",
                     op: "open",
                     more: err.to_string().into(),
@@ -1101,7 +1101,7 @@ pub fn try_ports<H: Handler + Clone>(hndlr: H, from: u16, up_to: u16, tls_data: 
             Err(error) => {
                 let error_s = error.to_string();
                 if !error_s.contains("port") {
-                    return Err(Error::Io {
+                    return Err(Error {
                         desc: "server",
                         op: "start",
                         more: error_s.into(),
@@ -1111,7 +1111,7 @@ pub fn try_ports<H: Handler + Clone>(hndlr: H, from: u16, up_to: u16, tls_data: 
         }
     }
 
-    Err(Error::Io {
+    Err(Error {
         desc: "server",
         op: "start",
         more: "no free ports".into(),
@@ -1132,7 +1132,7 @@ pub fn try_ports<H: Handler + Clone>(hndlr: H, from: u16, up_to: u16, tls_data: 
 /// ```
 pub fn generate_tls_data(temp_dir: &(String, PathBuf)) -> Result<((String, PathBuf), String), Error> {
     fn err<M: Into<Cow<'static, str>>>(which: bool, op: &'static str, more: M) -> Error {
-        Error::Io {
+        Error {
             desc: if which {
                 "TLS key generation process"
             } else {
@@ -1158,7 +1158,7 @@ pub fn generate_tls_data(temp_dir: &(String, PathBuf)) -> Result<((String, PathB
     let tls_dir = temp_dir.1.join("tls");
     if !tls_dir.exists() {
         if let Err(err) = fs::create_dir_all(&tls_dir) {
-            return Err(Error::Io {
+            return Err(Error {
                 desc: "temporary directory",
                 op: "create",
                 more: err.to_string().into(),
