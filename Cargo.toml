@@ -9,7 +9,7 @@ categories = ["network-programming", "web-programming::http-server"]
 license = "MIT"
 build = "build.rs"
 # Remember to also update in appveyor.yml
-version = "1.5.1"
+version = "1.5.2"
 # Remember to also update in http.md
 authors = ["thecoshman <rust@thecoshman.com>",
            "nabijaczleweli <nabijaczleweli@gmail.com>",
