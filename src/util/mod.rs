@@ -6,10 +6,10 @@ mod content_encoding;
 
 use base64;
 use std::path::Path;
+use percent_encoding;
 use std::borrow::Cow;
 use rfsapi::RawFileData;
 use std::{cmp, f64, fmt};
-use url::percent_encoding;
 use iron::headers::UserAgent;
 use std::collections::HashMap;
 use time::{self, Duration, Tm};

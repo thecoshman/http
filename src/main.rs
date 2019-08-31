@@ -1,4 +1,5 @@
 extern crate hyper_native_tls;
+extern crate percent_encoding;
 extern crate trivial_colours;
 #[macro_use]
 extern crate lazy_static;
@@ -21,7 +22,6 @@ extern crate iron;
 extern crate libc;
 extern crate rand;
 extern crate time;
-extern crate url;
 extern crate md6;
 
 mod error;
