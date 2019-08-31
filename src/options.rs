@@ -53,7 +53,7 @@ pub struct Options {
     /// Whether to generate a one-off certificate. Default: false
     pub generate_tls: bool,
     /// Data for authentication, in the form `username[:password]`. Default: `None`
-    pub auth_data: Option<String>,
+    pub global_auth_data: Option<String>,
     /// Whether to generate a one-off credential set. Default: false
     pub generate_auth: bool,
 }
@@ -116,7 +116,7 @@ impl Options {
             encode_fs: !matches.is_present("no-encode"),
             tls_data: matches.value_of("ssl").map(|id| ((id.to_string(), fs::canonicalize(id).unwrap()), env::var("HTTP_SSL_PASS").unwrap_or(String::new()))),
             generate_tls: matches.is_present("gen-ssl"),
-            auth_data: matches.value_of("auth").map(|auth| {
+            global_auth_data: matches.value_of("auth").map(|auth| {
                 if auth.ends_with(':') {
                         &auth[0..auth.len() - 1]
                     } else {

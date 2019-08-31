@@ -58,7 +58,7 @@ pass parameters like what port to use.
 
   --auth [USERNAME[:PASSWORD]]
 
-    Data for authentication.
+    Data for global authentication.
 
     If specified, will require the specified credentials to access any path
     on the server.
@@ -67,7 +67,7 @@ pass parameters like what port to use.
 
   --gen-auth
 
-    Generate a one-off username:password set for authentication.
+    Generate a one-off username:password set for global authentication.
 
     The username consists of 6-12 random alphanumeric characters, whereas
     the password consists of 10-25 random characters from most of the

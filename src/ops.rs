@@ -70,7 +70,7 @@ pub struct HttpHandler {
     pub follow_symlinks: bool,
     pub sandbox_symlinks: bool,
     pub check_indices: bool,
-    pub auth_data: Option<(String, Option<String>)>,
+    pub global_auth_data: Option<(String, Option<String>)>,
     pub writes_temp_dir: Option<(String, PathBuf)>,
     pub encoded_temp_dir: Option<(String, PathBuf)>,
     cache_gen: RwLock<CacheT<Vec<u8>>>,
@@ -84,7 +84,7 @@ impl HttpHandler {
             follow_symlinks: opts.follow_symlinks,
             sandbox_symlinks: opts.sandbox_symlinks,
             check_indices: opts.check_indices,
-            auth_data: opts.auth_data.as_ref().map(|auth| {
+            global_auth_data: opts.global_auth_data.as_ref().map(|auth| {
                 let mut itr = auth.split_terminator(':');
                 (itr.next().unwrap().to_string(), itr.next().map(str::to_string))
             }),
@@ -122,7 +122,7 @@ impl HttpHandler {
 
 impl Handler for HttpHandler {
     fn handle(&self, req: &mut Request) -> IronResult<Response> {
-        if let Some(auth) = self.auth_data.as_ref() {
+        if let Some(auth) = self.global_auth_data.as_ref() {
             if let Some(resp) = try!(self.verify_auth(req, auth)) {
                 return Ok(resp);
             }
@@ -1056,7 +1056,7 @@ impl Clone for HttpHandler {
             follow_symlinks: self.follow_symlinks,
             sandbox_symlinks: self.sandbox_symlinks,
             check_indices: self.check_indices,
-            auth_data: self.auth_data.clone(),
+            global_auth_data: self.global_auth_data.clone(),
             writes_temp_dir: self.writes_temp_dir.clone(),
             encoded_temp_dir: self.encoded_temp_dir.clone(),
             cache_gen: Default::default(),

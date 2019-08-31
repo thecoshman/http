@@ -59,7 +59,7 @@ fn result_main() -> Result<(), Error> {
         opts.tls_data = Some(try!(ops::generate_tls_data(&opts.temp_directory)));
     }
     if opts.generate_auth {
-        opts.auth_data = Some(ops::generate_auth_data());
+        opts.global_auth_data = Some(ops::generate_auth_data());
     }
 
     let mut responder = try!(if let Some(p) = opts.port {
@@ -96,7 +96,7 @@ fn result_main() -> Result<(), Error> {
         print!("out TLS");
     }
     print!(" and ");
-    if let Some(ad) = opts.auth_data.as_ref() {
+    if let Some(ad) = opts.global_auth_data.as_ref() {
         let mut itr = ad.split(':');
         print!("basic authentication using \"{}\" as username and ", itr.next().unwrap());
         if let Some(p) = itr.next() {
