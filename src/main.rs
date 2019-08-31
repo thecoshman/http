@@ -33,8 +33,10 @@ pub mod util;
 pub use error::Error;
 pub use options::Options;
 
+use std::mem;
 use iron::Iron;
 use std::process::exit;
+use std::collections::BTreeSet;
 use std::sync::{Arc, Mutex, Condvar};
 use hyper_native_tls::NativeTlsServer;
 
@@ -55,12 +57,17 @@ fn actual_main() -> i32 {
 
 fn result_main() -> Result<(), Error> {
     let mut opts = Options::parse();
+    println!("{:#?}", opts);
     if opts.generate_tls {
         opts.tls_data = Some(try!(ops::generate_tls_data(&opts.temp_directory)));
     }
-    if opts.generate_auth {
+    if opts.generate_global_auth {
         opts.global_auth_data = Some(ops::generate_auth_data());
     }
+    for path in mem::replace(&mut opts.generate_path_auth, BTreeSet::new()) {
+        opts.path_auth_data.insert(path, Some(ops::generate_auth_data()));
+    }
+    println!("{:#?}", opts);
 
     let mut responder = try!(if let Some(p) = opts.port {
         if let Some(&((ref id, _), ref pw)) = opts.tls_data.as_ref() {
@@ -98,7 +105,7 @@ fn result_main() -> Result<(), Error> {
     print!(" and ");
     if let Some(ad) = opts.global_auth_data.as_ref() {
         let mut itr = ad.split(':');
-        print!("basic authentication using \"{}\" as username and ", itr.next().unwrap());
+        print!("basic global authentication using \"{}\" as username and ", itr.next().unwrap());
         if let Some(p) = itr.next() {
             print!("\"{}\" as", p);
         } else {
@@ -106,7 +113,22 @@ fn result_main() -> Result<(), Error> {
         }
         print!(" password");
     } else {
-        print!("no authentication");
+        print!("no global authentication");
+    }
+    for (path, creds) in &opts.path_auth_data {
+        print!(", ");
+        if let Some(ad) = creds {
+            let mut itr = ad.split(':');
+            print!("basic authentication under \"{}\" using \"{}\" as username and ", path, itr.next().unwrap());
+            if let Some(p) = itr.next() {
+                print!("\"{}\" as", p);
+            } else {
+                print!("no");
+            }
+            print!(" password");
+        } else {
+            print!("no authentication under \"{}\"", path);
+        }
     }
     println!("...");
     println!("Ctrl-C to stop.");

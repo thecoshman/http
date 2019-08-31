@@ -77,6 +77,30 @@ pass parameters like what port to use.
 
     Exclusive with --auth. Default: false.
 
+  --path-auth [PATH=[USERNAME[:PASSWORD]]]
+
+    Data for per-path authentication.
+
+    The specified PATH will require the specified credentials to access.
+    If credentials are unspecified, the path will have authentication
+    disabled, even if global or parent paths have authentication specified.
+
+    PATH is slash-normalised stripped of leading and trailing slashes.
+    Specifying more than one of the same PATH is erroneous.
+
+    Default: empty.
+
+  --gen-path-auth [PATH]
+
+    Generate a one-off username:password set for authentication under PATH.
+
+    The format is the same as --gen-auth's.
+
+    Functions as if --path-auth was specified with PATH
+    and the generated credentials.
+
+    Exclusive with --path-auth with the equivalent PATH. Default: empty.
+
   -s --no-follow-symlinks
 
     Don't follow symlinks when requesting file access.
