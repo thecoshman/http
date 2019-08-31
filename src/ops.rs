@@ -123,7 +123,7 @@ impl HttpHandler {
 impl Handler for HttpHandler {
     fn handle(&self, req: &mut Request) -> IronResult<Response> {
         if let Some(auth) = self.global_auth_data.as_ref() {
-            if let Some(resp) = try!(self.verify_auth(req, auth)) {
+            if let Some(resp) = self.verify_auth(req, auth)? {
                 return Ok(resp);
             }
         }
@@ -1087,13 +1087,13 @@ pub fn try_ports<H: Handler + Clone>(hndlr: H, from: u16, up_to: u16, tls_data: 
         let ir = Iron::new(hndlr.clone());
         match if let Some(&((_, ref id), ref pw)) = tls_data.as_ref() {
             ir.https(("0.0.0.0", port),
-                     try!(NativeTlsServer::new(id, pw).map_err(|err| {
-                Error {
-                    desc: "TLS certificate",
-                    op: "open",
-                    more: err.to_string().into(),
-                }
-            })))
+                     NativeTlsServer::new(id, pw).map_err(|err| {
+                    Error {
+                        desc: "TLS certificate",
+                        op: "open",
+                        more: err.to_string().into(),
+                    }
+                })?)
         } else {
             ir.http(("0.0.0.0", port))
         } {
@@ -1166,15 +1166,15 @@ pub fn generate_tls_data(temp_dir: &(String, PathBuf)) -> Result<((String, PathB
         }
     }
 
-    let mut child = try!(Command::new("openssl")
-        .args(&["req", "-x509", "-newkey", "rsa:4096", "-nodes", "-keyout", "tls.key", "-out", "tls.crt", "-days", "3650", "-utf8"])
-        .current_dir(&tls_dir)
-        .stdin(Stdio::piped())
-        .stdout(Stdio::piped())
-        .stderr(Stdio::piped())
-        .spawn()
-        .map_err(|error| err(true, "spawn", error.to_string())));
-    try!(child.stdin
+    let mut child =
+        Command::new("openssl").args(&["req", "-x509", "-newkey", "rsa:4096", "-nodes", "-keyout", "tls.key", "-out", "tls.crt", "-days", "3650", "-utf8"])
+            .current_dir(&tls_dir)
+            .stdin(Stdio::piped())
+            .stdout(Stdio::piped())
+            .stderr(Stdio::piped())
+            .spawn()
+            .map_err(|error| err(true, "spawn", error.to_string()))?;
+    child.stdin
         .as_mut()
         .unwrap()
         .write_all(concat!("PL\nhttp\n",
@@ -1183,21 +1183,21 @@ pub fn generate_tls_data(temp_dir: &(String, PathBuf)) -> Result<((String, PathB
                            env!("CARGO_PKG_VERSION"),
                            "\nnabijaczleweli@gmail.com\n")
             .as_bytes())
-        .map_err(|error| err(true, "pipe", error.to_string())));
-    let es = try!(child.wait().map_err(|error| err(true, "wait", error.to_string())));
+        .map_err(|error| err(true, "pipe", error.to_string()))?;
+    let es = child.wait().map_err(|error| err(true, "wait", error.to_string()))?;
     if !es.success() {
         return Err(exit_err(true, &mut child, &es));
     }
 
-    let mut child = try!(Command::new("openssl")
-        .args(&["pkcs12", "-export", "-out", "tls.p12", "-inkey", "tls.key", "-in", "tls.crt", "-passin", "pass:", "-passout", "pass:"])
-        .current_dir(&tls_dir)
-        .stdin(Stdio::null())
-        .stdout(Stdio::null())
-        .stderr(Stdio::null())
-        .spawn()
-        .map_err(|error| err(false, "spawn", error.to_string())));
-    let es = try!(child.wait().map_err(|error| err(false, "wait", error.to_string())));
+    let mut child =
+        Command::new("openssl").args(&["pkcs12", "-export", "-out", "tls.p12", "-inkey", "tls.key", "-in", "tls.crt", "-passin", "pass:", "-passout", "pass:"])
+            .current_dir(&tls_dir)
+            .stdin(Stdio::null())
+            .stdout(Stdio::null())
+            .stderr(Stdio::null())
+            .spawn()
+            .map_err(|error| err(false, "spawn", error.to_string()))?;
+    let es = child.wait().map_err(|error| err(false, "wait", error.to_string()))?;
     if !es.success() {
         return Err(exit_err(false, &mut child, &es));
     }

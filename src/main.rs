@@ -59,7 +59,7 @@ fn result_main() -> Result<(), Error> {
     let mut opts = Options::parse();
     println!("{:#?}", opts);
     if opts.generate_tls {
-        opts.tls_data = Some(try!(ops::generate_tls_data(&opts.temp_directory)));
+        opts.tls_data = Some(ops::generate_tls_data(&opts.temp_directory)?);
     }
     if opts.generate_global_auth {
         opts.global_auth_data = Some(ops::generate_auth_data());
@@ -69,16 +69,16 @@ fn result_main() -> Result<(), Error> {
     }
     println!("{:#?}", opts);
 
-    let mut responder = try!(if let Some(p) = opts.port {
+    let mut responder = if let Some(p) = opts.port {
         if let Some(&((ref id, _), ref pw)) = opts.tls_data.as_ref() {
                 Iron::new(ops::HttpHandler::new(&opts)).https(("0.0.0.0", p),
-                                                              try!(NativeTlsServer::new(id, pw).map_err(|err| {
-                    Error {
-                        desc: "TLS certificate",
-                        op: "open",
-                        more: err.to_string().into(),
-                    }
-                })))
+                                                              NativeTlsServer::new(id, pw).map_err(|err| {
+                        Error {
+                            desc: "TLS certificate",
+                            op: "open",
+                            more: err.to_string().into(),
+                        }
+                    })?)
             } else {
                 Iron::new(ops::HttpHandler::new(&opts)).http(("0.0.0.0", p))
             }
@@ -91,7 +91,7 @@ fn result_main() -> Result<(), Error> {
             })
     } else {
         ops::try_ports(ops::HttpHandler::new(&opts), util::PORT_SCAN_LOWEST, util::PORT_SCAN_HIGHEST, &opts.tls_data)
-    });
+    }?;
 
     print!("{}Hosting \"{}\" on port {} with",
            trivial_colours::Reset,
