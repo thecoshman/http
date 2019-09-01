@@ -57,7 +57,6 @@ fn actual_main() -> i32 {
 
 fn result_main() -> Result<(), Error> {
     let mut opts = Options::parse();
-    println!("{:#?}", opts);
     if opts.generate_tls {
         opts.tls_data = Some(ops::generate_tls_data(&opts.temp_directory)?);
     }
@@ -67,7 +66,6 @@ fn result_main() -> Result<(), Error> {
     for path in mem::replace(&mut opts.generate_path_auth, BTreeSet::new()) {
         opts.path_auth_data.insert(path, Some(ops::generate_auth_data()));
     }
-    println!("{:#?}", opts);
 
     let mut responder = if let Some(p) = opts.port {
         if let Some(&((ref id, _), ref pw)) = opts.tls_data.as_ref() {

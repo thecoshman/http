@@ -84,6 +84,7 @@ pass parameters like what port to use.
     The specified PATH will require the specified credentials to access.
     If credentials are unspecified, the path will have authentication
     disabled, even if global or parent paths have authentication specified.
+    These can be arbitrarily nested.
 
     PATH is slash-normalised stripped of leading and trailing slashes.
     Specifying more than one of the same PATH is erroneous.
@@ -251,7 +252,8 @@ pass parameters like what port to use.
 
   `http --auth Pirate:memelord42`
 
-    As in the first example, but require all clients to log in with the username "Pirate" and password "memelord42".
+    As in the first example, but require all clients to log in
+    with the username "Pirate" and password "memelord42".
 
     Example output change:
       Hosting "." on port 8000 without TLS and basic authentication using "Pirate" as username and "memelord42" as password...
@@ -260,10 +262,23 @@ pass parameters like what port to use.
 
   `http --gen-auth`
 
-    As in the first example, but generate a username:password pair and require all clients to log in therewith.
+    As in the first example, but generate a username:password pair
+    and require all clients to log in therewith.
 
     Example output change:
       Hosting "." on port 8000 without TLS and basic authentication using "RQvjNUKmnD9" as username and ".TM&tb;t29,Eo" as password...
+
+    See above for log messages when performing requests.
+
+  `http --auth admin:admin --gen-path-auth /target/debug --path-auth target/doc= --path-auth target/.rustc_info.json= --path-auth target/release/=releases`
+
+    As in the first example, but allow unauthenticated access to /target/doc and /target/.rustc_info.json,
+    require username "releases" and no password to access /target/release,
+    require a randomly-generated username:password pair to access /target/debug,
+    and lock all other paths behind "admin:admin".
+
+    Example output change:
+      Hosting "." on port 8000 without TLS and basic global authentication using "admin" as username and "admin" as password, no authentication under "target/.rustc_info.json", basic authentication under "target/debug" using "r2ciYq00k8a" as username and "Z-zn~HV,R`<{br/0Yf." as password, no authentication under "target/doc", basic authentication under "target/release" using "releases" as username and no password...
 
     See above for log messages when performing requests.
 

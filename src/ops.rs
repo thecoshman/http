@@ -1,7 +1,4 @@
 use md6;
-use rand::{Rng, thread_rng};
-use rand::distributions::uniform::Uniform as UniformDistribution;
-use rand::distributions::Alphanumeric as AlphanumericDistribution;
 use std::iter;
 use time::now;
 use serde_json;
@@ -14,15 +11,18 @@ use lazysort::SortedBy;
 use std::path::PathBuf;
 use std::fs::{self, File};
 use std::default::Default;
+use rand::{Rng, thread_rng};
 use iron::modifiers::Header;
-use std::collections::HashMap;
 use self::super::{Options, Error};
 use mime_guess::guess_mime_type_opt;
 use hyper_native_tls::NativeTlsServer;
+use std::collections::{BTreeMap, HashMap};
 use std::io::{self, SeekFrom, Write, Read, Seek};
 use trivial_colours::{Reset as CReset, Colour as C};
 use std::process::{ExitStatus, Command, Child, Stdio};
 use rfsapi::{RawFsApiHeader, FilesetData, RawFileData};
+use rand::distributions::uniform::Uniform as UniformDistribution;
+use rand::distributions::Alphanumeric as AlphanumericDistribution;
 use iron::{headers, status, method, mime, IronResult, Listening, Response, TypeMap, Request, Handler, Iron};
 use self::super::util::{WwwAuthenticate, url_path, file_hash, is_symlink, encode_str, encode_file, file_length, hash_string, html_response, file_binary,
                         client_mobile, percent_decode, file_icon_suffix, is_actually_file, is_descendant_of, response_encoding, detect_file_as_dir,
@@ -71,6 +71,7 @@ pub struct HttpHandler {
     pub sandbox_symlinks: bool,
     pub check_indices: bool,
     pub global_auth_data: Option<(String, Option<String>)>,
+    pub path_auth_data: BTreeMap<String, Option<(String, Option<String>)>>,
     pub writes_temp_dir: Option<(String, PathBuf)>,
     pub encoded_temp_dir: Option<(String, PathBuf)>,
     cache_gen: RwLock<CacheT<Vec<u8>>>,
@@ -79,6 +80,16 @@ pub struct HttpHandler {
 
 impl HttpHandler {
     pub fn new(opts: &Options) -> HttpHandler {
+        let mut path_auth_data = BTreeMap::new();
+        for (path, creds) in &opts.path_auth_data {
+            path_auth_data.insert(path.to_string(),
+                                  creds.as_ref()
+                                      .map(|auth| {
+                                          let mut itr = auth.split_terminator(':');
+                                          (itr.next().unwrap().to_string(), itr.next().map(str::to_string))
+                                      }));
+        }
+
         HttpHandler {
             hosted_directory: opts.hosted_directory.clone(),
             follow_symlinks: opts.follow_symlinks,
@@ -88,6 +99,7 @@ impl HttpHandler {
                 let mut itr = auth.split_terminator(':');
                 (itr.next().unwrap().to_string(), itr.next().map(str::to_string))
             }),
+            path_auth_data: path_auth_data,
             writes_temp_dir: HttpHandler::temp_subdir(&opts.temp_directory, opts.allow_writes, "writes"),
             encoded_temp_dir: HttpHandler::temp_subdir(&opts.temp_directory, opts.encode_fs, "encoded"),
             cache_gen: Default::default(),
@@ -122,8 +134,8 @@ impl HttpHandler {
 
 impl Handler for HttpHandler {
     fn handle(&self, req: &mut Request) -> IronResult<Response> {
-        if let Some(auth) = self.global_auth_data.as_ref() {
-            if let Some(resp) = self.verify_auth(req, auth)? {
+        if self.global_auth_data.is_some() || !self.path_auth_data.is_empty() {
+            if let Some(resp) = self.verify_auth(req)? {
                 return Ok(resp);
             }
         }
@@ -146,7 +158,32 @@ impl Handler for HttpHandler {
 }
 
 impl HttpHandler {
-    fn verify_auth(&self, req: &mut Request, auth: &(String, Option<String>)) -> IronResult<Option<Response>> {
+    fn verify_auth(&self, req: &mut Request) -> IronResult<Option<Response>> {
+        let mut auth = self.global_auth_data.as_ref();
+
+        let mut path = req.url.as_ref().path();
+        if path.starts_with('/') {
+            path = &path[1..];
+        }
+        if path.ends_with('/') {
+            path = &path[..path.len() - 1];
+        }
+
+        while !path.is_empty() {
+            if let Some(pad) = self.path_auth_data.get(path) {
+                auth = pad.as_ref();
+                break;
+            }
+
+            path = &path[..path.rfind('/').unwrap_or(0)];
+        }
+
+        let auth = if let Some(auth) = auth {
+            auth
+        } else {
+            return Ok(None);
+        };
+
         match req.headers.get() {
             Some(headers::Authorization(headers::Basic { username, password })) => {
                 let pwd = if password == &Some(String::new()) {
@@ -1057,6 +1094,7 @@ impl Clone for HttpHandler {
             sandbox_symlinks: self.sandbox_symlinks,
             check_indices: self.check_indices,
             global_auth_data: self.global_auth_data.clone(),
+            path_auth_data: self.path_auth_data.clone(),
             writes_temp_dir: self.writes_temp_dir.clone(),
             encoded_temp_dir: self.encoded_temp_dir.clone(),
             cache_gen: Default::default(),
