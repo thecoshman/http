@@ -161,21 +161,23 @@ impl HttpHandler {
     fn verify_auth(&self, req: &mut Request) -> IronResult<Option<Response>> {
         let mut auth = self.global_auth_data.as_ref();
 
-        let mut path = req.url.as_ref().path();
-        if path.starts_with('/') {
-            path = &path[1..];
-        }
-        if path.ends_with('/') {
-            path = &path[..path.len() - 1];
-        }
-
-        while !path.is_empty() {
-            if let Some(pad) = self.path_auth_data.get(path) {
-                auth = pad.as_ref();
-                break;
+        if !self.path_auth_data.is_empty() {
+            let mut path = req.url.as_ref().path();
+            if path.starts_with('/') {
+                path = &path[1..];
+            }
+            if path.ends_with('/') {
+                path = &path[..path.len() - 1];
             }
 
-            path = &path[..path.rfind('/').unwrap_or(0)];
+            while !path.is_empty() {
+                if let Some(pad) = self.path_auth_data.get(path) {
+                    auth = pad.as_ref();
+                    break;
+                }
+
+                path = &path[..path.rfind('/').unwrap_or(0)];
+            }
         }
 
         let auth = if let Some(auth) = auth {
