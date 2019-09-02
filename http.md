@@ -147,6 +147,12 @@ pass parameters like what port to use.
 
     This is false by default because it's useful for reducing bandwidth usage.
 
+  -d --webdav
+
+    Handle WebDAV requests.
+
+    False by default.
+
 ## EXAMPLES
 
   `http`
