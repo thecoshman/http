@@ -60,8 +60,11 @@ pass parameters like what port to use.
 
     Data for global authentication.
 
-    If specified, will require the specified credentials to access any path
-    on the server.
+    Equivalent to --path-auth with a root path and the same crednetials.
+
+    This argument is deprecated, and will be replaced with the current version
+    of --path-auth on the next breaking release.
+    Use --path-auth in new designs to avoid surprises.
 
     Default: None.
 
@@ -69,11 +72,11 @@ pass parameters like what port to use.
 
     Generate a one-off username:password set for global authentication.
 
-    The username consists of 6-12 random alphanumeric characters, whereas
-    the password consists of 10-25 random characters from most of the
-    ASCII printable set.
-
     Functions as if --auth was specified with the generated credentials.
+
+    This argument is deprecated, and will be replaced with the current version
+    of --gen-path-auth on the next breaking release.
+    Use --gen-path-auth in new designs to avoid surprises.
 
     Exclusive with --auth. Default: false.
 
@@ -95,7 +98,9 @@ pass parameters like what port to use.
 
     Generate a one-off username:password set for authentication under PATH.
 
-    The format is the same as --gen-auth's.
+    The username consists of 6-12 random alphanumeric characters, whereas
+    the password consists of 10-25 random characters from most of the
+    ASCII printable set.
 
     Functions as if --path-auth was specified with PATH
     and the generated credentials.
@@ -235,13 +240,13 @@ pass parameters like what port to use.
       Hosting "." on port 8000 TLS certificate from "$TEMP/http-P-Rust-http/tls/tls.p12"
       and no authentication...
 
-  `http --auth Pirate`
+  `http --path-auth /=Pirate`
 
     As in the first example, but require all clients to log in with the username "Pirate".
 
     Example output change:
-      Hosting "." on port 8000 without TLS and basic authentication using "Pirate"
-      as username and no password...
+      Hosting "." on port 8000 without TLS and basic authentication under "/"
+      using "Pirate" as username and no password...
 
     On unauthed request:
       127.0.0.1:15141 requested to GET http://127.0.0.1:8005/ without authorisation
@@ -254,29 +259,29 @@ pass parameters like what port to use.
       127.0.0.1:15142 correctly authorised to GET http://127.0.0.1:8005/
       127.0.0.1:15142 was served directory listing for \\?\P:\Rust\http
 
-  `http --auth Pirate:memelord42`
+  `http --path-auth /=Pirate:memelord42`
 
     As in the first example, but require all clients to log in
     with the username "Pirate" and password "memelord42".
 
     Example output change:
-      Hosting "." on port 8000 without TLS and basic authentication using "Pirate"
-      as username and "memelord42" as password...
+      Hosting "." on port 8000 without TLS and basic authentication under "/"
+      using "Pirate" as username and "memelord42" as password...
 
     See above for log messages when performing requests.
 
-  `http --gen-auth`
+  `http --gen-path-auth /`
 
     As in the first example, but generate a username:password pair
     and require all clients to log in therewith.
 
     Example output change:
-      Hosting "." on port 8000 without TLS and basic authentication using "RQvjNUKmnD9"
-      as username and ".TM&tb;t29,Eo" as password...
+      Hosting "." on port 8000 without TLS and basic authentication under "/"
+      using "HHtTvqaC" as username and "_>&tFTOy]<8H%Mr@tP" as password...
 
     See above for log messages when performing requests.
 
-  `http --auth admin:admin --gen-path-auth /target/debug --path-auth target/doc= --path-auth target/.rustc_info.json= --path-auth target/release/=releases`
+  `http --path-auth /=admin:admin --gen-path-auth /target/debug --path-auth target/doc= --path-auth target/.rustc_info.json= --path-auth target/release/=releases`
 
     As in the first example, but allow unauthenticated access to /target/doc and /target/.rustc_info.json,
     require username "releases" and no password to access /target/release,
@@ -284,13 +289,13 @@ pass parameters like what port to use.
     and lock all other paths behind "admin:admin".
 
     Example output change:
-      Hosting "." on port 8000 without TLS and basic global authentication
+      Hosting "." on port 8000 without TLS and basic authentication under "/"
       using "admin" as username and "admin" as password,
-      no authentication under "target/.rustc_info.json",
-      basic authentication under "target/debug" using
-      "r2ciYq00k8a" as username and "Z-zn~HV,R`<{br/0Yf." as password,
-      no authentication under "target/doc"
-      basic authentication under "target/release" using
+      no authentication under "/target/.rustc_info.json",
+      basic authentication under "/target/debug" using
+      "2tSpUhpG" as username and "-XR;[0uYxWHD1%iJ#W" as password,
+      no authentication under "/target/doc",
+      basic authentication under "/target/release" using
       "releases" as username and no password...
 
     See above for log messages when performing requests.

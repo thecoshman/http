@@ -81,13 +81,20 @@ pub struct HttpHandler {
 impl HttpHandler {
     pub fn new(opts: &Options) -> HttpHandler {
         let mut path_auth_data = BTreeMap::new();
+        let mut global_auth_data = None;
+
         for (path, creds) in &opts.path_auth_data {
-            path_auth_data.insert(path.to_string(),
-                                  creds.as_ref()
-                                      .map(|auth| {
-                                          let mut itr = auth.split_terminator(':');
-                                          (itr.next().unwrap().to_string(), itr.next().map(str::to_string))
-                                      }));
+            let creds = creds.as_ref()
+                .map(|auth| {
+                    let mut itr = auth.split_terminator(':');
+                    (itr.next().unwrap().to_string(), itr.next().map(str::to_string))
+                });
+
+            if path == "" {
+                global_auth_data = creds;
+            } else {
+                path_auth_data.insert(path.to_string(), creds);
+            }
         }
 
         HttpHandler {
@@ -95,10 +102,7 @@ impl HttpHandler {
             follow_symlinks: opts.follow_symlinks,
             sandbox_symlinks: opts.sandbox_symlinks,
             check_indices: opts.check_indices,
-            global_auth_data: opts.global_auth_data.as_ref().map(|auth| {
-                let mut itr = auth.split_terminator(':');
-                (itr.next().unwrap().to_string(), itr.next().map(str::to_string))
-            }),
+            global_auth_data: global_auth_data,
             path_auth_data: path_auth_data,
             writes_temp_dir: HttpHandler::temp_subdir(&opts.temp_directory, opts.allow_writes, "writes"),
             encoded_temp_dir: HttpHandler::temp_subdir(&opts.temp_directory, opts.encode_fs, "encoded"),

@@ -60,9 +60,6 @@ fn result_main() -> Result<(), Error> {
     if opts.generate_tls {
         opts.tls_data = Some(ops::generate_tls_data(&opts.temp_directory)?);
     }
-    if opts.generate_global_auth {
-        opts.global_auth_data = Some(ops::generate_auth_data());
-    }
     for path in mem::replace(&mut opts.generate_path_auth, BTreeSet::new()) {
         opts.path_auth_data.insert(path, Some(ops::generate_auth_data()));
     }
@@ -101,32 +98,26 @@ fn result_main() -> Result<(), Error> {
         print!("out TLS");
     }
     print!(" and ");
-    if let Some(ad) = opts.global_auth_data.as_ref() {
-        let mut itr = ad.split(':');
-        print!("basic global authentication using \"{}\" as username and ", itr.next().unwrap());
-        if let Some(p) = itr.next() {
-            print!("\"{}\" as", p);
-        } else {
-            print!("no");
-        }
-        print!(" password");
-    } else {
-        print!("no global authentication");
-    }
-    for (path, creds) in &opts.path_auth_data {
-        print!(", ");
-        if let Some(ad) = creds {
-            let mut itr = ad.split(':');
-            print!("basic authentication under \"{}\" using \"{}\" as username and ", path, itr.next().unwrap());
-            if let Some(p) = itr.next() {
-                print!("\"{}\" as", p);
-            } else {
-                print!("no");
+    if !opts.path_auth_data.is_empty() {
+        for (i, (path, creds)) in opts.path_auth_data.iter().enumerate() {
+            if i != 0 {
+                print!(", ");
             }
-            print!(" password");
-        } else {
-            print!("no authentication under \"{}\"", path);
+            if let Some(ad) = creds {
+                let mut itr = ad.split(':');
+                print!("basic authentication under \"/{}\" using \"{}\" as username and ", path, itr.next().unwrap());
+                if let Some(p) = itr.next() {
+                    print!("\"{}\" as", p);
+                } else {
+                    print!("no");
+                }
+                print!(" password");
+            } else {
+                print!("no authentication under \"/{}\"", path);
+            }
         }
+    } else {
+        print!("no authentication");
     }
     println!("...");
     println!("Ctrl-C to stop.");

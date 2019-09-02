@@ -55,10 +55,6 @@ pub struct Options {
     pub tls_data: Option<((String, PathBuf), String)>,
     /// Whether to generate a one-off certificate. Default: false
     pub generate_tls: bool,
-    /// Data for authentication, in the form `username[:password]`. Default: `None`
-    pub global_auth_data: Option<String>,
-    /// Whether to generate a one-off credential set. Default: false
-    pub generate_global_auth: bool,
     /// Data for per-path authentication, in the form `username[:password]`, or `None` to explicitly disable
     pub path_auth_data: BTreeMap<String, Option<String>>,
     /// Paths for which to generate auth data
@@ -99,6 +95,10 @@ impl Options {
         let follow_symlinks = !matches.is_present("no-follow-symlinks");
 
         let mut path_auth_data = BTreeMap::new();
+        if let Some(root_auth) = matches.value_of("auth").map(Options::normalise_credentials) {
+            path_auth_data.insert("".to_string(), Some(root_auth));
+        }
+
         if let Some(path_auth) = matches.values_of("path-auth") {
             for (path, auth) in path_auth.map(Options::decode_path_credentials) {
                 match path_auth_data.entry(path) {
@@ -109,6 +109,10 @@ impl Options {
         }
 
         let mut generate_path_auth = BTreeSet::new();
+        if matches.is_present("gen-auth") {
+            generate_path_auth.insert("".to_string());
+        }
+
         if let Some(gen_path_auth) = matches.values_of("gen-path-auth") {
             for path in gen_path_auth.map(Options::normalise_path) {
                 if path_auth_data.contains_key(&path) {
@@ -150,8 +154,6 @@ impl Options {
             encode_fs: !matches.is_present("no-encode"),
             tls_data: matches.value_of("ssl").map(|id| ((id.to_string(), fs::canonicalize(id).unwrap()), env::var("HTTP_SSL_PASS").unwrap_or(String::new()))),
             generate_tls: matches.is_present("gen-ssl"),
-            global_auth_data: matches.value_of("auth").map(Options::normalise_credentials),
-            generate_global_auth: matches.is_present("gen-auth"),
             path_auth_data: path_auth_data,
             generate_path_auth: generate_path_auth,
         }
@@ -197,7 +199,7 @@ impl Options {
 
     fn path_credentials_dupe(path: &str) -> ! {
         ClapError {
-                message: format!("Credentials for path \"{}\" already present", path),
+                message: format!("Credentials for path \"/{}\" already present", path),
                 kind: ClapErrorKind::ArgumentConflict,
                 info: None,
             }
@@ -214,15 +216,6 @@ impl Options {
                 }
                 _ => frags.push(fragment),
             }
-        }
-
-        if frags.is_empty() {
-            ClapError {
-                    message: format!("Path \"{}\" resolves to root, use --[gen-]auth", path),
-                    kind: ClapErrorKind::ValueValidation,
-                    info: None,
-                }
-                .exit();
         }
 
         let mut ret = String::with_capacity(frags.iter().map(|s| s.len()).sum::<usize>() + frags.len());
