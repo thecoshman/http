@@ -163,6 +163,12 @@ pass parameters like what port to use.
       N >= 2 – suppress startup except for auth data, if present
       N >= 3 – suppress all startup messages
 
+  -d --webdav
+
+    Handle WebDAV requests.
+
+    False by default.
+
 ## EXAMPLES
 
   `http`
