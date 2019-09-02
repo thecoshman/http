@@ -5,6 +5,7 @@ extern crate trivial_colours;
 extern crate lazy_static;
 extern crate serde_json;
 extern crate mime_guess;
+extern crate tabwriter;
 extern crate lazysort;
 extern crate brotli2;
 extern crate unicase;
@@ -36,6 +37,8 @@ pub use options::Options;
 use std::mem;
 use iron::Iron;
 use std::process::exit;
+use tabwriter::TabWriter;
+use std::io::{Write, stdout};
 use std::collections::BTreeSet;
 use std::sync::{Arc, Mutex, Condvar};
 use hyper_native_tls::NativeTlsServer;
@@ -97,29 +100,33 @@ fn result_main() -> Result<(), Error> {
     } else {
         print!("out TLS");
     }
-    print!(" and ");
     if !opts.path_auth_data.is_empty() {
-        for (i, (path, creds)) in opts.path_auth_data.iter().enumerate() {
-            if i != 0 {
-                print!(", ");
-            }
-            if let Some(ad) = creds {
-                let mut itr = ad.split(':');
-                print!("basic authentication under \"/{}\" using \"{}\" as username and ", path, itr.next().unwrap());
-                if let Some(p) = itr.next() {
-                    print!("\"{}\" as", p);
-                } else {
-                    print!("no");
-                }
-                print!(" password");
-            } else {
-                print!("no authentication under \"/{}\"", path);
-            }
-        }
+        print!(" and basic authentication");
     } else {
-        print!("no authentication");
+        print!(" and no authentication");
     }
     println!("...");
+    if !opts.path_auth_data.is_empty() {
+        println!("Basic authentication credentials:");
+
+        let mut out = TabWriter::new(stdout());
+        writeln!(out, "Path\tUsername\tPassword").unwrap();
+
+        for (path, creds) in &opts.path_auth_data {
+            if let Some(ad) = creds {
+                let mut itr = ad.split(':');
+                write!(out, "/{}\t{}\t", path, itr.next().unwrap()).unwrap();
+                if let Some(p) = itr.next() {
+                    write!(out, "{}", p).unwrap();
+                }
+                writeln!(out).unwrap();
+            } else {
+                writeln!(out, "/{}\t\t", path).unwrap();
+            }
+        }
+
+        out.flush().unwrap();
+    }
     println!("Ctrl-C to stop.");
     println!();
 
