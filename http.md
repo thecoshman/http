@@ -223,7 +223,8 @@ pass parameters like what port to use.
     unlocked with password "pwd".
 
     Assuming password is correct, example output change:
-      Hosting "." on port 8000 TLS certificate from "cert/http8k.p12" and no authentication...
+      Hosting "." on port 8000 TLS certificate from "cert/http8k.p12"
+      and no authentication...
 
   `http --gen-ssl`
 
@@ -231,20 +232,23 @@ pass parameters like what port to use.
     identity file.
 
     Example output change:
-      Hosting "." on port 8000 TLS certificate from "$TEMP/http-P-Rust-http/tls/tls.p12" and no authentication...
+      Hosting "." on port 8000 TLS certificate from "$TEMP/http-P-Rust-http/tls/tls.p12"
+      and no authentication...
 
   `http --auth Pirate`
 
     As in the first example, but require all clients to log in with the username "Pirate".
 
     Example output change:
-      Hosting "." on port 8000 without TLS and basic authentication using "Pirate" as username and no password...
+      Hosting "." on port 8000 without TLS and basic authentication using "Pirate"
+      as username and no password...
 
     On unauthed request:
       127.0.0.1:15141 requested to GET http://127.0.0.1:8005/ without authorisation
 
     Invalid credentials supplied:
-      127.0.0.1:15142 requested to GET http://127.0.0.1:8005/ with invalid credentials "Pirate:memelord11"
+      127.0.0.1:15142 requested to GET http://127.0.0.1:8005/ with invalid credentials
+      "Pirate:memelord11"
 
     Valid credentials supplied:
       127.0.0.1:15142 correctly authorised to GET http://127.0.0.1:8005/
@@ -256,7 +260,8 @@ pass parameters like what port to use.
     with the username "Pirate" and password "memelord42".
 
     Example output change:
-      Hosting "." on port 8000 without TLS and basic authentication using "Pirate" as username and "memelord42" as password...
+      Hosting "." on port 8000 without TLS and basic authentication using "Pirate"
+      as username and "memelord42" as password...
 
     See above for log messages when performing requests.
 
@@ -266,7 +271,8 @@ pass parameters like what port to use.
     and require all clients to log in therewith.
 
     Example output change:
-      Hosting "." on port 8000 without TLS and basic authentication using "RQvjNUKmnD9" as username and ".TM&tb;t29,Eo" as password...
+      Hosting "." on port 8000 without TLS and basic authentication using "RQvjNUKmnD9"
+      as username and ".TM&tb;t29,Eo" as password...
 
     See above for log messages when performing requests.
 
@@ -278,7 +284,14 @@ pass parameters like what port to use.
     and lock all other paths behind "admin:admin".
 
     Example output change:
-      Hosting "." on port 8000 without TLS and basic global authentication using "admin" as username and "admin" as password, no authentication under "target/.rustc_info.json", basic authentication under "target/debug" using "r2ciYq00k8a" as username and "Z-zn~HV,R`<{br/0Yf." as password, no authentication under "target/doc", basic authentication under "target/release" using "releases" as username and no password...
+      Hosting "." on port 8000 without TLS and basic global authentication
+      using "admin" as username and "admin" as password,
+      no authentication under "target/.rustc_info.json",
+      basic authentication under "target/debug" using
+      "r2ciYq00k8a" as username and "Z-zn~HV,R`<{br/0Yf." as password,
+      no authentication under "target/doc"
+      basic authentication under "target/release" using
+      "releases" as username and no password...
 
     See above for log messages when performing requests.
 
