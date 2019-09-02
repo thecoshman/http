@@ -560,7 +560,7 @@ impl HttpHandler {
         self.handle_raw_fs_api_response(status::Ok,
                                         &FilesetData {
                                             writes_supported: self.writes_temp_dir.is_some(),
-                                            is_root: req.url.path() == [""],
+                                            is_root: req.url.as_ref().path_segments().unwrap().count() == 1,
                                             is_file: false,
                                             files: req_p.read_dir()
                                                 .expect("Failed to read requested directory")
@@ -603,7 +603,7 @@ impl HttpHandler {
                     ((!self.follow_symlinks || !self.sandbox_symlinks) ||
                      (self.follow_symlinks && self.sandbox_symlinks && is_descendant_of(&req_p, &self.hosted_directory.1)))
                 }) {
-                if req.url.path().pop() == Some("") {
+                if req.url.as_ref().path_segments().unwrap().next_back() == Some("") {
                     let r = self.handle_get_file(req, idx);
                     log!("{} found index file for directory {magenta}{}{reset}",
                          iter::repeat(' ').take(req.remote_addr.to_string().len()).collect::<String>(),
@@ -640,7 +640,7 @@ impl HttpHandler {
 
     fn handle_get_mobile_dir_listing(&self, req: &mut Request, req_p: PathBuf) -> IronResult<Response> {
         let relpath = (url_path(&req.url) + "/").replace("//", "/");
-        let is_root = req.url.path() == [""];
+        let is_root = req.url.as_ref().path_segments().unwrap().count() == 1;
         log!("{green}{}{reset} was served mobile directory listing for {magenta}{}{reset}",
              req.remote_addr,
              req_p.display());
@@ -727,7 +727,7 @@ impl HttpHandler {
 
     fn handle_get_dir_listing(&self, req: &mut Request, req_p: PathBuf) -> IronResult<Response> {
         let relpath = (url_path(&req.url) + "/").replace("//", "/");
-        let is_root = req.url.path() == [""];
+        let is_root = req.url.as_ref().path_segments().unwrap().count() == 1;
         log!("{green}{}{reset} was served directory listing for {magenta}{}{reset}",
              req.remote_addr,
              req_p.display());
@@ -1062,22 +1062,28 @@ impl HttpHandler {
     }
 
     fn parse_requested_path_custom_symlink(&self, req: &Request, follow_symlinks: bool) -> (PathBuf, bool, bool) {
-        req.url.path().into_iter().filter(|p| !p.is_empty()).fold((self.hosted_directory.1.clone(), false, false), |(mut cur, mut sk, mut err), pp| {
-            if let Some(pp) = percent_decode(pp) {
-                cur.push(&*pp);
-            } else {
-                err = true;
-            }
-            while let Ok(newlink) = cur.read_link() {
-                sk = true;
-                if follow_symlinks {
-                    cur = newlink;
+        req.url
+            .as_ref()
+            .path_segments()
+            .unwrap()
+            .into_iter()
+            .filter(|p| !p.is_empty())
+            .fold((self.hosted_directory.1.clone(), false, false), |(mut cur, mut sk, mut err), pp| {
+                if let Some(pp) = percent_decode(pp) {
+                    cur.push(&*pp);
                 } else {
-                    break;
+                    err = true;
                 }
-            }
-            (cur, sk, err)
-        })
+                while let Ok(newlink) = cur.read_link() {
+                    sk = true;
+                    if follow_symlinks {
+                        cur = newlink;
+                    } else {
+                        break;
+                    }
+                }
+                (cur, sk, err)
+            })
     }
 
     fn create_temp_dir(&self, td: &Option<(String, PathBuf)>) {
