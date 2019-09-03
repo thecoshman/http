@@ -66,3 +66,9 @@ name = "httplz"
 path = "src/main.rs"
 test = false
 doc = false
+
+
+[package.metadata.deb]
+name = "http"
+maintainer = "nabijaczleweli <nabijaczleweli@gmail.com>"
+section = "web"

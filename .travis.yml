@@ -13,6 +13,9 @@ matrix:
     - env: LANGUAGE=Rust CLIPPY=true
       language: rust
       rust: nightly
+    - env: LANGUAGE=Rust-deb DEPLOY=true DEPLOY_FILE="$TRAVIS_BUILD_DIR/target/debian"
+      language: rust
+      rust: stable
     - env: LANGUAGE=Ruby DEPLOY=true DEPLOY_FILE="$TRAVIS_BUILD_DIR/../http-man-$TRAVIS_TAG.tbz2"
       language: ruby
       rust: []
@@ -23,6 +26,10 @@ matrix:
 
 install:
   - if [ "$LANGUAGE" == "Ruby" ]; then gem install ronn; fi
+  - if [ "$LANGUAGE" == "Rust-deb" ]; then
+      export DEPLOY_FILE="$DEPLOY_FILE/http_$(awk '/version/ {print(gensub(/"/, "", "g", $3)); exit}' Cargo.toml)_amd64.deb";
+      cargo install cargo-deb || :;
+    fi
 
 script:
   - if [ "$LANGUAGE" == "Rust" ]; then cargo build --verbose; fi
@@ -33,6 +40,8 @@ script:
       cargo install -f clippy;
       cargo clippy;
     fi
+  -
+  - if [ "$LANGUAGE" == "Rust-deb" ]; then cargo deb; fi
   -
   - if [ "$LANGUAGE" == "Ruby" ]; then
       mkdir man; pushd man;
