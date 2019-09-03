@@ -165,6 +165,23 @@ impl Handler for HttpHandler {
                 })
             }
             method::Trace => self.handle_trace(req),
+            method::Extension(ext) => {
+                if self.webdav {
+                    match ext {
+                        "COPY" => self.handle_webdav_copy(req),
+                        "LOCK" => self.handle_webdav_lock(req),
+                        "MKCOL" => self.handle_webdav_mkcol(req),
+                        "MOVE" => self.handle_webdav_move(req),
+                        "PROPFIND" => self.handle_webdav_propfind(req),
+                        "PROPPATCH" => self.handle_webdav_proppatch(req),
+                        "UNLOCK" => self.handle_webdav_unlock(req),
+
+                        _ => self.handle_bad_method(req),
+                    }
+                } else {
+                    self.handle_bad_method(req)
+                }
+            }
             _ => self.handle_bad_method(req),
         }
     }
