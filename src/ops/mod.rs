@@ -1,6 +1,5 @@
 use md6;
 use std::iter;
-use time::now;
 use serde_json;
 use std::borrow::Cow;
 use serde::Serialize;
@@ -18,7 +17,6 @@ use mime_guess::guess_mime_type_opt;
 use hyper_native_tls::NativeTlsServer;
 use std::collections::{BTreeMap, HashMap};
 use std::io::{self, SeekFrom, Write, Read, Seek};
-use trivial_colours::{Reset as CReset, Colour as C};
 use std::process::{ExitStatus, Command, Child, Stdio};
 use rfsapi::{RawFsApiHeader, FilesetData, RawFileData};
 use rand::distributions::uniform::Uniform as UniformDistribution;
@@ -33,6 +31,9 @@ use self::super::util::{WwwAuthenticate, url_path, file_hash, is_symlink, encode
 
 macro_rules! log {
     ($fmt:expr) => {
+        use time::now;
+        use trivial_colours::{Reset as CReset, Colour as C};
+
         print!("{}[{}]{} ", C::Cyan, now().strftime("%F %T").unwrap(), CReset);
         println!(concat!($fmt, "{black:.0}{red:.0}{green:.0}{yellow:.0}{blue:.0}{magenta:.0}{cyan:.0}{white:.0}{reset:.0}"),
                  black = C::Black,
@@ -46,6 +47,9 @@ macro_rules! log {
                  reset = CReset);
     };
     ($fmt:expr, $($arg:tt)*) => {
+        use time::now;
+        use trivial_colours::{Reset as CReset, Colour as C};
+
         print!("{}[{}]{} ", C::Cyan, now().strftime("%F %T").unwrap(), CReset);
         println!(concat!($fmt, "{black:.0}{red:.0}{green:.0}{yellow:.0}{blue:.0}{magenta:.0}{cyan:.0}{white:.0}{reset:.0}"),
                  $($arg)*,
@@ -60,6 +64,8 @@ macro_rules! log {
                  reset = CReset);
     };
 }
+
+mod webdav;
 
 
 // TODO: ideally this String here would be Encoding instead but hyper is bad
@@ -158,9 +164,9 @@ impl Handler for HttpHandler {
                 })
             }
             method::Trace => self.handle_trace(req),
-            method::Extension(ext) => {
+            method::Extension(ref ext) => {
                 if self.webdav {
-                    match ext {
+                    match &ext[..] {
                         "COPY" => self.handle_webdav_copy(req),
                         "LOCK" => self.handle_webdav_lock(req),
                         "MKCOL" => self.handle_webdav_mkcol(req),
