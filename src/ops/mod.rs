@@ -22,11 +22,11 @@ use rfsapi::{RawFsApiHeader, FilesetData, RawFileData};
 use rand::distributions::uniform::Uniform as UniformDistribution;
 use rand::distributions::Alphanumeric as AlphanumericDistribution;
 use iron::{headers, status, method, mime, IronResult, Listening, Response, TypeMap, Request, Handler, Iron};
-use self::super::util::{WwwAuthenticate, url_path, file_hash, is_symlink, encode_str, encode_file, file_length, hash_string, html_response, file_binary,
+use self::super::util::{WwwAuthenticate, Dav, url_path, file_hash, is_symlink, encode_str, encode_file, file_length, hash_string, html_response, file_binary,
                         client_mobile, percent_decode, file_icon_suffix, is_actually_file, is_descendant_of, response_encoding, detect_file_as_dir,
                         encoding_extension, file_time_modified, get_raw_fs_metadata, human_readable_size, is_nonexistant_descendant_of, USER_AGENT, ERROR_HTML,
-                        INDEX_EXTENSIONS, MIN_ENCODING_GAIN, MAX_ENCODING_SIZE, MIN_ENCODING_SIZE, DIRECTORY_LISTING_HTML, MOBILE_DIRECTORY_LISTING_HTML,
-                        BLACKLISTED_ENCODING_EXTENSIONS};
+                        INDEX_EXTENSIONS, MIN_ENCODING_GAIN, MAX_ENCODING_SIZE, MIN_ENCODING_SIZE, DAV_LEVEL_1_METHODS, DIRECTORY_LISTING_HTML,
+                        MOBILE_DIRECTORY_LISTING_HTML, BLACKLISTED_ENCODING_EXTENSIONS};
 
 
 macro_rules! log {
@@ -152,7 +152,7 @@ impl Handler for HttpHandler {
             }
         }
 
-        match req.method {
+        let mut resp = match req.method {
             method::Options => self.handle_options(req),
             method::Get => self.handle_get(req),
             method::Put => self.handle_put(req),
@@ -168,12 +168,10 @@ impl Handler for HttpHandler {
                 if self.webdav {
                     match &ext[..] {
                         "COPY" => self.handle_webdav_copy(req),
-                        "LOCK" => self.handle_webdav_lock(req),
                         "MKCOL" => self.handle_webdav_mkcol(req),
                         "MOVE" => self.handle_webdav_move(req),
                         "PROPFIND" => self.handle_webdav_propfind(req),
                         "PROPPATCH" => self.handle_webdav_proppatch(req),
-                        "UNLOCK" => self.handle_webdav_unlock(req),
 
                         _ => self.handle_bad_method(req),
                     }
@@ -182,7 +180,11 @@ impl Handler for HttpHandler {
                 }
             }
             _ => self.handle_bad_method(req),
+        }?;
+        if self.webdav {
+            resp.headers.set(Dav::LEVEL_1);
         }
+        Ok(resp)
     }
 }
 
@@ -255,9 +257,12 @@ impl HttpHandler {
 
     fn handle_options(&self, req: &mut Request) -> IronResult<Response> {
         log!("{green}{}{reset} asked for {red}OPTIONS{reset}", req.remote_addr);
-        Ok(Response::with((status::NoContent,
-                           Header(headers::Server(USER_AGENT.to_string())),
-                           Header(headers::Allow(vec![method::Options, method::Get, method::Put, method::Delete, method::Head, method::Trace])))))
+
+        let mut allowed_methods = Vec::with_capacity(6 + if self.webdav { DAV_LEVEL_1_METHODS.len() } else { 0 });
+        allowed_methods.extend_from_slice(&[method::Options, method::Get, method::Put, method::Delete, method::Head, method::Trace]);
+        allowed_methods.extend_from_slice(&DAV_LEVEL_1_METHODS);
+
+        Ok(Response::with((status::NoContent, Header(headers::Server(USER_AGENT.to_string())), Header(headers::Allow(allowed_methods)))))
     }
 
     fn handle_get(&self, req: &mut Request) -> IronResult<Response> {
