@@ -5,20 +5,20 @@ mod os;
 mod content_encoding;
 
 use base64;
+use iron::method;
 use std::path::Path;
 use percent_encoding;
 use std::borrow::Cow;
 use rfsapi::RawFileData;
 use std::{cmp, f64, fmt};
-use iron::headers::UserAgent;
 use std::collections::HashMap;
 use time::{self, Duration, Tm};
 use iron::{mime, Headers, Url};
 use std::io::{BufReader, BufRead};
 use base64::display::Base64Display;
 use std::fs::{self, FileType, File};
-use iron::headers::{HeaderFormat, Header};
 use iron::error::HttpResult as HyperResult;
+use iron::headers::{HeaderFormat, UserAgent, Header};
 use mime_guess::{guess_mime_type_opt, get_mime_type_str};
 
 pub use self::os::*;
@@ -71,6 +71,9 @@ lazy_static! {
         ass.insert("adjust_tz", Cow::Borrowed(include_str!("../../assets/adjust_tz.js")));
         ass
     };
+
+    pub static ref DAV_LEVEL_1_METHODS: Vec<method::Method> =
+        ["COPY", "MKCOL", "MOVE", "PROPFIND", "PROPPATCH"].into_iter().map(|m| method::Extension(m.to_string())).collect();
 }
 
 /// The port to start scanning from if no ports were given.
@@ -106,6 +109,38 @@ impl Header for WwwAuthenticate {
 impl HeaderFormat for WwwAuthenticate {
     fn fmt_header(&self, f: &mut fmt::Formatter) -> fmt::Result {
         f.write_str(&self.0)
+    }
+}
+
+/// The [DAV header](https://tools.ietf.org/html/rfc2518#section-9.1), without parsing.
+///
+/// We don't ever receive this header, only ever send it, so this is fine.
+#[derive(Debug, Clone, Hash, PartialOrd, Ord, PartialEq, Eq)]
+pub struct Dav(pub &'static [&'static str]);
+
+impl Dav {
+    pub const LEVEL_1: Dav = Dav(&["1"]);
+}
+
+impl Header for Dav {
+    fn header_name() -> &'static str {
+        "DAV"
+    }
+
+    /// Dummy impl returning an empty value, since we're only ever sending these
+    fn parse_header(_: &[Vec<u8>]) -> HyperResult<Dav> {
+        Ok(Dav(&[]))
+    }
+}
+
+impl HeaderFormat for Dav {
+    fn fmt_header(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        f.write_str(self.0[0])?;
+        for lvl in self.0.iter().skip(1) {
+            f.write_str(", ")?;
+            f.write_str(lvl)?;
+        }
+        Ok(())
     }
 }
 
