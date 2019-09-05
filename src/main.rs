@@ -96,26 +96,28 @@ fn result_main() -> Result<(), Error> {
                        &opts.tls_data)
     }?;
 
-    print!("{}Hosting \"{}\" on port {}",
-           trivial_colours::Reset,
-           opts.hosted_directory.0,
-           responder.socket.port());
-    if responder.socket.ip() != IpAddr::from([0, 0, 0, 0]) {
-        print!(" under address {}", responder.socket.ip());
+    if opts.loglevel < ops::LogLevel::NoStartup {
+        print!("{}Hosting \"{}\" on port {}",
+               trivial_colours::Reset,
+               opts.hosted_directory.0,
+               responder.socket.port());
+        if responder.socket.ip() != IpAddr::from([0, 0, 0, 0]) {
+            print!(" under address {}", responder.socket.ip());
+        }
+        print!(" with");
+        if let Some(&((ref id, _), _)) = opts.tls_data.as_ref() {
+            print!(" TLS certificate from \"{}\"", id);
+        } else {
+            print!("out TLS");
+        }
+        if !opts.path_auth_data.is_empty() {
+            print!(" and basic authentication");
+        } else {
+            print!(" and no authentication");
+        }
+        println!("...");
     }
-    print!(" with");
-    if let Some(&((ref id, _), _)) = opts.tls_data.as_ref() {
-        print!(" TLS certificate from \"{}\"", id);
-    } else {
-        print!("out TLS");
-    }
-    if !opts.path_auth_data.is_empty() {
-        print!(" and basic authentication");
-    } else {
-        print!(" and no authentication");
-    }
-    println!("...");
-    if !opts.path_auth_data.is_empty() {
+    if !opts.path_auth_data.is_empty() && opts.loglevel < ops::LogLevel::NoAuth {
         println!("Basic authentication credentials:");
 
         let mut out = TabWriter::new(stdout());
@@ -136,8 +138,10 @@ fn result_main() -> Result<(), Error> {
 
         out.flush().unwrap();
     }
-    println!("Ctrl-C to stop.");
-    println!();
+    if opts.loglevel < ops::LogLevel::NoStartup {
+        println!("Ctrl-C to stop.");
+        println!();
+    }
 
     let end_handler = Arc::new(Condvar::new());
     ctrlc::set_handler({
@@ -150,7 +154,7 @@ fn result_main() -> Result<(), Error> {
     responder.close().unwrap();
 
     // This is necessary because the server isn't Drop::drop()ped when the responder is
-    ops::HttpHandler::clean_temp_dirs(&opts.temp_directory);
+    ops::HttpHandler::clean_temp_dirs(&opts.temp_directory, opts.loglevel);
 
     Ok(())
 }
