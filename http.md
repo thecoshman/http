@@ -153,6 +153,16 @@ pass parameters like what port to use.
 
     This is false by default because it's useful for reducing bandwidth usage.
 
+  -q --quiet...
+
+    Suppress increasing amounts of output.
+
+    Specifying this flag N times will, for:
+      N == 0 – show all output
+      N >= 1 – suppress serving status lines ("IP was served something")
+      N >= 2 – suppress startup except for auth data, if present
+      N >= 3 – suppress all startup messages
+
 ## EXAMPLES
 
   `http`

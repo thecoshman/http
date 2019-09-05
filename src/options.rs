@@ -14,6 +14,7 @@
 use clap::{AppSettings, ErrorKind as ClapErrorKind, Error as ClapError, Arg, App};
 use std::collections::btree_map::{BTreeMap, Entry as BTreeMapEntry};
 use std::collections::BTreeSet;
+use self::super::ops::LogLevel;
 use std::env::{self, temp_dir};
 use std::path::PathBuf;
 use std::str::FromStr;
@@ -54,6 +55,12 @@ pub struct Options {
     pub allow_writes: bool,
     /// Whether to encode filesystem files. Default: true
     pub encode_fs: bool,
+    /// How much to suppress output
+    ///
+    ///   * >= 1 – suppress serving status lines ("IP was served something")
+    ///   * >= 2 – suppress startup except for auth data, if present
+    ///   * >= 3 – suppress all startup messages
+    pub loglevel: LogLevel,
     /// Data for HTTPS, identity file and password. Default: `None`
     pub tls_data: Option<((String, PathBuf), String)>,
     /// Whether to generate a one-off certificate. Default: false
@@ -84,6 +91,7 @@ impl Options {
             .arg(Arg::from_usage("-w --allow-write 'Allow for write operations. Default: false'"))
             .arg(Arg::from_usage("-i --no-indices 'Always generate dir listings even if index files are available. Default: false'"))
             .arg(Arg::from_usage("-e --no-encode 'Do not encode filesystem files. Default: false'"))
+            .arg(Arg::from_usage("-q --quiet... 'Suppress increasing amounts of output'"))
             .arg(Arg::from_usage("--ssl [TLS_IDENTITY] 'Data for HTTPS, identity file. Password in HTTP_SSL_PASS env var, otherwise empty'")
                 .validator(Options::identity_validator))
             .arg(Arg::from_usage("--gen-ssl 'Generate a one-off TLS certificate'").conflicts_with("ssl"))
@@ -157,6 +165,7 @@ impl Options {
             check_indices: !matches.is_present("no-indices"),
             allow_writes: matches.is_present("allow-write"),
             encode_fs: !matches.is_present("no-encode"),
+            loglevel: matches.occurrences_of("quiet").into(),
             tls_data: matches.value_of("ssl").map(|id| ((id.to_string(), fs::canonicalize(id).unwrap()), env::var("HTTP_SSL_PASS").unwrap_or(String::new()))),
             generate_tls: matches.is_present("gen-ssl"),
             path_auth_data: path_auth_data,
