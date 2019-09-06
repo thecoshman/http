@@ -36,6 +36,7 @@ pub use options::Options;
 
 use std::mem;
 use iron::Iron;
+use std::net::IpAddr;
 use std::process::exit;
 use tabwriter::TabWriter;
 use std::io::{Write, stdout};
@@ -69,7 +70,7 @@ fn result_main() -> Result<(), Error> {
 
     let mut responder = if let Some(p) = opts.port {
         if let Some(&((ref id, _), ref pw)) = opts.tls_data.as_ref() {
-                Iron::new(ops::HttpHandler::new(&opts)).https(("0.0.0.0", p),
+                Iron::new(ops::HttpHandler::new(&opts)).https((opts.bind_address, p),
                                                               NativeTlsServer::new(id, pw).map_err(|err| {
                         Error {
                             desc: "TLS certificate",
@@ -78,7 +79,7 @@ fn result_main() -> Result<(), Error> {
                         }
                     })?)
             } else {
-                Iron::new(ops::HttpHandler::new(&opts)).http(("0.0.0.0", p))
+                Iron::new(ops::HttpHandler::new(&opts)).http((opts.bind_address, p))
             }
             .map_err(|_| {
                 Error {
@@ -88,13 +89,21 @@ fn result_main() -> Result<(), Error> {
                 }
             })
     } else {
-        ops::try_ports(ops::HttpHandler::new(&opts), util::PORT_SCAN_LOWEST, util::PORT_SCAN_HIGHEST, &opts.tls_data)
+        ops::try_ports(ops::HttpHandler::new(&opts),
+                       opts.bind_address,
+                       util::PORT_SCAN_LOWEST,
+                       util::PORT_SCAN_HIGHEST,
+                       &opts.tls_data)
     }?;
 
-    print!("{}Hosting \"{}\" on port {} with",
+    print!("{}Hosting \"{}\" on port {}",
            trivial_colours::Reset,
            opts.hosted_directory.0,
            responder.socket.port());
+    if responder.socket.ip() != IpAddr::from([0, 0, 0, 0]) {
+        print!(" under address {}", responder.socket.ip());
+    }
+    print!(" with");
     if let Some(&((ref id, _), _)) = opts.tls_data.as_ref() {
         print!(" TLS certificate from \"{}\"", id);
     } else {

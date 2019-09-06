@@ -3,6 +3,7 @@ use std::iter;
 use time::now;
 use serde_json;
 use std::borrow::Cow;
+use std::net::IpAddr;
 use serde::Serialize;
 use unicase::UniCase;
 use iron::mime::Mime;
@@ -70,7 +71,6 @@ pub struct HttpHandler {
     pub follow_symlinks: bool,
     pub sandbox_symlinks: bool,
     pub check_indices: bool,
-    pub webdav: bool,
     pub global_auth_data: Option<(String, Option<String>)>,
     pub path_auth_data: BTreeMap<String, Option<(String, Option<String>)>>,
     pub writes_temp_dir: Option<(String, PathBuf)>,
@@ -103,7 +103,6 @@ impl HttpHandler {
             follow_symlinks: opts.follow_symlinks,
             sandbox_symlinks: opts.sandbox_symlinks,
             check_indices: opts.check_indices,
-            webdav: opts.webdav,
             global_auth_data: global_auth_data,
             path_auth_data: path_auth_data,
             writes_temp_dir: HttpHandler::temp_subdir(&opts.temp_directory, opts.allow_writes, "writes"),
@@ -1107,7 +1106,6 @@ impl Clone for HttpHandler {
             follow_symlinks: self.follow_symlinks,
             sandbox_symlinks: self.sandbox_symlinks,
             check_indices: self.check_indices,
-            webdav: self.webdav,
             global_auth_data: self.global_auth_data.clone(),
             path_auth_data: self.path_auth_data.clone(),
             writes_temp_dir: self.writes_temp_dir.clone(),
@@ -1134,12 +1132,13 @@ impl Clone for HttpHandler {
 /// # use iron::{status, Response};
 /// let server = try_ports(|req| Ok(Response::with((status::Ok, "Abolish the burgeoisie!"))), 8000, 8100, None).unwrap();
 /// ```
-pub fn try_ports<H: Handler + Clone>(hndlr: H, from: u16, up_to: u16, tls_data: &Option<((String, PathBuf), String)>) -> Result<Listening, Error> {
+pub fn try_ports<H: Handler + Clone>(hndlr: H, addr: IpAddr, from: u16, up_to: u16, tls_data: &Option<((String, PathBuf), String)>)
+                                     -> Result<Listening, Error> {
     let hndlr = hndlr;
     for port in from..up_to + 1 {
         let ir = Iron::new(hndlr.clone());
         match if let Some(&((_, ref id), ref pw)) = tls_data.as_ref() {
-            ir.https(("0.0.0.0", port),
+            ir.https((addr, port),
                      NativeTlsServer::new(id, pw).map_err(|err| {
                     Error {
                         desc: "TLS certificate",
@@ -1148,7 +1147,7 @@ pub fn try_ports<H: Handler + Clone>(hndlr: H, from: u16, up_to: u16, tls_data: 
                     }
                 })?)
         } else {
-            ir.http(("0.0.0.0", port))
+            ir.http((addr, port))
         } {
             Ok(server) => return Ok(server),
             Err(error) => {
