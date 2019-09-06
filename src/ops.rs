@@ -283,7 +283,7 @@ impl HttpHandler {
              req.remote_addr,
              req.method,
              req.url,
-             &cause[3..cause.len() - 4]);
+             &cause[3..cause.len() - 4]); // Strip <p> tags
 
         self.handle_generated_response_encoding(req,
                                                 status::BadRequest,
