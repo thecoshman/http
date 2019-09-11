@@ -50,7 +50,7 @@ set PREFIX=D:\Akces
 curl -SsL https://cdn.rawgit.com/thecoshman/http/master/install.sh | sh
 ```
 
-If you're on a Debian-based amd64 machine, you can also grab a `.deb` paclage from the [latest release page](https://github.com/thecoshman/http/releases/latest).
+If you're on a Debian-based amd64 machine, you can also grab a `.deb` package from the [latest release page](https://github.com/thecoshman/http/releases/latest).
 
 If you're on Windows and prefer a more guided installation (or you don't have a shell),
 you can download the Windows installer from the [latest release's page](https://github.com/thecoshman/http/releases/latest).
