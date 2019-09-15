@@ -7,16 +7,16 @@ use self::super::super::util::{CommaList, Depth, file_time_modified, file_time_c
 use xml::{EmitterConfig as XmlEmitterConfig, ParserConfig as XmlParserConfig};
 use xml::reader::{EventReader as XmlReader, XmlEvent as XmlREvent};
 use xml::writer::{EventWriter as XmlWriter, XmlEvent as XmlWEvent};
+use std::io::{self, ErrorKind as IoErrorKind, Write};
 use iron::{status, IronResult, Response, Request};
 use xml::writer::Error as XmlWError;
 use mime_guess::guess_mime_type_opt;
 use xml::name::{Name, OwnedName};
 use self::super::HttpHandler;
 use xml::common::XmlVersion;
-use std::io::{self, Write};
 use iron::mime::Mime;
 use std::path::Path;
-use std::str;
+use std::fs;
 
 
 /*
@@ -102,7 +102,8 @@ impl HttpHandler {
              req_p.display(),
              depth);
 
-        match self.handle_webdav_propfind_write_output(req, req.url.as_ref().as_str().to_string(), &req_p, &props, depth).expect("Couldn't write PROPFIND XML") {
+        match self.handle_webdav_propfind_write_output(req, req.url.as_ref().as_str().to_string(), &req_p, &props, depth)
+            .expect("Couldn't write PROPFIND XML") {
             Ok(xml_resp) => Ok(Response::with((status::MultiStatus, xml_resp, "text/xml;charset=utf-8".parse::<Mime>().unwrap()))),
             Err(resp) => resp,
         }
@@ -170,10 +171,36 @@ impl HttpHandler {
     }
 
     pub(super) fn handle_webdav_mkcol(&self, req: &mut Request) -> IronResult<Response> {
-        log!(self.log, "{:#?}", req);
-        eprintln!("{:?}", req.headers);
-        io::copy(&mut req.body, &mut io::stderr()).unwrap();
-        Ok(Response::with((status::MethodNotAllowed, "MKCOL unimplemented")))
+        let (req_p, symlink, url_err) = self.parse_requested_path(req);
+
+        log!(self.log,
+             "{green}{}{reset} requested to {red}MKCOL{reset} at {yellow}{}{reset}",
+             req.remote_addr,
+             req_p.display());
+
+        if url_err {
+            return self.handle_invalid_url(req, "<p>Percent-encoding decoded to invalid UTF-8.</p>");
+        }
+
+        if self.writes_temp_dir.is_none() {
+            return self.handle_forbidden_method(req, "-w", "write requests");
+        }
+
+        if !req_p.parent().map(|pp| pp.exists()).unwrap_or(true) || (symlink && !self.follow_symlinks) ||
+           (symlink && self.follow_symlinks && self.sandbox_symlinks && !is_descendant_of(&req_p, &self.hosted_directory.1)) {
+            return self.handle_nonexistant(req, req_p);
+        }
+
+        match fs::create_dir(&req_p) {
+            Ok(()) => Ok(Response::with(status::Created)),
+            Err(e) => {
+                match e.kind() {
+                    IoErrorKind::NotFound => self.handle_nonexistant(req, req_p),
+                    IoErrorKind::AlreadyExists => Ok(Response::with((status::MethodNotAllowed, "File exists"))),
+                    _ => Ok(Response::with(status::Forbidden)),
+                }
+            }
+        }
     }
 
     pub(super) fn handle_webdav_copy(&self, req: &mut Request) -> IronResult<Response> {
