@@ -12,6 +12,7 @@ use std::fs::{self, File};
 use std::default::Default;
 use rand::{Rng, thread_rng};
 use iron::modifiers::Header;
+use iron::url::Url as GenericUrl;
 use self::super::{Options, Error};
 use mime_guess::guess_mime_type_opt;
 use hyper_native_tls::NativeTlsServer;
@@ -30,7 +31,7 @@ use self::super::util::{WwwAuthenticate, CommaList, Dav, url_path, file_hash, is
 
 
 macro_rules! log {
-    ($fmt:expr) => {
+    ($fmt:expr) => {{
         use time::now;
         use trivial_colours::{Reset as CReset, Colour as C};
 
@@ -45,8 +46,8 @@ macro_rules! log {
                  cyan = C::Cyan,
                  white = C::White,
                  reset = CReset);
-    };
-    ($fmt:expr, $($arg:tt)*) => {
+    }};
+    ($fmt:expr, $($arg:tt)*) => {{
         use time::now;
         use trivial_colours::{Reset as CReset, Colour as C};
 
@@ -62,7 +63,7 @@ macro_rules! log {
                  cyan = C::Cyan,
                  white = C::White,
                  reset = CReset);
-    };
+    }};
 }
 
 mod webdav;
@@ -974,7 +975,7 @@ impl HttpHandler {
             return self.handle_forbidden_method(req, "-w", "write requests");
         }
 
-        let (req_p, symlink, url_err) = self.parse_requested_path_custom_symlink(req, false);
+        let (req_p, symlink, url_err) = self.parse_requested_path_custom_symlink(req.url.as_ref(), false);
 
         if url_err {
             self.handle_invalid_url(req, "<p>Percent-encoding decoded to invalid UTF-8.</p>")
@@ -1114,13 +1115,11 @@ impl HttpHandler {
     }
 
     fn parse_requested_path(&self, req: &Request) -> (PathBuf, bool, bool) {
-        self.parse_requested_path_custom_symlink(req, true)
+        self.parse_requested_path_custom_symlink(req.url.as_ref(), true)
     }
 
-    fn parse_requested_path_custom_symlink(&self, req: &Request, follow_symlinks: bool) -> (PathBuf, bool, bool) {
-        req.url
-            .as_ref()
-            .path_segments()
+    fn parse_requested_path_custom_symlink(&self, req_url: &GenericUrl, follow_symlinks: bool) -> (PathBuf, bool, bool) {
+        req_url.path_segments()
             .unwrap()
             .into_iter()
             .filter(|p| !p.is_empty())

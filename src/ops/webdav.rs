@@ -1,13 +1,17 @@
-//! WebDAV handling is based heavily on
-//! https://github.com/tylerwhall/hyperdav-server/blob/415f512ac030478593ad389a3267aeed7441d826/src/lib.rs
+//! Basic WebDAV handling is based heavily on
+//! https://github.com/tylerwhall/hyperdav-server/blob/415f512ac030478593ad389a3267aeed7441d826/src/lib.rs,
+//! and extended on
+//! https://github.com/miquels/webdav-handler-rs @ 02433c1acfccd848a7de26889f6857cbad559076,
+//! adhering to
+//! https://tools.ietf.org/html/rfc2518
 
 
-use self::super::super::util::{CommaList, Depth, file_time_modified, file_time_created, is_actually_file, is_descendant_of, html_response, file_length,
-                               file_binary, ERROR_HTML};
+use self::super::super::util::{Destination, CommaList, Overwrite, Depth, file_time_modified, file_time_created, is_actually_file, is_descendant_of,
+                               html_response, file_length, file_binary, copy_dir, ERROR_HTML};
 use xml::{EmitterConfig as XmlEmitterConfig, ParserConfig as XmlParserConfig};
+use std::io::{self, ErrorKind as IoErrorKind, Result as IoResult, Write};
 use xml::reader::{EventReader as XmlReader, XmlEvent as XmlREvent};
 use xml::writer::{EventWriter as XmlWriter, XmlEvent as XmlWEvent};
-use std::io::{self, ErrorKind as IoErrorKind, Write};
 use iron::{status, IronResult, Response, Request};
 use xml::writer::Error as XmlWError;
 use mime_guess::guess_mime_type_opt;
@@ -17,49 +21,6 @@ use xml::common::XmlVersion;
 use iron::mime::Mime;
 use std::path::Path;
 use std::fs;
-
-
-/*
-davfs2 mount:
-
-[2019-09-17 18:30:09] Request {
-    url: Url { generic_url: "http://192.168.1.109:8000/" }
-    method: Extension("PROPFIND")
-    remote_addr: V4(192.168.1.109:3373)
-    local_addr: V4(0.0.0.0:8000)
-}
-Headers { User-Agent: davfs2/1.5.4 neon/0.30.2
-, Connection: TE
-, TE: trailers
-, Host: 192.168.1.109:8000
-, Depth: 1
-, Content-Length: 257
-, Content-Type: application/xml
-, }
-<?xml version="1.0" encoding="utf-8"?>
-<propfind xmlns="DAV:">
-    <prop>
-        <resourcetype xmlns="DAV:"/>
-        <getcontentlength xmlns="DAV:"/>
-        <getetag xmlns="DAV:"/>
-        <getlastmodified xmlns="DAV:"/>
-        <executable xmlns="http://apache.org/dav/props/"/>
-    </prop>
-</propfind>
-
-
-Headers { User-Agent: davfs2/1.5.4 neon/0.30.2
-, Connection: TE
-, TE: trailers
-, Host: 192.168.1.109:8000
-, Depth: 0
-, Content-Length: 159
-, Content-Type: application/xml
-, }
-Propfind "\\\\?\\P:\\Rust\\http" [OwnedName { local_name: "quota-available-bytes", namespace: Some("DAV:"), prefix: None },
-                                  OwnedName { local_name: "quota-used-bytes", namespace: Some("DAV:"), prefix: None }] 0
-*/
-
 
 
 lazy_static! {
@@ -203,10 +164,80 @@ impl HttpHandler {
     }
 
     pub(super) fn handle_webdav_copy(&self, req: &mut Request) -> IronResult<Response> {
-        log!("{:#?}", req);
-        eprintln!("{:?}", req.headers);
-        io::copy(&mut req.body, &mut io::stderr()).unwrap();
-        Ok(Response::with((status::MethodNotAllowed, "COPY unimplemented")))
+        let (req_p, symlink, url_err) = self.parse_requested_path(req);
+
+        if url_err {
+            return self.handle_invalid_url(req, "<p>Percent-encoding decoded to invalid UTF-8.</p>");
+        }
+        let (dest_p, dest_symlink) = match req.headers.get::<Destination>() {
+            Some(dest) => {
+                let (dest_p, dest_symlink, dest_url_err) = self.parse_requested_path_custom_symlink(&dest.0, true);
+
+                if dest_url_err {
+                    return self.handle_invalid_url(req, "<p>Percent-encoding decoded destination to invalid UTF-8.</p>");
+                }
+
+                (dest_p, dest_symlink)
+            }
+            None => return self.handle_invalid_url(req, "<p>Destination URL invalid or nonexistant.</p>"),
+        };
+
+        let depth = req.headers.get::<Depth>().copied().unwrap_or(Depth::Infinity);
+        let overwrite = req.headers.get::<Overwrite>().copied().unwrap_or_default().0;
+
+        log!("{green}{}{reset} requested to {red}COPY{reset} {yellow}{}{reset} to {yellow}{}{reset}",
+             req.remote_addr,
+             req_p.display(),
+             dest_p.display());
+
+        if self.writes_temp_dir.is_none() {
+            return self.handle_forbidden_method(req, "-w", "write requests");
+        }
+
+        if req_p == dest_p {
+            return Ok(Response::with(status::Forbidden));
+        }
+
+        if !req_p.exists() || (symlink && !self.follow_symlinks) ||
+           (symlink && self.follow_symlinks && self.sandbox_symlinks && !is_descendant_of(&req_p, &self.hosted_directory.1)) {
+            return self.handle_nonexistant(req, req_p);
+        }
+
+        if !dest_p.parent().map(|pp| pp.exists()).unwrap_or(true) || (dest_symlink && !self.follow_symlinks) ||
+           (dest_symlink && self.follow_symlinks && self.sandbox_symlinks && !is_descendant_of(&dest_p, &self.hosted_directory.1)) {
+            return Ok(Response::with(status::Conflict));
+        }
+
+        let mut overwritten = false;
+        if dest_p.exists() {
+            if !overwrite {
+                return Ok(Response::with(status::PreconditionFailed));
+            }
+
+            if !is_actually_file(&dest_p.metadata().expect("Failed to get destination file metadata").file_type()) {
+                // NB: this disallows overwriting non-empty directories
+                if fs::remove_dir(&dest_p).is_err() {
+                    return Ok(Response::with(status::Locked));
+                }
+            }
+
+            overwritten = true;
+        }
+
+        if is_actually_file(&req_p.metadata().expect("Failed to get requested file metadata").file_type()) {
+            copy_response(fs::copy(req_p, dest_p).map(|_| ()), overwritten)
+        } else {
+            match depth {
+                Depth::Zero => copy_response(fs::create_dir(dest_p), overwritten),
+                // TODO: proper error handling
+                Depth::Infinity => copy_response(copy_dir(&req_p, &dest_p).map(|_| ()), overwritten),
+                _ => {
+                    self.handle_generated_response_encoding(req,
+                                                            status::BadRequest,
+                                                            html_response(ERROR_HTML, &["400 Bad Request", &format!("Unsupported depth: {}", depth), ""]))
+                }
+            }
+        }
     }
 
     pub(super) fn handle_webdav_move(&self, req: &mut Request) -> IronResult<Response> {
@@ -356,4 +387,17 @@ fn write_client_prop<W: Write>(out: &mut XmlWriter<W>, prop: Name) -> Result<(),
         }
     }
     out.write(XmlWEvent::start_element(prop))
+}
+
+fn copy_response(op_result: IoResult<()>, overwritten: bool) -> IronResult<Response> {
+    match op_result {
+        Ok(_) => {
+            if overwritten {
+                Ok(Response::with(status::NoContent))
+            } else {
+                Ok(Response::with(status::Created))
+            }
+        }
+        Err(_) => Ok(Response::with(status::InsufficientStorage)),
+    }
 }
