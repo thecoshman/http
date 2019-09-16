@@ -8,19 +8,21 @@ use base64;
 use iron::method;
 use std::path::Path;
 use percent_encoding;
+use walkdir::WalkDir;
 use std::borrow::Cow;
 use rfsapi::RawFileData;
-use std::{cmp, f64, fmt};
 use std::time::SystemTime;
+use std::{cmp, f64, fmt, str};
 use std::collections::HashMap;
 use time::{self, Duration, Tm};
 use iron::{mime, Headers, Url};
-use std::io::{BufReader, BufRead};
+use iron::url::Url as GenericUrl;
 use base64::display::Base64Display;
 use std::fs::{self, FileType, File};
 use iron::headers::{HeaderFormat, UserAgent, Header};
 use mime_guess::{guess_mime_type_opt, get_mime_type_str};
 use iron::error::{HttpResult as HyperResult, HttpError as HyperError};
+use std::io::{ErrorKind as IoErrorKind, BufReader, BufRead, Result as IoResult, Error as IoError};
 
 pub use self::os::*;
 pub use self::content_encoding::*;
@@ -194,8 +196,87 @@ impl HeaderFormat for Depth {
 }
 
 impl fmt::Display for Depth {
+    #[inline(always)]
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         self.fmt_header(f)
+    }
+}
+
+/// The [Destination header](https://tools.ietf.org/html/rfc2518#section-9.3).
+#[derive(Debug, Clone, Hash, PartialOrd, Ord, PartialEq, Eq)]
+pub struct Destination(pub GenericUrl);
+
+impl Header for Destination {
+    fn header_name() -> &'static str {
+        "Destination"
+    }
+
+    fn parse_header(raw: &[Vec<u8>]) -> HyperResult<Destination> {
+        if raw.len() != 1 {
+            return Err(HyperError::Header);
+        }
+
+        let url = str::from_utf8(&unsafe { raw.get_unchecked(0) }).map_err(|_| HyperError::Header)?;
+        GenericUrl::parse(url).map(Destination).map_err(HyperError::Uri)
+    }
+}
+
+impl HeaderFormat for Destination {
+    fn fmt_header(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        f.write_str(self.0.as_str())
+    }
+}
+
+impl fmt::Display for Destination {
+    #[inline(always)]
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        self.fmt_header(f)
+    }
+}
+
+/// The [Overwrite header](https://tools.ietf.org/html/rfc2518#section-9.6).
+#[derive(Debug, Copy, Clone, Hash, PartialOrd, Ord, PartialEq, Eq)]
+pub struct Overwrite(pub bool);
+
+impl Header for Overwrite {
+    fn header_name() -> &'static str {
+        "Overwrite"
+    }
+
+    fn parse_header(raw: &[Vec<u8>]) -> HyperResult<Overwrite> {
+        if raw.len() != 1 {
+            return Err(HyperError::Header);
+        }
+
+        let val = unsafe { raw.get_unchecked(0) };
+        if val.len() != 1 {
+            return Err(HyperError::Header);
+        }
+        match unsafe { val.get_unchecked(0) } {
+            b'T' => Ok(Overwrite(true)),
+            b'F' => Ok(Overwrite(false)),
+            _ => Err(HyperError::Header),
+        }
+    }
+}
+
+impl HeaderFormat for Overwrite {
+    fn fmt_header(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        f.write_str(if self.0 { "T" } else { "F" })
+    }
+}
+
+impl fmt::Display for Overwrite {
+    #[inline(always)]
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        self.fmt_header(f)
+    }
+}
+
+impl Default for Overwrite {
+    #[inline(always)]
+    fn default() -> Overwrite {
+        Overwrite(true)
     }
 }
 
@@ -478,4 +559,59 @@ pub fn get_raw_fs_metadata<P: AsRef<Path>>(f: P) -> RawFileData {
         size: f.metadata().expect("Failed to get requested file metadata").len(),
         is_file: true,
     }
+}
+
+/// Recursively copy a directory
+///
+/// Stolen from https://github.com/mdunsmuir/copy_dir/blob/0.1.2/src/lib.rs
+pub fn copy_dir(from: &Path, to: &Path) -> IoResult<Vec<IoError>> {
+    macro_rules! push_error {
+        ($vec:ident, $expr:expr) => {
+            match $expr {
+                Err(e) => $vec.push(e),
+                Ok(_) => (),
+            }
+        };
+    }
+
+    let mut errors = Vec::new();
+
+    fs::create_dir(&to)?;
+
+    // The approach taken by this code (i.e. walkdir) will not gracefully
+    // handle copying a directory into itself, so we're going to simply
+    // disallow it by checking the paths. This is a thornier problem than I
+    // wish it was, and I'd like to find a better solution, but for now I
+    // would prefer to return an error rather than having the copy blow up
+    // in users' faces. Ultimately I think a solution to this will involve
+    // not using walkdir at all, and might come along with better handling
+    // of hard links.
+    if from.canonicalize().and_then(|fc| to.canonicalize().map(|tc| (fc, tc))).map(|(fc, tc)| tc.starts_with(fc))? {
+        fs::remove_dir(&to)?;
+
+        return Err(IoError::new(IoErrorKind::Other, "cannot copy to a path prefixed by the source path"));
+    }
+
+    for entry in WalkDir::new(&from).min_depth(1).into_iter().flatten() {
+        let source_metadata = match entry.metadata() {
+            Ok(md) => md,
+            Err(_) => {
+                errors.push(IoError::new(IoErrorKind::Other, format!("coudln't get metadata for {:?}", entry.path())));
+                continue;
+            }
+        };
+
+        let relative_path = entry.path().strip_prefix(&from).expect("strip_prefix failed; this is a probably a bug in copy_dir");
+
+        let target_path = to.join(relative_path);
+
+        if !is_actually_file(&source_metadata.file_type()) {
+            push_error!(errors, fs::create_dir(&target_path));
+            push_error!(errors, fs::set_permissions(&target_path, source_metadata.permissions()));
+        } else {
+            push_error!(errors, fs::copy(entry.path(), &target_path));
+        }
+    }
+
+    Ok(errors)
 }
