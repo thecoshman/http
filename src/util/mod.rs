@@ -199,6 +199,26 @@ impl fmt::Display for Depth {
     }
 }
 
+#[derive(Debug, Copy, Clone, Hash, PartialOrd, Ord, PartialEq, Eq)]
+pub struct CommaList<D: fmt::Display, I: Iterator<Item = D>>(pub I);
+
+impl<D: fmt::Display, I: Iterator<Item = D> + Clone> fmt::Display for CommaList<D, I> {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        let mut itr = self.0.clone();
+        if let Some(item) = itr.next() {
+            item.fmt(f)?;
+
+            for item in itr {
+                f.write_str(", ")?;
+                item.fmt(f)?;
+            }
+        }
+
+        Ok(())
+    }
+}
+
+
 
 /// Uppercase the first character of the supplied string.
 ///

@@ -1,7 +1,8 @@
-//! WebDAV handling is based heavily on https://github.com/tylerwhall/hyperdav-server/blob/415f512ac030478593ad389a3267aeed7441d826/src/lib.rs
+//! WebDAV handling is based heavily on
+//! https://github.com/tylerwhall/hyperdav-server/blob/415f512ac030478593ad389a3267aeed7441d826/src/lib.rs
 
 
-use self::super::super::util::{Depth, file_time_modified, file_time_created, is_actually_file, html_response, file_length, file_binary, url_path, ERROR_HTML};
+use self::super::super::util::{CommaList, Depth, file_time_modified, file_time_created, is_actually_file, html_response, file_length, file_binary, ERROR_HTML};
 use xml::{EmitterConfig as XmlEmitterConfig, ParserConfig as XmlParserConfig};
 use xml::reader::{EventReader as XmlReader, XmlEvent as XmlREvent};
 use xml::writer::{EventWriter as XmlWriter, XmlEvent as XmlWEvent};
@@ -62,15 +63,12 @@ Propfind "\\\\?\\P:\\Rust\\http" [OwnedName { local_name: "quota-available-bytes
 
 lazy_static! {
     static ref DEFAULT_XML_PARSER_CONFIG: XmlParserConfig = XmlParserConfig { trim_whitespace: true, ..Default::default() };
-    static ref DEFAULT_XML_EMITTER_CONFIG: XmlEmitterConfig = XmlEmitterConfig { perform_indent: true, ..Default::default() };
+    static ref DEFAULT_XML_EMITTER_CONFIG: XmlEmitterConfig = XmlEmitterConfig { perform_indent: cfg!(debug_assertions), ..Default::default() };
 }
 
 
 impl HttpHandler {
     pub(super) fn handle_webdav_propfind(&self, req: &mut Request) -> IronResult<Response> {
-        log!(self.log, "{:#?}", req);
-        eprintln!("{:?}", req.headers);
-
         let (req_p, _, url_err) = self.parse_requested_path(req);
 
         if url_err {
@@ -85,35 +83,20 @@ impl HttpHandler {
             Err(e) => {
                 log!("{green}{}{reset} tried to {red}PROPFIND{reset} {yellow}{}{reset} with invalid XML",
                      req.remote_addr,
-                     url_path(&req.url));
+                     req_p.display());
                 return self.handle_generated_response_encoding(req,
                                                                status::BadRequest,
                                                                html_response(ERROR_HTML, &["400 Bad Request", &format!("Invalid XML: {}", e), ""]));
             }
         };
 
-        eprintln!("Propfind {:?} {:?} {}", req_p, props, depth);
+        log!("{green}{}{reset} requested {red}PROPFIND{reset} of {} on {yellow}{}{reset} at depth {}",
+             req.remote_addr,
+             CommaList(props.iter().map(|p| &p.local_name)),
+             req_p.display(),
+             depth);
 
-        let mut resp = vec![];
-
-        let mut xml_out = XmlWriter::new_with_config(&mut resp, DEFAULT_XML_EMITTER_CONFIG.clone());
-        xml_out.write(XmlWEvent::StartDocument {
-                version: XmlVersion::Version10,
-                encoding: Some("utf-8"),
-                standalone: None,
-            })
-            .expect("TODO");
-        xml_out.write(XmlWEvent::start_element("D:multistatus").ns("D", "DAV:")).expect("TODO");
-
-        handle_propfind_path(&mut xml_out, req.url.as_ref().as_str(), &req_p, &props).expect("TODO");
-
-        if req_p.metadata().expect("Failed to get requested file metadata").is_dir() {
-            handle_propfind_path_recursive(&mut xml_out, req.url.as_ref().as_str(), &req_p, &props, depth).expect("TODO");
-        }
-
-        xml_out.write(XmlWEvent::end_element()).expect("TODO");
-        // println!("{}", str::from_utf8(&resp).unwrap());
-
+        let resp = generate_propfind(req.url.as_ref().as_str(), &req_p, &props, depth).expect("Couldn't write PROPFIND XML");
         Ok(Response::with((status::MultiStatus, resp, "text/xml;charset=utf-8".parse::<Mime>().unwrap())))
     }
 
@@ -146,6 +129,28 @@ impl HttpHandler {
     }
 }
 
+
+fn generate_propfind(url: &str, path: &Path, props: &[OwnedName], depth: Depth) -> Result<Vec<u8>, XmlWError> {
+    let mut resp = vec![];
+
+    let mut xml_out = XmlWriter::new_with_config(&mut resp, DEFAULT_XML_EMITTER_CONFIG.clone());
+    xml_out.write(XmlWEvent::StartDocument {
+            version: XmlVersion::Version10,
+            encoding: Some("utf-8"),
+            standalone: None,
+        })?;
+    xml_out.write(XmlWEvent::start_element("D:multistatus").ns("D", "DAV:"))?;
+
+    handle_propfind_path(&mut xml_out, url, &path, &props)?;
+
+    if path.metadata().expect("Failed to get requested file metadata").is_dir() {
+        handle_propfind_path_recursive(&mut xml_out, url, &path, &props, depth)?;
+    }
+
+    xml_out.write(XmlWEvent::end_element())?;
+
+    Ok(resp)
+}
 
 fn parse_propfind(req: &mut Request) -> Result<Vec<OwnedName>, String> {
     #[derive(Debug, Copy, Clone, Hash, PartialOrd, Ord, PartialEq, Eq)]
