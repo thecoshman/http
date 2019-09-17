@@ -24,6 +24,7 @@ extern crate libc;
 extern crate rand;
 extern crate time;
 extern crate md6;
+extern crate xml;
 
 mod error;
 mod options;
