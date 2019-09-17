@@ -11,15 +11,16 @@ use percent_encoding;
 use std::borrow::Cow;
 use rfsapi::RawFileData;
 use std::{cmp, f64, fmt};
+use std::time::SystemTime;
 use std::collections::HashMap;
 use time::{self, Duration, Tm};
 use iron::{mime, Headers, Url};
 use std::io::{BufReader, BufRead};
 use base64::display::Base64Display;
 use std::fs::{self, FileType, File};
-use iron::error::HttpResult as HyperResult;
 use iron::headers::{HeaderFormat, UserAgent, Header};
 use mime_guess::{guess_mime_type_opt, get_mime_type_str};
+use iron::error::{HttpResult as HyperResult, HttpError as HyperError};
 
 pub use self::os::*;
 pub use self::content_encoding::*;
@@ -144,6 +145,60 @@ impl HeaderFormat for Dav {
     }
 }
 
+/// The [Depth header](https://tools.ietf.org/html/rfc2518#section-9.2).
+#[derive(Debug, Copy, Clone, Hash, PartialOrd, Ord, PartialEq, Eq)]
+pub enum Depth {
+    Zero,
+    One,
+    Infinity,
+}
+
+impl Depth {
+    /// Get a depth lower than this one by one, if it exists
+    pub fn lower(self) -> Option<Depth> {
+        match self {
+            Depth::Zero => None,
+            Depth::One => Some(Depth::Zero),
+            Depth::Infinity => Some(Depth::Infinity),
+        }
+    }
+}
+
+impl Header for Depth {
+    fn header_name() -> &'static str {
+        "Depth"
+    }
+
+    fn parse_header(raw: &[Vec<u8>]) -> HyperResult<Depth> {
+        if raw.len() != 1 {
+            return Err(HyperError::Header);
+        }
+
+        Ok(match &unsafe { raw.get_unchecked(0) }[..] {
+            b"0" => Depth::Zero,
+            b"1" => Depth::One,
+            b"infinity" => Depth::Infinity,
+            _ => return Err(HyperError::Header),
+        })
+    }
+}
+
+impl HeaderFormat for Depth {
+    fn fmt_header(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            Depth::Zero => f.write_str("0"),
+            Depth::One => f.write_str("1"),
+            Depth::Infinity => f.write_str("infinity"),
+        }
+    }
+}
+
+impl fmt::Display for Depth {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        self.fmt_header(f)
+    }
+}
+
 
 /// Uppercase the first character of the supplied string.
 ///
@@ -239,7 +294,16 @@ pub fn percent_decode(s: &str) -> Option<Cow<str>> {
 
 /// Get the timestamp of the file's last modification as a `time::Tm` in UTC.
 pub fn file_time_modified(f: &Path) -> Tm {
-    match f.metadata().expect("Failed to get file metadata").modified().expect("Failed to get file last modified date").elapsed() {
+    file_time_impl(f.metadata().expect("Failed to get file metadata").modified().expect("Failed to get file last modified date"))
+}
+
+/// Get the timestamp of the file's last modification as a `time::Tm` in UTC.
+pub fn file_time_created(f: &Path) -> Tm {
+    file_time_impl(f.metadata().expect("Failed to get file metadata").created().expect("Failed to get file created date"))
+}
+
+fn file_time_impl(time: SystemTime) -> Tm {
+    match time.elapsed() {
         Ok(dur) => time::now_utc() - Duration::from_std(dur).unwrap(),
         Err(ste) => time::now_utc() + Duration::from_std(ste.duration()).unwrap(),
     }
