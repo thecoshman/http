@@ -17,10 +17,10 @@ use xml::writer::Error as XmlWError;
 use mime_guess::guess_mime_type_opt;
 use iron::url::Url as GenericUrl;
 use xml::name::{Name, OwnedName};
+use std::path::{PathBuf, Path};
 use self::super::HttpHandler;
 use xml::common::XmlVersion;
 use iron::mime::Mime;
-use std::path::Path;
 use std::fs;
 
 
@@ -165,7 +165,33 @@ impl HttpHandler {
         }
     }
 
-    pub(super) fn handle_webdav_copy(&self, req: &mut Request) -> IronResult<Response> {
+    #[inline(always)]
+    pub(crate) fn handle_webdav_copy(&self, req: &mut Request) -> IronResult<Response> {
+        self.handle_webdav_copy_move(req, false, None)
+    }
+
+    #[inline(always)]
+    pub(crate) fn handle_webdav_move(&self, req: &mut Request) -> IronResult<Response> {
+        let mut sp = (PathBuf::new(), false);
+        let resp = self.handle_webdav_copy_move(req, true, Some(&mut sp))?;
+
+        if resp.status == Some(status::Created) || resp.status == Some(status::NoContent) {
+            let (req_p, is_file) = sp;
+
+            let removal = if is_file {
+                fs::remove_file(req_p)
+            } else {
+                fs::remove_dir_all(req_p)
+            };
+            if removal.is_err() {
+                return Ok(Response::with(status::Locked));
+            }
+        }
+
+        Ok(resp)
+    }
+
+    fn handle_webdav_copy_move(&self, req: &mut Request, is_move: bool, source_path: Option<&mut (PathBuf, bool)>) -> IronResult<Response> {
         let (req_p, symlink, url_err) = self.parse_requested_path(req);
 
         if url_err {
@@ -190,6 +216,7 @@ impl HttpHandler {
         log!(self.log,
              "{green}{}{reset} requested to {red}COPY{reset} {yellow}{}{reset} to {yellow}{}{reset}",
              req.remote_addr,
+             if !is_move { "COPY" } else { "MOVE" },
              req_p.display(),
              dest_p.display());
 
@@ -227,19 +254,23 @@ impl HttpHandler {
             overwritten = true;
         }
 
-        if is_actually_file(&req_p.metadata().expect("Failed to get requested file metadata").file_type()) {
+        let source_file = is_actually_file(&req_p.metadata().expect("Failed to get requested file metadata").file_type());
+        if let Some(sp) = source_path {
+            *sp = (req_p.clone(), source_file);
+        }
+        if source_file {
             copy_response(fs::copy(req_p, dest_p).map(|_| ()), overwritten)
         } else {
             match depth {
-                Depth::Zero => copy_response(fs::create_dir(dest_p), overwritten),
+                Depth::Zero if !is_move => copy_response(fs::create_dir(dest_p), overwritten),
                 Depth::Infinity => {
                     match copy_dir(&req_p, &dest_p) {
                         Ok(errors) => {
                             if errors.is_empty() {
                                 copy_response(Ok(()), overwritten)
                             } else {
-                                return Ok(Response::with((status::MultiStatus,
-                                                          copy_response_multierror(&errors, req.url.as_ref()).expect("Couldn't write PROPFIND XML"))));
+                                Ok(Response::with((status::MultiStatus,
+                                                   copy_response_multierror(&errors, req.url.as_ref()).expect("Couldn't write PROPFIND XML"))))
                             }
                         }
                         Err(err) => copy_response(Err(err), overwritten),
@@ -248,17 +279,10 @@ impl HttpHandler {
                 _ => {
                     self.handle_generated_response_encoding(req,
                                                             status::BadRequest,
-                                                            html_response(ERROR_HTML, &["400 Bad Request", &format!("Unsupported depth: {}", depth), ""]))
+                                                            html_response(ERROR_HTML, &["400 Bad Request", &format!("Invalid depth: {}", depth), ""]))
                 }
             }
         }
-    }
-
-    pub(super) fn handle_webdav_move(&self, req: &mut Request) -> IronResult<Response> {
-        log!(self.log, "{:#?}", req);
-        eprintln!("{:?}", req.headers);
-        io::copy(&mut req.body, &mut io::stderr()).unwrap();
-        Ok(Response::with((status::MethodNotAllowed, "MOVE unimplemented")))
     }
 }
 
