@@ -564,11 +564,11 @@ pub fn get_raw_fs_metadata<P: AsRef<Path>>(f: P) -> RawFileData {
 /// Recursively copy a directory
 ///
 /// Stolen from https://github.com/mdunsmuir/copy_dir/blob/0.1.2/src/lib.rs
-pub fn copy_dir(from: &Path, to: &Path) -> IoResult<Vec<IoError>> {
+pub fn copy_dir(from: &Path, to: &Path) -> IoResult<Vec<(IoError, String)>> {
     macro_rules! push_error {
-        ($vec:ident, $expr:expr) => {
+        ($vec:ident, $path:ident, $expr:expr) => {
             match $expr {
-                Err(e) => $vec.push(e),
+                Err(e) => $vec.push((e, $path.to_string_lossy().into_owned())),
                 Ok(_) => (),
             }
         };
@@ -595,8 +595,8 @@ pub fn copy_dir(from: &Path, to: &Path) -> IoResult<Vec<IoError>> {
     for entry in WalkDir::new(&from).min_depth(1).into_iter().flatten() {
         let source_metadata = match entry.metadata() {
             Ok(md) => md,
-            Err(_) => {
-                errors.push(IoError::new(IoErrorKind::Other, format!("coudln't get metadata for {:?}", entry.path())));
+            Err(err) => {
+                errors.push((err.into(), entry.path().to_string_lossy().into_owned()));
                 continue;
             }
         };
@@ -606,10 +606,10 @@ pub fn copy_dir(from: &Path, to: &Path) -> IoResult<Vec<IoError>> {
         let target_path = to.join(relative_path);
 
         if !is_actually_file(&source_metadata.file_type()) {
-            push_error!(errors, fs::create_dir(&target_path));
-            push_error!(errors, fs::set_permissions(&target_path, source_metadata.permissions()));
+            push_error!(errors, relative_path, fs::create_dir(&target_path));
+            push_error!(errors, relative_path, fs::set_permissions(&target_path, source_metadata.permissions()));
         } else {
-            push_error!(errors, fs::copy(entry.path(), &target_path));
+            push_error!(errors, relative_path, fs::copy(entry.path(), &target_path));
         }
     }
 
