@@ -8,13 +8,14 @@
 
 use self::super::super::util::{Destination, CommaList, Overwrite, Depth, file_time_modified, file_time_created, is_actually_file, is_descendant_of,
                                html_response, file_length, file_binary, copy_dir, ERROR_HTML};
+use std::io::{self, ErrorKind as IoErrorKind, Result as IoResult, Error as IoError, Write};
 use xml::{EmitterConfig as XmlEmitterConfig, ParserConfig as XmlParserConfig};
-use std::io::{self, ErrorKind as IoErrorKind, Result as IoResult, Write};
 use xml::reader::{EventReader as XmlReader, XmlEvent as XmlREvent};
 use xml::writer::{EventWriter as XmlWriter, XmlEvent as XmlWEvent};
 use iron::{status, IronResult, Response, Request};
 use xml::writer::Error as XmlWError;
 use mime_guess::guess_mime_type_opt;
+use iron::url::Url as GenericUrl;
 use xml::name::{Name, OwnedName};
 use self::super::HttpHandler;
 use xml::common::XmlVersion;
@@ -231,8 +232,19 @@ impl HttpHandler {
         } else {
             match depth {
                 Depth::Zero => copy_response(fs::create_dir(dest_p), overwritten),
-                // TODO: proper error handling
-                Depth::Infinity => copy_response(copy_dir(&req_p, &dest_p).map(|_| ()), overwritten),
+                Depth::Infinity => {
+                    match copy_dir(&req_p, &dest_p) {
+                        Ok(errors) => {
+                            if errors.is_empty() {
+                                copy_response(Ok(()), overwritten)
+                            } else {
+                                return Ok(Response::with((status::MultiStatus,
+                                                          copy_response_multierror(&errors, req.url.as_ref()).expect("Couldn't write PROPFIND XML"))));
+                            }
+                        }
+                        Err(err) => copy_response(Err(err), overwritten),
+                    }
+                }
                 _ => {
                     self.handle_generated_response_encoding(req,
                                                             status::BadRequest,
@@ -402,4 +414,34 @@ fn copy_response(op_result: IoResult<()>, overwritten: bool) -> IronResult<Respo
         }
         Err(_) => Ok(Response::with(status::InsufficientStorage)),
     }
+}
+
+fn copy_response_multierror(errors: &[(IoError, String)], req_url: &GenericUrl) -> Result<Vec<u8>, XmlWError> {
+    let mut resp = vec![];
+
+    let mut out = XmlWriter::new_with_config(&mut resp, DEFAULT_XML_EMITTER_CONFIG.clone());
+    out.write(XmlWEvent::StartDocument {
+            version: XmlVersion::Version10,
+            encoding: Some("utf-8"),
+            standalone: None,
+        })?;
+    out.write(XmlWEvent::start_element("D:multistatus").ns("D", "DAV:"))?;
+
+    for (_, subp) in errors {
+        out.write(XmlWEvent::start_element("D:response"))?;
+
+        out.write(XmlWEvent::start_element("D:href"))?;
+        out.write(XmlWEvent::characters(req_url.join(subp).expect("Couldn't append errored path to url").as_str()))?;
+        out.write(XmlWEvent::end_element())?;
+
+        out.write(XmlWEvent::start_element("D:status"))?;
+        out.write(XmlWEvent::characters("HTTP/1.1 507 Insufficient Storage"))?;
+        out.write(XmlWEvent::end_element())?;
+
+        out.write(XmlWEvent::end_element())?;
+    }
+
+    out.write(XmlWEvent::end_element())?;
+
+    Ok(resp)
 }
