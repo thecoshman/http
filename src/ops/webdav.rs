@@ -8,7 +8,7 @@
 
 use self::super::super::util::{Destination, CommaList, Overwrite, Depth, file_time_modified, file_time_created, is_actually_file, is_descendant_of,
                                html_response, file_length, file_binary, copy_dir, ERROR_HTML};
-use std::io::{self, ErrorKind as IoErrorKind, Result as IoResult, Error as IoError, Write};
+use std::io::{ErrorKind as IoErrorKind, Result as IoResult, Error as IoError, Write};
 use xml::{EmitterConfig as XmlEmitterConfig, ParserConfig as XmlParserConfig};
 use xml::reader::{EventReader as XmlReader, XmlEvent as XmlREvent};
 use xml::writer::{EventWriter as XmlWriter, XmlEvent as XmlWEvent};
@@ -71,29 +71,23 @@ impl HttpHandler {
         }
     }
 
+    /// Adapted from hyperdav-server
     fn handle_webdav_propfind_write_output(&self, req: &mut Request, url: String, path: &Path, props: &[OwnedName], depth: Depth)
                                            -> Result<Result<Vec<u8>, IronResult<Response>>, XmlWError> {
-        let mut resp = vec![];
+        let mut out = intialise_xml_output()?;
+        out.write(XmlWEvent::start_element("D:multistatus").ns("D", "DAV:"))?;
 
-        let mut xml_out = XmlWriter::new_with_config(&mut resp, DEFAULT_XML_EMITTER_CONFIG.clone());
-        xml_out.write(XmlWEvent::StartDocument {
-                version: XmlVersion::Version10,
-                encoding: Some("utf-8"),
-                standalone: None,
-            })?;
-        xml_out.write(XmlWEvent::start_element("D:multistatus").ns("D", "DAV:"))?;
-
-        handle_propfind_path(&mut xml_out, &url, &path, &props)?;
+        handle_propfind_path(&mut out, &url, &path, &props)?;
 
         if path.metadata().expect("Failed to get requested file metadata").is_dir() {
-            if let Some(ir) = self.handle_webdav_propfind_path_recursive(req, &mut xml_out, url, &path, &props, depth)? {
+            if let Some(ir) = self.handle_webdav_propfind_path_recursive(req, &mut out, url, &path, &props, depth)? {
                 return Ok(Err(ir));
             }
         }
 
-        xml_out.write(XmlWEvent::end_element())?;
+        out.write(XmlWEvent::end_element())?;
 
-        Ok(Ok(resp))
+        Ok(Ok(out.into_inner()))
     }
 
     fn handle_webdav_propfind_path_recursive<W: Write>(&self, req: &mut Request, out: &mut XmlWriter<W>, root_url: String, root_path: &Path,
@@ -125,11 +119,37 @@ impl HttpHandler {
         Ok(None)
     }
 
+    /// NB: we don't allow modifying any properties, so we 409 Conflict all of them
     pub(super) fn handle_webdav_proppatch(&self, req: &mut Request) -> IronResult<Response> {
-        log!("{:#?}", req);
-        eprintln!("{:?}", req.headers);
-        io::copy(&mut req.body, &mut io::stderr()).unwrap();
-        Ok(Response::with((status::MethodNotAllowed, "PROPPATCH unimplemented")))
+        let (req_p, symlink, url_err) = self.parse_requested_path(req);
+
+        if url_err {
+            return self.handle_invalid_url(req, "<p>Percent-encoding decoded to invalid UTF-8.</p>");
+        }
+
+        if !req_p.exists() || (symlink && !self.follow_symlinks) ||
+           (symlink && self.follow_symlinks && self.sandbox_symlinks && !is_descendant_of(&req_p, &self.hosted_directory.1)) {
+            return self.handle_nonexistant(req, req_p);
+        }
+
+        let props = match parse_proppatch(req) {
+            Ok(props) => props,
+            Err(e) => {
+                log!("{green}{}{reset} tried to {red}PROPPATCH{reset} {yellow}{}{reset} with invalid XML",
+                     req.remote_addr,
+                     req_p.display());
+                return self.handle_generated_response_encoding(req,
+                                                               status::BadRequest,
+                                                               html_response(ERROR_HTML, &["400 Bad Request", &format!("Invalid XML: {}", e), ""]));
+            }
+        };
+
+        log!("{:#?}", props);
+
+        match write_proppatch_output(&props, req.url.as_ref()).expect("Couldn't write PROPPATCH XML") {
+            Ok(xml_resp) => Ok(Response::with((status::MultiStatus, xml_resp, "text/xml;charset=utf-8".parse::<Mime>().unwrap()))),
+            Err(resp) => resp,
+        }
     }
 
     pub(super) fn handle_webdav_mkcol(&self, req: &mut Request) -> IronResult<Response> {
@@ -285,6 +305,9 @@ impl HttpHandler {
 }
 
 
+/// https://tools.ietf.org/html/rfc2518#section-12.14
+///
+/// Adapted from hyperdav-server
 fn parse_propfind(req: &mut Request) -> Result<Vec<OwnedName>, String> {
     #[derive(Debug, Copy, Clone, Hash, PartialOrd, Ord, PartialEq, Eq)]
     enum State {
@@ -321,6 +344,7 @@ fn parse_propfind(req: &mut Request) -> Result<Vec<OwnedName>, String> {
     }
 }
 
+/// Adapted from hyperdav-server
 fn handle_propfind_path<W: Write>(out: &mut XmlWriter<W>, url: &str, path: &Path, props: &[OwnedName]) -> Result<(), XmlWError> {
     out.write(XmlWEvent::start_element("D:response"))?;
 
@@ -354,7 +378,7 @@ fn handle_propfind_path<W: Write>(out: &mut XmlWriter<W>, url: &str, path: &Path
     out.write(XmlWEvent::start_element("D:propstat"))?;
     out.write(XmlWEvent::start_element("D:prop"))?;
     for prop in failed_props {
-        write_client_prop(out, prop.borrow())?;
+        start_client_prop_element(out, prop.borrow())?;
         out.write(XmlWEvent::end_element())?;
     }
     out.write(XmlWEvent::end_element())?; // prop
@@ -363,9 +387,11 @@ fn handle_propfind_path<W: Write>(out: &mut XmlWriter<W>, url: &str, path: &Path
     out.write(XmlWEvent::end_element())?; // status
     out.write(XmlWEvent::end_element())?; // propstat
     out.write(XmlWEvent::end_element())?; // response
+
     Ok(())
 }
 
+/// Adapted from hyperdav-server
 fn handle_prop_path<W: Write>(out: &mut XmlWriter<W>, path: &Path, prop: Name) -> Result<bool, XmlWError> {
     match (prop.namespace, prop.local_name) {
         (Some("DAV:"), "resourcetype") => {
@@ -408,21 +434,105 @@ fn handle_prop_path<W: Write>(out: &mut XmlWriter<W>, path: &Path, prop: Name) -
     Ok(true)
 }
 
-fn write_client_prop<W: Write>(out: &mut XmlWriter<W>, prop: Name) -> Result<(), XmlWError> {
+/// Adapted from hyperdav-server
+fn start_client_prop_element<W: Write>(out: &mut XmlWriter<W>, prop: Name) -> Result<(), XmlWError> {
     if let Some(namespace) = prop.namespace {
         if let Some(prefix) = prop.prefix {
             // Remap the client's prefix if it overlaps with our DAV: prefix
             if prefix == "D" && namespace != "DAV:" {
-                return out.write(XmlWEvent::start_element(Name {
-                        local_name: prop.local_name,
-                        namespace: Some(namespace),
-                        prefix: Some("U"),
-                    })
-                    .ns("U", namespace));
+                return out.write(XmlWEvent::start_element(Name { prefix: Some("U"), ..prop }).ns("U", namespace));
             }
         }
     }
+
     out.write(XmlWEvent::start_element(prop))
+}
+
+/// https://tools.ietf.org/html/rfc2518#section-12.13
+fn parse_proppatch(req: &mut Request) -> Result<Vec<(OwnedName, bool)>, String> {
+    #[derive(Debug, Copy, Clone, Hash, PartialOrd, Ord, PartialEq, Eq)]
+    enum State {
+        Start,
+        PropertyUpdate,
+        Action,
+        Prop,
+        InProp,
+    }
+
+
+    let mut xml = XmlReader::new_with_config(&mut req.body, DEFAULT_XML_PARSER_CONFIG.clone());
+    let mut state = State::Start;
+    let mut props = vec![];
+    let mut propname = None;
+    let mut is_remove = false;
+
+    loop {
+        let event = xml.next().map_err(|e| e.to_string())?;
+
+        match (state, event) {
+            (State::Start, XmlREvent::StartDocument { .. }) => (),
+            (State::Start, XmlREvent::StartElement { ref name, .. }) if name.local_name == "propertyupdate" => state = State::PropertyUpdate,
+
+            (State::PropertyUpdate, XmlREvent::StartElement { ref name, .. }) if name.local_name == "set" => {
+                state = State::Action;
+                is_remove = false;
+            }
+            (State::PropertyUpdate, XmlREvent::StartElement { ref name, .. }) if name.local_name == "remove" => {
+                state = State::Action;
+                is_remove = true;
+            }
+            (State::PropertyUpdate, XmlREvent::EndElement { .. }) => return Ok(props),
+
+            (State::Action, XmlREvent::StartElement { ref name, .. }) if name.local_name == "prop" => state = State::Prop,
+            (State::Action, XmlREvent::EndElement { .. }) => state = State::PropertyUpdate,
+
+            (State::Prop, XmlREvent::StartElement { name, .. }) => {
+                state = State::InProp;
+                propname = Some(name.clone());
+                props.push((name, is_remove));
+            }
+            (State::Prop, XmlREvent::EndElement { .. }) => state = State::Action,
+
+            (State::InProp, XmlREvent::EndElement { name, .. }) => {
+                if Some(name) == propname {
+                    state = State::Prop;
+                }
+            }
+            (State::InProp, _) => {}
+
+            (st, ev) => return Err(format!("Unexpected event {:?} during state {:?}", ev, st)),
+        }
+    }
+}
+
+fn write_proppatch_output(props: &[(OwnedName, bool)], req_url: &GenericUrl) -> Result<Result<Vec<u8>, IronResult<Response>>, XmlWError> {
+    let mut out = intialise_xml_output()?;
+    out.write(XmlWEvent::start_element("D:multistatus").ns("D", "DAV:"))?;
+
+    out.write(XmlWEvent::start_element("D:href"))?;
+    out.write(XmlWEvent::characters(req_url.as_str()))?;
+    out.write(XmlWEvent::end_element())?;
+
+    out.write(XmlWEvent::start_element("D:propstat"))?;
+
+    for (name, _) in props {
+        out.write(XmlWEvent::start_element("D:prop"))?;
+
+        start_client_prop_element(&mut out, name.borrow())?;
+        out.write(XmlWEvent::end_element())?;
+
+        out.write(XmlWEvent::end_element())?;
+    }
+
+    out.write(XmlWEvent::start_element("D:status"))?;
+    out.write(XmlWEvent::characters("HTTP/1.1 409 Conflict"))?;
+    out.write(XmlWEvent::end_element())?;
+
+    out.write(XmlWEvent::end_element())?;
+
+    out.write(XmlWEvent::end_element())?;
+
+    Ok(Ok(out.into_inner()))
 }
 
 fn copy_response(op_result: IoResult<()>, overwritten: bool) -> IronResult<Response> {
@@ -439,31 +549,35 @@ fn copy_response(op_result: IoResult<()>, overwritten: bool) -> IronResult<Respo
 }
 
 fn copy_response_multierror(errors: &[(IoError, String)], req_url: &GenericUrl) -> Result<Vec<u8>, XmlWError> {
-    let mut resp = vec![];
+    let mut out = intialise_xml_output()?;
+    out.write(XmlWEvent::start_element("D:multistatus").ns("D", "DAV:"))?;
+    out.write(XmlWEvent::start_element("D:response"))?;
 
-    let mut out = XmlWriter::new_with_config(&mut resp, DEFAULT_XML_EMITTER_CONFIG.clone());
+    for (_, subp) in errors {
+        out.write(XmlWEvent::start_element("D:href"))?;
+        out.write(XmlWEvent::characters(req_url.join(subp).expect("Couldn't append errored path to url").as_str()))?;
+        out.write(XmlWEvent::end_element())?;
+    }
+
+    out.write(XmlWEvent::start_element("D:status"))?;
+    out.write(XmlWEvent::characters("HTTP/1.1 507 Insufficient Storage"))?;
+    out.write(XmlWEvent::end_element())?;
+
+    out.write(XmlWEvent::end_element())?;
+
+    out.write(XmlWEvent::end_element())?;
+
+    Ok(out.into_inner())
+}
+
+fn intialise_xml_output() -> Result<XmlWriter<Vec<u8>>, XmlWError> {
+    let mut out = XmlWriter::new_with_config(vec![], DEFAULT_XML_EMITTER_CONFIG.clone());
+
     out.write(XmlWEvent::StartDocument {
             version: XmlVersion::Version10,
             encoding: Some("utf-8"),
             standalone: None,
         })?;
-    out.write(XmlWEvent::start_element("D:multistatus").ns("D", "DAV:"))?;
 
-    for (_, subp) in errors {
-        out.write(XmlWEvent::start_element("D:response"))?;
-
-        out.write(XmlWEvent::start_element("D:href"))?;
-        out.write(XmlWEvent::characters(req_url.join(subp).expect("Couldn't append errored path to url").as_str()))?;
-        out.write(XmlWEvent::end_element())?;
-
-        out.write(XmlWEvent::start_element("D:status"))?;
-        out.write(XmlWEvent::characters("HTTP/1.1 507 Insufficient Storage"))?;
-        out.write(XmlWEvent::end_element())?;
-
-        out.write(XmlWEvent::end_element())?;
-    }
-
-    out.write(XmlWEvent::end_element())?;
-
-    Ok(resp)
+    Ok(out)
 }
