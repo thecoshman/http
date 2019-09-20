@@ -2,10 +2,10 @@
 
 
 mod os;
+mod webdav;
 mod content_encoding;
 
 use base64;
-use iron::method;
 use std::path::Path;
 use percent_encoding;
 use walkdir::WalkDir;
@@ -16,26 +16,26 @@ use std::{cmp, f64, fmt, str};
 use std::collections::HashMap;
 use time::{self, Duration, Tm};
 use iron::{mime, Headers, Url};
-use iron::url::Url as GenericUrl;
 use base64::display::Base64Display;
 use std::fs::{self, FileType, File};
+use iron::error::{HttpResult as HyperResult};
 use iron::headers::{HeaderFormat, UserAgent, Header};
 use mime_guess::{guess_mime_type_opt, get_mime_type_str};
-use iron::error::{HttpResult as HyperResult, HttpError as HyperError};
 use std::io::{ErrorKind as IoErrorKind, BufReader, BufRead, Result as IoResult, Error as IoError};
 
 pub use self::os::*;
+pub use self::webdav::*;
 pub use self::content_encoding::*;
 
 
 /// The generic HTML page to use as response to errors.
-pub static ERROR_HTML: &'static str = include_str!("../../assets/error.html");
+pub static ERROR_HTML: &str = include_str!("../../assets/error.html");
 
 /// The HTML page to use as template for a requested directory's listing.
-pub static DIRECTORY_LISTING_HTML: &'static str = include_str!("../../assets/directory_listing.html");
+pub static DIRECTORY_LISTING_HTML: &str = include_str!("../../assets/directory_listing.html");
 
 /// The HTML page to use as template for a requested directory's listing for mobile devices.
-pub static MOBILE_DIRECTORY_LISTING_HTML: &'static str = include_str!("../../assets/directory_listing_mobile.html");
+pub static MOBILE_DIRECTORY_LISTING_HTML: &str = include_str!("../../assets/directory_listing_mobile.html");
 
 lazy_static! {
     /// Collection of data to be injected into generated responses.
@@ -74,9 +74,6 @@ lazy_static! {
         ass.insert("adjust_tz", Cow::Borrowed(include_str!("../../assets/adjust_tz.js")));
         ass
     };
-
-    pub static ref DAV_LEVEL_1_METHODS: Vec<method::Method> =
-        ["COPY", "MKCOL", "MOVE", "PROPFIND", "PROPPATCH"].into_iter().map(|m| method::Extension(m.to_string())).collect();
 }
 
 /// The port to start scanning from if no ports were given.
@@ -86,10 +83,10 @@ pub static PORT_SCAN_LOWEST: u16 = 8000;
 pub static PORT_SCAN_HIGHEST: u16 = 9999;
 
 /// The app name and version to use with User-Agent or Server response header.
-pub static USER_AGENT: &'static str = concat!("http/", env!("CARGO_PKG_VERSION"));
+pub static USER_AGENT: &str = concat!("http/", env!("CARGO_PKG_VERSION"));
 
 /// Index file extensions to look for if `-i` was not specified.
-pub static INDEX_EXTENSIONS: &'static [&'static str] = &["html", "htm", "shtml"];
+pub static INDEX_EXTENSIONS: &[&str] = &["html", "htm", "shtml"];
 
 
 /// The [WWW-Authenticate header](https://tools.ietf.org/html/rfc7235#section-4.1), without parsing.
@@ -112,171 +109,6 @@ impl Header for WwwAuthenticate {
 impl HeaderFormat for WwwAuthenticate {
     fn fmt_header(&self, f: &mut fmt::Formatter) -> fmt::Result {
         f.write_str(&self.0)
-    }
-}
-
-/// The [DAV header](https://tools.ietf.org/html/rfc2518#section-9.1), without parsing.
-///
-/// We don't ever receive this header, only ever send it, so this is fine.
-#[derive(Debug, Clone, Hash, PartialOrd, Ord, PartialEq, Eq)]
-pub struct Dav(pub &'static [&'static str]);
-
-impl Dav {
-    pub const LEVEL_1: Dav = Dav(&["1"]);
-}
-
-impl Header for Dav {
-    fn header_name() -> &'static str {
-        "DAV"
-    }
-
-    /// Dummy impl returning an empty value, since we're only ever sending these
-    fn parse_header(_: &[Vec<u8>]) -> HyperResult<Dav> {
-        Ok(Dav(&[]))
-    }
-}
-
-impl HeaderFormat for Dav {
-    fn fmt_header(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        f.write_str(self.0[0])?;
-        for lvl in self.0.iter().skip(1) {
-            f.write_str(", ")?;
-            f.write_str(lvl)?;
-        }
-        Ok(())
-    }
-}
-
-/// The [Depth header](https://tools.ietf.org/html/rfc2518#section-9.2).
-#[derive(Debug, Copy, Clone, Hash, PartialOrd, Ord, PartialEq, Eq)]
-pub enum Depth {
-    Zero,
-    One,
-    Infinity,
-}
-
-impl Depth {
-    /// Get a depth lower than this one by one, if it exists
-    pub fn lower(self) -> Option<Depth> {
-        match self {
-            Depth::Zero => None,
-            Depth::One => Some(Depth::Zero),
-            Depth::Infinity => Some(Depth::Infinity),
-        }
-    }
-}
-
-impl Header for Depth {
-    fn header_name() -> &'static str {
-        "Depth"
-    }
-
-    fn parse_header(raw: &[Vec<u8>]) -> HyperResult<Depth> {
-        if raw.len() != 1 {
-            return Err(HyperError::Header);
-        }
-
-        Ok(match &unsafe { raw.get_unchecked(0) }[..] {
-            b"0" => Depth::Zero,
-            b"1" => Depth::One,
-            b"infinity" => Depth::Infinity,
-            _ => return Err(HyperError::Header),
-        })
-    }
-}
-
-impl HeaderFormat for Depth {
-    fn fmt_header(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        match self {
-            Depth::Zero => f.write_str("0"),
-            Depth::One => f.write_str("1"),
-            Depth::Infinity => f.write_str("infinity"),
-        }
-    }
-}
-
-impl fmt::Display for Depth {
-    #[inline(always)]
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        self.fmt_header(f)
-    }
-}
-
-/// The [Destination header](https://tools.ietf.org/html/rfc2518#section-9.3).
-#[derive(Debug, Clone, Hash, PartialOrd, Ord, PartialEq, Eq)]
-pub struct Destination(pub GenericUrl);
-
-impl Header for Destination {
-    fn header_name() -> &'static str {
-        "Destination"
-    }
-
-    fn parse_header(raw: &[Vec<u8>]) -> HyperResult<Destination> {
-        if raw.len() != 1 {
-            return Err(HyperError::Header);
-        }
-
-        let url = str::from_utf8(&unsafe { raw.get_unchecked(0) }).map_err(|_| HyperError::Header)?;
-        GenericUrl::parse(url).map(Destination).map_err(HyperError::Uri)
-    }
-}
-
-impl HeaderFormat for Destination {
-    fn fmt_header(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        f.write_str(self.0.as_str())
-    }
-}
-
-impl fmt::Display for Destination {
-    #[inline(always)]
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        self.fmt_header(f)
-    }
-}
-
-/// The [Overwrite header](https://tools.ietf.org/html/rfc2518#section-9.6).
-#[derive(Debug, Copy, Clone, Hash, PartialOrd, Ord, PartialEq, Eq)]
-pub struct Overwrite(pub bool);
-
-impl Header for Overwrite {
-    fn header_name() -> &'static str {
-        "Overwrite"
-    }
-
-    fn parse_header(raw: &[Vec<u8>]) -> HyperResult<Overwrite> {
-        if raw.len() != 1 {
-            return Err(HyperError::Header);
-        }
-
-        let val = unsafe { raw.get_unchecked(0) };
-        if val.len() != 1 {
-            return Err(HyperError::Header);
-        }
-        match unsafe { val.get_unchecked(0) } {
-            b'T' => Ok(Overwrite(true)),
-            b'F' => Ok(Overwrite(false)),
-            _ => Err(HyperError::Header),
-        }
-    }
-}
-
-impl HeaderFormat for Overwrite {
-    fn fmt_header(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        f.write_str(if self.0 { "T" } else { "F" })
-    }
-}
-
-impl fmt::Display for Overwrite {
-    #[inline(always)]
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        self.fmt_header(f)
-    }
-}
-
-impl Default for Overwrite {
-    #[inline(always)]
-    fn default() -> Overwrite {
-        Overwrite(true)
     }
 }
 
@@ -525,6 +357,13 @@ pub fn human_readable_size(s: u64) -> String {
 /// Check if, given the request headers, the client should be considered a mobile device.
 pub fn client_mobile(hdr: &Headers) -> bool {
     hdr.get::<UserAgent>().map(|s| s.contains("Mobi") || s.contains("mobi")).unwrap_or(false)
+}
+
+/// Check if, given the request headers, the client should be treated as Microsoft software.
+///
+/// Based on https://github.com/miquels/webdav-handler-rs/blob/02433c1acfccd848a7de26889f6857cbad559076/src/handle_props.rs#L529
+pub fn client_microsoft(hdr: &Headers) -> bool {
+    hdr.get::<UserAgent>().map(|s| s.contains("Microsoft") || s.contains("microsoft")).unwrap_or(false)
 }
 
 /// Get the suffix for the icon to use to represent the given file.

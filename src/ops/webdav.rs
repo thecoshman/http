@@ -12,11 +12,11 @@ use std::io::{ErrorKind as IoErrorKind, Result as IoResult, Error as IoError, Wr
 use xml::{EmitterConfig as XmlEmitterConfig, ParserConfig as XmlParserConfig};
 use xml::reader::{EventReader as XmlReader, XmlEvent as XmlREvent};
 use xml::writer::{EventWriter as XmlWriter, XmlEvent as XmlWEvent};
+use xml::name::{OwnedName as OwnedXmlName, Name as XmlName};
 use iron::{status, IronResult, Response, Request};
 use xml::writer::Error as XmlWError;
 use mime_guess::guess_mime_type_opt;
 use iron::url::Url as GenericUrl;
-use xml::name::{Name, OwnedName};
 use std::path::{PathBuf, Path};
 use self::super::HttpHandler;
 use xml::common::XmlVersion;
@@ -74,7 +74,7 @@ impl HttpHandler {
     }
 
     /// Adapted from hyperdav-server
-    fn handle_webdav_propfind_write_output(&self, req: &mut Request, url: String, path: &Path, props: &[OwnedName], depth: Depth)
+    fn handle_webdav_propfind_write_output(&self, req: &mut Request, url: String, path: &Path, props: &[OwnedXmlName], depth: Depth)
                                            -> Result<Result<Vec<u8>, IronResult<Response>>, XmlWError> {
         let mut out = intialise_xml_output()?;
         out.write(XmlWEvent::start_element("D:multistatus").ns("D", "DAV:"))?;
@@ -93,7 +93,7 @@ impl HttpHandler {
     }
 
     fn handle_webdav_propfind_path_recursive<W: Write>(&self, req: &mut Request, out: &mut XmlWriter<W>, root_url: String, root_path: &Path,
-                                                       props: &[OwnedName], depth: Depth)
+                                                       props: &[OwnedXmlName], depth: Depth)
                                                        -> Result<Option<IronResult<Response>>, XmlWError> {
         if let Some(next_depth) = depth.lower() {
             for f in root_path.read_dir().expect("Failed to read requested directory").map(|p| p.expect("Failed to iterate over requested directory")) {
@@ -147,7 +147,11 @@ impl HttpHandler {
             }
         };
 
-        log!(self.log, "{:#?}", props);
+        log!(self.log,
+             "{green}{}{reset} requested {red}PROPPATCH{reset} of {} on {yellow}{}{reset}",
+             req.remote_addr,
+             CommaList(props.iter().map(|p| &p.0.local_name)),
+             req_p.display());
 
         match write_proppatch_output(&props, req.url.as_ref()).expect("Couldn't write PROPPATCH XML") {
             Ok(xml_resp) => Ok(Response::with((status::MultiStatus, xml_resp, "text/xml;charset=utf-8".parse::<Mime>().unwrap()))),
@@ -313,7 +317,7 @@ impl HttpHandler {
 /// https://tools.ietf.org/html/rfc2518#section-12.14
 ///
 /// Adapted from hyperdav-server
-fn parse_propfind(req: &mut Request) -> Result<Vec<OwnedName>, String> {
+fn parse_propfind(req: &mut Request) -> Result<Vec<OwnedXmlName>, String> {
     #[derive(Debug, Copy, Clone, Hash, PartialOrd, Ord, PartialEq, Eq)]
     enum State {
         Start,
@@ -350,7 +354,7 @@ fn parse_propfind(req: &mut Request) -> Result<Vec<OwnedName>, String> {
 }
 
 /// Adapted from hyperdav-server
-fn handle_propfind_path<W: Write>(out: &mut XmlWriter<W>, url: &str, path: &Path, props: &[OwnedName]) -> Result<(), XmlWError> {
+fn handle_propfind_path<W: Write>(out: &mut XmlWriter<W>, url: &str, path: &Path, props: &[OwnedXmlName]) -> Result<(), XmlWError> {
     out.write(XmlWEvent::start_element("D:response"))?;
 
     out.write(XmlWEvent::start_element("D:href"))?;
@@ -397,7 +401,7 @@ fn handle_propfind_path<W: Write>(out: &mut XmlWriter<W>, url: &str, path: &Path
 }
 
 /// Adapted from hyperdav-server
-fn handle_prop_path<W: Write>(out: &mut XmlWriter<W>, path: &Path, prop: Name) -> Result<bool, XmlWError> {
+fn handle_prop_path<W: Write>(out: &mut XmlWriter<W>, path: &Path, prop: XmlName) -> Result<bool, XmlWError> {
     match (prop.namespace, prop.local_name) {
         (Some("DAV:"), "resourcetype") => {
             out.write(XmlWEvent::start_element("D:resourcetype"))?;
@@ -440,12 +444,12 @@ fn handle_prop_path<W: Write>(out: &mut XmlWriter<W>, path: &Path, prop: Name) -
 }
 
 /// Adapted from hyperdav-server
-fn start_client_prop_element<W: Write>(out: &mut XmlWriter<W>, prop: Name) -> Result<(), XmlWError> {
+fn start_client_prop_element<W: Write>(out: &mut XmlWriter<W>, prop: XmlName) -> Result<(), XmlWError> {
     if let Some(namespace) = prop.namespace {
         if let Some(prefix) = prop.prefix {
             // Remap the client's prefix if it overlaps with our DAV: prefix
             if prefix == "D" && namespace != "DAV:" {
-                return out.write(XmlWEvent::start_element(Name { prefix: Some("U"), ..prop }).ns("U", namespace));
+                return out.write(XmlWEvent::start_element(XmlName { prefix: Some("U"), ..prop }).ns("U", namespace));
             }
         }
     }
@@ -454,7 +458,7 @@ fn start_client_prop_element<W: Write>(out: &mut XmlWriter<W>, prop: Name) -> Re
 }
 
 /// https://tools.ietf.org/html/rfc2518#section-12.13
-fn parse_proppatch(req: &mut Request) -> Result<Vec<(OwnedName, bool)>, String> {
+fn parse_proppatch(req: &mut Request) -> Result<Vec<(OwnedXmlName, bool)>, String> {
     #[derive(Debug, Copy, Clone, Hash, PartialOrd, Ord, PartialEq, Eq)]
     enum State {
         Start,
@@ -510,7 +514,7 @@ fn parse_proppatch(req: &mut Request) -> Result<Vec<(OwnedName, bool)>, String> 
     }
 }
 
-fn write_proppatch_output(props: &[(OwnedName, bool)], req_url: &GenericUrl) -> Result<Result<Vec<u8>, IronResult<Response>>, XmlWError> {
+fn write_proppatch_output(props: &[(OwnedXmlName, bool)], req_url: &GenericUrl) -> Result<Result<Vec<u8>, IronResult<Response>>, XmlWError> {
     let mut out = intialise_xml_output()?;
     out.write(XmlWEvent::start_element("D:multistatus").ns("D", "DAV:"))?;
 
