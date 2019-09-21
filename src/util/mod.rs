@@ -18,9 +18,10 @@ use time::{self, Duration, Tm};
 use iron::{mime, Headers, Url};
 use base64::display::Base64Display;
 use std::fs::{self, FileType, File};
-use iron::error::{HttpResult as HyperResult};
+use iron::error::HttpResult as HyperResult;
 use iron::headers::{HeaderFormat, UserAgent, Header};
 use mime_guess::{guess_mime_type_opt, get_mime_type_str};
+use xml::name::{OwnedName as OwnedXmlName, Name as XmlName};
 use std::io::{ErrorKind as IoErrorKind, BufReader, BufRead, Result as IoResult, Error as IoError};
 
 pub use self::os::*;
@@ -128,6 +129,26 @@ impl<D: fmt::Display, I: Iterator<Item = D> + Clone> fmt::Display for CommaList<
         }
 
         Ok(())
+    }
+}
+
+
+/// `xml`'s `OwnedName::borrow()` returns a value not a reference, so it cannot be used with the libstd `Borrow` trait
+pub trait BorrowXmlName<'n> {
+    fn borrow_xml_name(&'n self) -> XmlName<'n>;
+}
+
+impl<'n> BorrowXmlName<'n> for XmlName<'n> {
+    #[inline(always)]
+    fn borrow_xml_name(&'n self) -> XmlName<'n> {
+        *self
+    }
+}
+
+impl<'n> BorrowXmlName<'n> for OwnedXmlName {
+    #[inline(always)]
+    fn borrow_xml_name(&'n self) -> XmlName<'n> {
+        self.borrow()
     }
 }
 
