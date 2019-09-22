@@ -33,6 +33,8 @@ pub static WEBDAV_XML_NAMESPACE_MICROSOFT: (&str, &str) = ("Z", "urn:schemas-mic
 pub static WEBDAV_XML_NAMESPACE_APACHE: (&str, &str) = ("A", "http://apache.org/dav/props/");
 
 /// All first-class-recognised prefix/namespace pairs
+///
+/// `WEBDAV_XML_NAMESPACE_DAV` needs to be the first here
 pub static WEBDAV_XML_NAMESPACES: &[&(&str, &str)] = &[&WEBDAV_XML_NAMESPACE_DAV, &WEBDAV_XML_NAMESPACE_MICROSOFT, &WEBDAV_XML_NAMESPACE_APACHE];
 
 /// Properties to return on empty body or [`<allprop />`](https://tools.ietf.org/html/rfc2518#section-12.14.1)
