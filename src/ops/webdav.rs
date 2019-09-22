@@ -8,19 +8,21 @@
 
 use self::super::super::util::{BorrowXmlName, Destination, CommaList, Overwrite, Depth, file_time_modified, file_time_created, client_microsoft,
                                is_actually_file, is_descendant_of, html_response, file_length, file_binary, copy_dir, WEBDAV_ALLPROP_PROPERTIES_NON_WINDOWS,
-                               WEBDAV_ALLPROP_PROPERTIES_WINDOWS, WEBDAV_PROPNAME_PROPERTIES, ERROR_HTML};
+                               WEBDAV_ALLPROP_PROPERTIES_WINDOWS, WEBDAV_PROPNAME_PROPERTIES, WEBDAV_XML_NAMESPACE_DAV, WEBDAV_XML_NAMESPACES, ERROR_HTML};
 use xml::reader::{EventReader as XmlReader, XmlEvent as XmlREvent, Error as XmlRError};
+use xml::writer::{EventWriter as XmlWriter, XmlEvent as XmlWEvent, Error as XmlWError};
 use std::io::{ErrorKind as IoErrorKind, Result as IoResult, Error as IoError, Write};
 use xml::{EmitterConfig as XmlEmitterConfig, ParserConfig as XmlParserConfig};
+use xml::writer::events::StartElementBuilder as XmlWEventStartElementBuilder;
 use xml::common::{TextPosition as XmlTextPosition, XmlVersion, Position};
-use xml::writer::{EventWriter as XmlWriter, XmlEvent as XmlWEvent};
 use xml::name::{OwnedName as OwnedXmlName, Name as XmlName};
 use iron::{status, IronResult, Response, Request};
-use xml::writer::Error as XmlWError;
 use mime_guess::guess_mime_type_opt;
 use iron::url::Url as GenericUrl;
 use std::path::{PathBuf, Path};
 use self::super::HttpHandler;
+use itertools::Itertools;
+use std::borrow::Borrow;
 use iron::mime::Mime;
 use std::{fmt, fs};
 
@@ -100,10 +102,7 @@ impl HttpHandler {
         };
 
         match resp.expect("Couldn't write PROPFIND XML") {
-            Ok(xml_resp) => {
-                println!("{}", std::str::from_utf8(&xml_resp).unwrap());
-                Ok(Response::with((status::MultiStatus, xml_resp, "text/xml;charset=utf-8".parse::<Mime>().unwrap())))
-            }
+            Ok(xml_resp) => Ok(Response::with((status::MultiStatus, xml_resp, "text/xml;charset=utf-8".parse::<Mime>().unwrap()))),
             Err(resp) => resp,
         }
     }
@@ -113,7 +112,7 @@ impl HttpHandler {
                                                                      depth: Depth)
                                                                      -> Result<Result<Vec<u8>, IronResult<Response>>, XmlWError> {
         let mut out = intialise_xml_output()?;
-        out.write(XmlWEvent::start_element("D:multistatus").ns("D", "DAV:"))?;
+        out.write(namespaces_for_props("D:multistatus", props.iter().flat_map(|pp| pp.iter())))?;
 
         handle_propfind_path(&mut out, &url, &path, props, just_names)?;
 
@@ -463,18 +462,21 @@ fn handle_propfind_path<'n, W: Write, N: BorrowXmlName<'n>>(out: &mut XmlWriter<
     out.write(XmlWEvent::end_element())?; // status
     out.write(XmlWEvent::end_element())?; // propstat
 
-    // Handle the failed properties
-    out.write(XmlWEvent::start_element("D:propstat"))?;
-    out.write(XmlWEvent::start_element("D:prop"))?;
-    for prop in failed_props {
-        start_client_prop_element(out, prop)?;
-        out.write(XmlWEvent::end_element())?;
+    if !failed_props.is_empty() {
+        // Handle the failed properties
+        out.write(XmlWEvent::start_element("D:propstat"))?;
+        out.write(XmlWEvent::start_element("D:prop"))?;
+        for prop in failed_props {
+            start_client_prop_element(out, prop)?;
+            out.write(XmlWEvent::end_element())?;
+        }
+        out.write(XmlWEvent::end_element())?; // prop
+        out.write(XmlWEvent::start_element("D:status"))?;
+        out.write(XmlWEvent::characters("HTTP/1.1 404 Not Found"))?;
+        out.write(XmlWEvent::end_element())?; // status
+        out.write(XmlWEvent::end_element())?; // propstat
     }
-    out.write(XmlWEvent::end_element())?; // prop
-    out.write(XmlWEvent::start_element("D:status"))?;
-    out.write(XmlWEvent::characters("HTTP/1.1 404 Not Found"))?;
-    out.write(XmlWEvent::end_element())?; // status
-    out.write(XmlWEvent::end_element())?; // propstat
+
     out.write(XmlWEvent::end_element())?; // response
 
     Ok(())
@@ -484,7 +486,7 @@ fn handle_propfind_path<'n, W: Write, N: BorrowXmlName<'n>>(out: &mut XmlWriter<
 fn handle_prop_path<W: Write>(out: &mut XmlWriter<W>, path: &Path, prop: XmlName) -> Result<bool, XmlWError> {
     match (prop.namespace, prop.local_name) {
         (Some("DAV:"), "resourcetype") => {
-            start_client_prop_element(out, prop)?;
+            out.write(XmlWEvent::start_element("D:resourcetype"))?;
             if !is_actually_file(&path.metadata().expect("Failed to get requested file metadata").file_type()) {
                 out.write(XmlWEvent::start_element("D:collection"))?;
                 out.write(XmlWEvent::end_element())?;
@@ -492,22 +494,22 @@ fn handle_prop_path<W: Write>(out: &mut XmlWriter<W>, path: &Path, prop: XmlName
         }
 
         (Some("DAV:"), "creationdate") => {
-            start_client_prop_element(out, prop)?;
+            out.write(XmlWEvent::start_element("D:creationdate"))?;
             out.write(XmlWEvent::characters(&file_time_created(&path).rfc3339().to_string()))?;
         }
 
         (Some("DAV:"), "getlastmodified") => {
-            start_client_prop_element(out, prop)?;
+            out.write(XmlWEvent::start_element("D:getlastmodified"))?;
             out.write(XmlWEvent::characters(&file_time_modified(&path).rfc3339().to_string()))?;
         }
 
         (Some("DAV:"), "getcontentlength") => {
-            start_client_prop_element(out, prop)?;
+            out.write(XmlWEvent::start_element("D:getcontentlength"))?;
             out.write(XmlWEvent::characters(&file_length(&path.metadata().expect("Failed to get requested file metadata"), &path).to_string()))?;
         }
 
         (Some("DAV:"), "getcontenttype") => {
-            start_client_prop_element(out, prop)?;
+            out.write(XmlWEvent::start_element("D:getcontenttype"))?;
             let mime_type = guess_mime_type_opt(&path).unwrap_or_else(|| if file_binary(&path) {
                 "application/octet-stream".parse().unwrap()
             } else {
@@ -525,11 +527,13 @@ fn handle_prop_path<W: Write>(out: &mut XmlWriter<W>, path: &Path, prop: XmlName
 
 /// Adapted from hyperdav-server
 fn start_client_prop_element<W: Write>(out: &mut XmlWriter<W>, prop: XmlName) -> Result<(), XmlWError> {
-    if let Some(namespace) = prop.namespace {
-        if let Some(prefix) = prop.prefix {
-            // Remap the client's prefix if it overlaps with our DAV: prefix
-            if prefix == "D" && namespace != "DAV:" {
-                return out.write(XmlWEvent::start_element(XmlName { prefix: Some("U"), ..prop }).ns("U", namespace));
+    if let Some(prop_prefix) = prop.prefix {
+        if let Some(prop_namespace) = prop.namespace {
+            for (prefix, namespace) in WEBDAV_XML_NAMESPACES {
+                // Remap the client's prefix if it overlaps with one of ours
+                if prop_prefix == *prefix && prop_namespace != *namespace {
+                    return out.write(XmlWEvent::start_element(XmlName { prefix: Some("U"), ..prop }).ns("U", prop_namespace));
+                }
             }
         }
     }
@@ -596,7 +600,7 @@ fn parse_proppatch(req: &mut Request) -> Result<Vec<(OwnedXmlName, bool)>, Strin
 
 fn write_proppatch_output(props: &[(OwnedXmlName, bool)], req_url: &GenericUrl) -> Result<Result<Vec<u8>, IronResult<Response>>, XmlWError> {
     let mut out = intialise_xml_output()?;
-    out.write(XmlWEvent::start_element("D:multistatus").ns("D", "DAV:"))?;
+    out.write(namespaces_for_props("D:multistatus", props.iter().map(|pp| &pp.0)))?;
 
     out.write(XmlWEvent::start_element("D:href"))?;
     out.write(XmlWEvent::characters(req_url.as_str()))?;
@@ -639,7 +643,7 @@ fn copy_response(op_result: IoResult<()>, overwritten: bool) -> IronResult<Respo
 
 fn copy_response_multierror(errors: &[(IoError, String)], req_url: &GenericUrl) -> Result<Vec<u8>, XmlWError> {
     let mut out = intialise_xml_output()?;
-    out.write(XmlWEvent::start_element("D:multistatus").ns("D", "DAV:"))?;
+    out.write(XmlWEvent::start_element("D:multistatus").ns(WEBDAV_XML_NAMESPACE_DAV.0, WEBDAV_XML_NAMESPACE_DAV.1))?;
     out.write(XmlWEvent::start_element("D:response"))?;
 
     for (_, subp) in errors {
@@ -669,4 +673,16 @@ fn intialise_xml_output() -> Result<XmlWriter<Vec<u8>>, XmlWError> {
         })?;
 
     Ok(out)
+}
+
+fn namespaces_for_props<'n, N: 'n + BorrowXmlName<'n>, Ni: Iterator<Item = &'n N>>(elem_name: &str, props: Ni) -> XmlWEventStartElementBuilder {
+    let mut bldr = XmlWEvent::start_element(elem_name).ns(WEBDAV_XML_NAMESPACES[0].0, WEBDAV_XML_NAMESPACES[0].1);
+
+    for prop_namespace in props.map(|p| p.borrow().borrow_xml_name()).flat_map(|p| p.namespace).unique() {
+        if let Some((prefix, namespace)) = WEBDAV_XML_NAMESPACES[1..].iter().find(|(_, ns)| *ns == prop_namespace) {
+            bldr = bldr.ns(*prefix, *namespace);
+        }
+    }
+
+    bldr
 }
