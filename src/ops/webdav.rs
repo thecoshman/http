@@ -596,7 +596,7 @@ fn handle_prop_path<W: Write>(out: &mut XmlWriter<W>, path: &Path, meta: &Metada
 fn start_client_prop_element<W: Write>(out: &mut XmlWriter<W>, prop: XmlName) -> Result<(), XmlWError> {
     if let Some(prop_namespace) = prop.namespace {
         if let Some(prop_prefix) = prop.prefix {
-            if WEBDAV_XML_NAMESPACES.iter().find(|(pf, _)| *pf == prop_prefix).is_some() {
+            if WEBDAV_XML_NAMESPACES.iter().any(|(pf, _)| *pf == prop_prefix) {
                 return out.write(XmlWEvent::start_element(XmlName { prefix: Some("U"), ..prop }).ns("U", prop_namespace));
             }
         }

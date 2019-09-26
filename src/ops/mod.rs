@@ -121,7 +121,7 @@ impl HttpHandler {
     }
 
     pub fn clean_temp_dirs(temp_dir: &(String, PathBuf)) {
-        for (temp_name, temp_dir) in ["writes", "encoded", "tls"].into_iter().flat_map(|tn| HttpHandler::temp_subdir(temp_dir, true, tn)) {
+        for (temp_name, temp_dir) in ["writes", "encoded", "tls"].iter().flat_map(|tn| HttpHandler::temp_subdir(temp_dir, true, tn)) {
             if temp_dir.exists() && fs::remove_dir_all(&temp_dir).is_ok() {
                 log!("Deleted temp dir {magenta}{}{reset}", temp_name);
             }
@@ -708,10 +708,10 @@ impl HttpHandler {
                 let fp = f.path();
                 let mut symlink = false;
                 !((!self.follow_symlinks &&
-                   (|| {
+                   {
                     symlink = is_symlink(&fp);
                     symlink
-                })()) || (self.follow_symlinks && self.sandbox_symlinks && symlink && !is_descendant_of(fp, &self.hosted_directory.1)))
+                }) || (self.follow_symlinks && self.sandbox_symlinks && symlink && !is_descendant_of(fp, &self.hosted_directory.1)))
             })
             .sorted_by(|lhs, rhs| {
                 (is_actually_file(&lhs.file_type().expect("Failed to get file type")),
@@ -794,10 +794,10 @@ impl HttpHandler {
                 let fp = f.path();
                 let mut symlink = false;
                 !((!self.follow_symlinks &&
-                   (|| {
+                   {
                     symlink = is_symlink(&fp);
                     symlink
-                })()) || (self.follow_symlinks && self.sandbox_symlinks && symlink && !is_descendant_of(fp, &self.hosted_directory.1)))
+                }) || (self.follow_symlinks && self.sandbox_symlinks && symlink && !is_descendant_of(fp, &self.hosted_directory.1)))
             })
             .sorted_by(|lhs, rhs| {
                 (is_actually_file(&lhs.file_type().expect("Failed to get file type")),
@@ -1123,7 +1123,6 @@ impl HttpHandler {
     fn parse_requested_path_custom_symlink(&self, req_url: &GenericUrl, follow_symlinks: bool) -> (PathBuf, bool, bool) {
         req_url.path_segments()
             .unwrap()
-            .into_iter()
             .filter(|p| !p.is_empty())
             .fold((self.hosted_directory.1.clone(), false, false), |(mut cur, mut sk, mut err), pp| {
                 if let Some(pp) = percent_decode(pp) {
