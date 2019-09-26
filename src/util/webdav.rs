@@ -20,7 +20,7 @@ macro_rules! xml_name {
 lazy_static! {
     /// HTTP methods we support for WebDAV level 1, as specified in https://tools.ietf.org/html/rfc2518, without locks
     pub static ref DAV_LEVEL_1_METHODS: Vec<method::Method> =
-        ["COPY", "MKCOL", "MOVE", "PROPFIND", "PROPPATCH"].into_iter().map(|m| method::Extension(m.to_string())).collect();
+        ["COPY", "MKCOL", "MOVE", "PROPFIND", "PROPPATCH"].iter().map(|m| method::Extension(m.to_string())).collect();
 }
 
 /// Prefix and namespace URI for generic WebDAV elements

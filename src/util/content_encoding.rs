@@ -17,7 +17,7 @@ lazy_static! {
     /// The list of content encodings we handle.
     pub static ref SUPPORTED_ENCODINGS: Vec<Encoding> = {
         let es = vec![Encoding::Gzip, Encoding::Deflate, Encoding::EncodingExt("br".to_string()), Encoding::EncodingExt("bzip2".to_string())];
-        [es.clone(), es.into_iter().map(|e| Encoding::EncodingExt(format!("x-{}", e))).collect()].into_iter().flat_map(|e| e.clone()).collect()
+        [es.clone(), es.into_iter().map(|e| Encoding::EncodingExt(format!("x-{}", e))).collect()].iter().flat_map(|e| e.clone()).collect()
     };
 
     /// The list of extensions not to encode.
@@ -46,7 +46,7 @@ pub fn response_encoding(requested: &mut [QualityItem<Encoding>]) -> Option<Enco
 /// Encode a string slice using a specified encoding or `None` if encoding failed or is not recognised.
 pub fn encode_str(dt: &str, enc: &Encoding) -> Option<Vec<u8>> {
     type EncodeT = fn(&str) -> Option<Vec<u8>>;
-    static STR_ENCODING_FNS: &'static [EncodeT] = &[encode_str_gzip, encode_str_deflate, encode_str_brotli, encode_str_bzip2];
+    static STR_ENCODING_FNS: &[EncodeT] = &[encode_str_gzip, encode_str_deflate, encode_str_brotli, encode_str_bzip2];
 
     encoding_idx(enc).and_then(|fi| STR_ENCODING_FNS[fi](dt))
 }
@@ -55,7 +55,7 @@ pub fn encode_str(dt: &str, enc: &Encoding) -> Option<Vec<u8>> {
 /// `false` if encoding failed, is not recognised or an I/O error occurred.
 pub fn encode_file(p: &Path, op: &Path, enc: &Encoding) -> bool {
     type EncodeT = fn(File, File) -> bool;
-    static FILE_ENCODING_FNS: &'static [EncodeT] = &[encode_file_gzip, encode_file_deflate, encode_file_brotli, encode_file_bzip2];
+    static FILE_ENCODING_FNS: &[EncodeT] = &[encode_file_gzip, encode_file_deflate, encode_file_brotli, encode_file_bzip2];
 
     encoding_idx(enc)
         .map(|fi| {
@@ -69,7 +69,7 @@ pub fn encode_file(p: &Path, op: &Path, enc: &Encoding) -> bool {
 
 /// Encoding extension to use for encoded files, for example "gz" for gzip, or `None` if the encoding is not recognised.
 pub fn encoding_extension(enc: &Encoding) -> Option<&'static str> {
-    static ENCODING_EXTS: &'static [&'static str] = &["gz", "dflt", "br", "bz2"];
+    static ENCODING_EXTS: &[&str] = &["gz", "dflt", "br", "bz2"];
 
     encoding_idx(enc).map(|ei| ENCODING_EXTS[ei])
 }

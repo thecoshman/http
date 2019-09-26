@@ -455,8 +455,8 @@ pub fn copy_dir(from: &Path, to: &Path) -> IoResult<Vec<(IoError, String)>> {
     macro_rules! push_error {
         ($vec:ident, $path:ident, $expr:expr) => {
             match $expr {
-                Err(e) => $vec.push((e, $path.to_string_lossy().into_owned())),
                 Ok(_) => (),
+                Err(e) => $vec.push((e, $path.to_string_lossy().into_owned())),
             }
         };
     }
