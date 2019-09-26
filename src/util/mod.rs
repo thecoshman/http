@@ -17,8 +17,8 @@ use std::collections::HashMap;
 use time::{self, Duration, Tm};
 use iron::{mime, Headers, Url};
 use base64::display::Base64Display;
-use std::fs::{self, FileType, File};
 use iron::error::HttpResult as HyperResult;
+use std::fs::{self, FileType, Metadata, File};
 use iron::headers::{HeaderFormat, UserAgent, Header};
 use mime_guess::{guess_mime_type_opt, get_mime_type_str};
 use xml::name::{OwnedName as OwnedXmlName, Name as XmlName};
@@ -187,7 +187,10 @@ pub fn uppercase_first(s: &str) -> String {
 /// assert!(!file_binary("Cargo.toml"));
 /// ```
 pub fn file_binary<P: AsRef<Path>>(path: P) -> bool {
-    let path = path.as_ref();
+    file_binary_impl(path.as_ref())
+}
+
+fn file_binary_impl(path: &Path) -> bool {
     path.metadata()
         .map(|m| is_device(&m.file_type()) || File::open(path).and_then(|f| BufReader::new(f).read_line(&mut String::new())).is_err())
         .unwrap_or(true)
@@ -247,18 +250,33 @@ pub fn percent_decode(s: &str) -> Option<Cow<str>> {
 }
 
 /// Get the timestamp of the file's last modification as a `time::Tm` in UTC.
-pub fn file_time_modified(f: &Path) -> Tm {
-    file_time_impl(f.metadata().expect("Failed to get file metadata").modified().expect("Failed to get file last modified date"))
+pub fn file_time_modified_p(f: &Path) -> Tm {
+    file_time_modified(&f.metadata().expect("Failed to get file metadata"))
 }
 
 /// Get the timestamp of the file's last modification as a `time::Tm` in UTC.
-pub fn file_time_created(f: &Path) -> Tm {
-    file_time_impl(f.metadata().expect("Failed to get file metadata").created().expect("Failed to get file created date"))
+pub fn file_time_created_p(f: &Path) -> Tm {
+    file_time_created(&f.metadata().expect("Failed to get file metadata"))
 }
 
 /// Get the timestamp of the file's last access as a `time::Tm` in UTC.
-pub fn file_time_accessed(f: &Path) -> Tm {
-    file_time_impl(f.metadata().expect("Failed to get file metadata").accessed().expect("Failed to get file accessed date"))
+pub fn file_time_accessed_p(f: &Path) -> Tm {
+    file_time_accessed(&f.metadata().expect("Failed to get file metadata"))
+}
+
+/// Get the timestamp of the file's last modification as a `time::Tm` in UTC.
+pub fn file_time_modified(m: &Metadata) -> Tm {
+    file_time_impl(m.modified().expect("Failed to get file last modified date"))
+}
+
+/// Get the timestamp of the file's last modification as a `time::Tm` in UTC.
+pub fn file_time_created(m: &Metadata) -> Tm {
+    file_time_impl(m.created().expect("Failed to get file created date"))
+}
+
+/// Get the timestamp of the file's last access as a `time::Tm` in UTC.
+pub fn file_time_accessed(m: &Metadata) -> Tm {
+    file_time_impl(m.accessed().expect("Failed to get file accessed date"))
 }
 
 fn file_time_impl(time: SystemTime) -> Tm {
@@ -412,7 +430,11 @@ pub fn file_icon_suffix<P: AsRef<Path>>(f: P, is_file: bool) -> &'static str {
 ///
 /// The specified path must point to a file.
 pub fn get_raw_fs_metadata<P: AsRef<Path>>(f: P) -> RawFileData {
-    let f = f.as_ref();
+    get_raw_fs_metadata_impl(f.as_ref())
+}
+
+fn get_raw_fs_metadata_impl(f: &Path) -> RawFileData {
+    let meta = f.metadata().expect("Failed to get requested file metadata");
     RawFileData {
         mime_type: guess_mime_type_opt(f).unwrap_or_else(|| if file_binary(f) {
             "application/octet-stream".parse().unwrap()
@@ -420,8 +442,8 @@ pub fn get_raw_fs_metadata<P: AsRef<Path>>(f: P) -> RawFileData {
             "text/plain".parse().unwrap()
         }),
         name: f.file_name().unwrap().to_str().expect("Failed to get requested file name").to_string(),
-        last_modified: file_time_modified(f),
-        size: f.metadata().expect("Failed to get requested file metadata").len(),
+        last_modified: file_time_modified(&meta),
+        size: file_length(&meta, &f),
         is_file: true,
     }
 }
