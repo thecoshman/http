@@ -1,6 +1,7 @@
 extern crate hyper_native_tls;
 extern crate percent_encoding;
 extern crate trivial_colours;
+#[cfg(not(target_os = "windows"))]
 extern crate os_str_generic;
 #[macro_use]
 extern crate lazy_static;
@@ -15,6 +16,8 @@ extern crate walkdir;
 extern crate base64;
 extern crate flate2;
 extern crate rfsapi;
+#[cfg(target_os = "windows")]
+extern crate winapi;
 extern crate bzip2;
 extern crate ctrlc;
 extern crate serde;

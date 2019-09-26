@@ -6,9 +6,9 @@
 //! https://tools.ietf.org/html/rfc2518
 
 
-use self::super::super::util::{BorrowXmlName, Destination, CommaList, Overwrite, Depth, file_time_accessed, file_time_modified, file_time_created,
-                               client_microsoft, is_actually_file, is_descendant_of, file_executable, html_response, file_length, file_binary, copy_dir,
-                               WEBDAV_ALLPROP_PROPERTIES_NON_WINDOWS, WEBDAV_ALLPROP_PROPERTIES_WINDOWS, WEBDAV_XML_NAMESPACE_MICROSOFT,
+use self::super::super::util::{BorrowXmlName, Destination, CommaList, Overwrite, Depth, win32_file_attributes, file_time_accessed, file_time_modified,
+                               file_time_created, client_microsoft, is_actually_file, is_descendant_of, file_executable, html_response, file_length,
+                               file_binary, copy_dir, WEBDAV_ALLPROP_PROPERTIES_NON_WINDOWS, WEBDAV_ALLPROP_PROPERTIES_WINDOWS, WEBDAV_XML_NAMESPACE_MICROSOFT,
                                WEBDAV_XML_NAMESPACE_APACHE, WEBDAV_PROPNAME_PROPERTIES, WEBDAV_XML_NAMESPACE_DAV, WEBDAV_XML_NAMESPACES, ERROR_HTML};
 use xml::reader::{EventReader as XmlReader, XmlEvent as XmlREvent, Error as XmlRError};
 use xml::writer::{EventWriter as XmlWriter, XmlEvent as XmlWEvent, Error as XmlWError};
@@ -19,7 +19,6 @@ use xml::common::{TextPosition as XmlTextPosition, XmlVersion, Position};
 use xml::name::{OwnedName as OwnedXmlName, Name as XmlName};
 use iron::{status, IronResult, Response, Request};
 use mime_guess::guess_mime_type_opt;
-use os_str_generic::OsStrGenericExt;
 use iron::url::Url as GenericUrl;
 use std::path::{PathBuf, Path};
 use std::fs::{self, Metadata};
@@ -545,26 +544,10 @@ fn handle_prop_path<W: Write>(out: &mut XmlWriter<W>, path: &Path, meta: &Metada
                 out.write(XmlWEvent::characters(&file_time_created(meta).rfc3339().to_string()))?;
             }
 
-            // TODO: maybe use https://docs.microsoft.com/en-gb/windows/win32/api/fileapi/nf-fileapi-getfileattributesa?
             "Win32FileAttributes" => {
                 out.write(XmlWEvent::start_element((WEBDAV_XML_NAMESPACE_MICROSOFT.0, "Win32FileAttributes")))?;
 
-                let mut attr = 0u32;
-                if meta.permissions().readonly() {
-                    attr |= 0x0001;
-                }
-                if path.file_name().map(|n| n.starts_with(".")).unwrap_or(false) {
-                    attr |= 0x0002;
-                }
-                if !is_actually_file(&meta.file_type()) {
-                    attr |= 0x0010;
-                } else {
-                    // this is the 'Archive' bit, which is set by
-                    // default on _all_ files on creation and on
-                    // modification.
-                    attr |= 0x0020;
-                }
-
+                let attr = win32_file_attributes(meta, path);
                 out.write(XmlWEvent::characters(&format!("{:08x}", attr)))?;
             }
 
