@@ -18,7 +18,6 @@ authors = ["thecoshman <rust@thecoshman.com>",
 [dependencies]
 hyper-native-tls = "0.3"
 percent-encoding = "2.1"
-os-str-generic = "0.2"
 lazy_static = "1.4"
 serde_json = "0.9"
 mime_guess = "1.8"
@@ -48,6 +47,13 @@ default-features = false
 [dependencies.iron]
 version = "0.6"
 features = ["hyper-native-tls"]
+
+[target.'cfg(target_os = "windows")'.dependencies.winapi]
+version = "0.3"
+features = ["fileapi"]
+
+[target.'cfg(not(target_os = "windows"))'.dependencies.os-str-generic]
+version = "0.2"
 
 [target.'cfg(not(any(target_os = "windows", target_os = "macos")))'.dependencies.libc]
 version = "0.2"
