@@ -26,9 +26,9 @@ use rand::distributions::Alphanumeric as AlphanumericDistribution;
 use iron::{headers, status, method, mime, IronResult, Listening, Response, TypeMap, Request, Handler, Iron};
 use self::super::util::{WwwAuthenticate, CommaList, Dav, url_path, file_hash, is_symlink, encode_str, encode_file, file_length, hash_string, html_response,
                         file_binary, client_mobile, percent_decode, file_icon_suffix, is_actually_file, is_descendant_of, response_encoding, detect_file_as_dir,
-                        encoding_extension, file_time_modified, get_raw_fs_metadata, human_readable_size, is_nonexistant_descendant_of, USER_AGENT, ERROR_HTML,
-                        INDEX_EXTENSIONS, MIN_ENCODING_GAIN, MAX_ENCODING_SIZE, MIN_ENCODING_SIZE, DAV_LEVEL_1_METHODS, DIRECTORY_LISTING_HTML,
-                        MOBILE_DIRECTORY_LISTING_HTML, BLACKLISTED_ENCODING_EXTENSIONS};
+                        encoding_extension, file_time_modified, file_time_modified_p, get_raw_fs_metadata, human_readable_size, is_nonexistant_descendant_of,
+                        USER_AGENT, ERROR_HTML, INDEX_EXTENSIONS, MIN_ENCODING_GAIN, MAX_ENCODING_SIZE, MIN_ENCODING_SIZE, DAV_LEVEL_1_METHODS,
+                        DIRECTORY_LISTING_HTML, MOBILE_DIRECTORY_LISTING_HTML, BLACKLISTED_ENCODING_EXTENSIONS};
 
 
 macro_rules! log {
@@ -408,7 +408,7 @@ impl HttpHandler {
 
         Ok(Response::with((status::PartialContent,
                            (Header(headers::Server(USER_AGENT.to_string())),
-                            Header(headers::LastModified(headers::HttpDate(file_time_modified(&req_p)))),
+                            Header(headers::LastModified(headers::HttpDate(file_time_modified_p(&req_p)))),
                             Header(headers::ContentRange(headers::ContentRangeSpec::Bytes {
                                 range: Some((from, to)),
                                 instance_length: Some(file_length(&f.metadata().expect("Failed to get requested file metadata"), &req_p)),
@@ -454,13 +454,14 @@ impl HttpHandler {
 
     fn handle_get_file_opened_range(&self, req_p: PathBuf, s: SeekFrom, b_from: u64, clen: u64, mt: Mime) -> IronResult<Response> {
         let mut f = File::open(&req_p).expect("Failed to open requested file");
-        let flen = file_length(&f.metadata().expect("Failed to get requested file metadata"), &req_p);
+        let fmeta = f.metadata().expect("Failed to get requested file metadata");
+        let flen = file_length(&fmeta, &req_p);
         f.seek(s).expect("Failed to seek requested file");
 
         Ok(Response::with((status::PartialContent,
                            f,
                            (Header(headers::Server(USER_AGENT.to_string())),
-                            Header(headers::LastModified(headers::HttpDate(file_time_modified(&req_p)))),
+                            Header(headers::LastModified(headers::HttpDate(file_time_modified(&fmeta)))),
                             Header(headers::ContentRange(headers::ContentRangeSpec::Bytes {
                                 range: Some((b_from, flen - 1)),
                                 instance_length: Some(flen),
@@ -495,7 +496,7 @@ impl HttpHandler {
 
         Ok(Response::with((status::NoContent,
                            Header(headers::Server(USER_AGENT.to_string())),
-                           Header(headers::LastModified(headers::HttpDate(file_time_modified(&req_p)))),
+                           Header(headers::LastModified(headers::HttpDate(file_time_modified_p(&req_p)))),
                            Header(headers::ContentRange(headers::ContentRangeSpec::Bytes {
                                range: Some((from, to)),
                                instance_length: Some(file_length(&req_p.metadata().expect("Failed to get requested file metadata"), &req_p)),
@@ -524,7 +525,7 @@ impl HttpHandler {
         } else {
             Ok(Response::with((status::Ok,
                                (Header(headers::Server(USER_AGENT.to_string())),
-                                Header(headers::LastModified(headers::HttpDate(file_time_modified(&req_p)))),
+                                Header(headers::LastModified(headers::HttpDate(file_time_modified(&metadata)))),
                                 Header(headers::AcceptRanges(vec![headers::RangeUnit::Bytes]))),
                                req_p.as_path(),
                                Header(headers::ContentLength(file_length(&metadata, &req_p))),
@@ -558,7 +559,7 @@ impl HttpHandler {
                     Some(&(ref resp_p, false)) => {
                         return Ok(Response::with((status::Ok,
                                                   Header(headers::Server(USER_AGENT.to_string())),
-                                                  Header(headers::LastModified(headers::HttpDate(file_time_modified(resp_p)))),
+                                                  Header(headers::LastModified(headers::HttpDate(file_time_modified_p(resp_p)))),
                                                   Header(headers::AcceptRanges(vec![headers::RangeUnit::Bytes])),
                                                   resp_p.as_path(),
                                                   mt)));
@@ -609,7 +610,7 @@ impl HttpHandler {
 
         Ok(Response::with((status::Ok,
                            (Header(headers::Server(USER_AGENT.to_string())),
-                            Header(headers::LastModified(headers::HttpDate(file_time_modified(&req_p)))),
+                            Header(headers::LastModified(headers::HttpDate(file_time_modified_p(&req_p)))),
                             Header(headers::AcceptRanges(vec![headers::RangeUnit::Bytes]))),
                            req_p.as_path(),
                            Header(headers::ContentLength(file_length(&req_p.metadata().expect("Failed to get requested file metadata"), &req_p))),
@@ -633,11 +634,10 @@ impl HttpHandler {
                     let fp = f.path();
                     let mut symlink = false;
                     !((!self.follow_symlinks &&
-                       (|| {
+                       {
                         symlink = is_symlink(&fp);
                         symlink
-                    })()) ||
-                      (self.follow_symlinks && self.sandbox_symlinks && symlink && !is_descendant_of(fp, &self.hosted_directory.1)))
+                    }) || (self.follow_symlinks && self.sandbox_symlinks && symlink && !is_descendant_of(fp, &self.hosted_directory.1)))
                 })
                                                 .map(|f| {
                     let is_file = is_actually_file(&f.file_type().expect("Failed to get file type"));
@@ -647,7 +647,7 @@ impl HttpHandler {
                         RawFileData {
                             mime_type: "text/directory".parse().unwrap(),
                             name: f.file_name().into_string().expect("Failed to get file name"),
-                            last_modified: file_time_modified(&f.path()),
+                            last_modified: file_time_modified_p(&f.path()),
                             size: 0,
                             is_file: false,
                         }
@@ -720,8 +720,7 @@ impl HttpHandler {
             format!("<a href=\"/{up_path}{up_path_slash}\" class=\"list entry top\"><span class=\"back_arrow_icon\">Parent directory</span></a> \
                      <a href=\"/{up_path}{up_path_slash}\" class=\"list entry bottom\"><span class=\"marker\">@</span>\
                        <span class=\"datetime\">{} UTC</span></a>",
-                    file_time_modified(req_p.parent()
-                            .expect("Failed to get requested directory's parent directory"))
+                    file_time_modified_p(req_p.parent().expect("Failed to get requested directory's parent directory"))
                         .strftime("%F %T")
                         .unwrap(),
                     up_path = slash_idx.map(|i| &rel_noslash[0..i]).unwrap_or(""),
@@ -747,6 +746,7 @@ impl HttpHandler {
             })
             .fold("".to_string(), |cur, f| {
                 let is_file = is_actually_file(&f.file_type().expect("Failed to get file type"));
+                let fmeta = f.metadata().expect("Failed to get requested file metadata");
                 let fname = f.file_name().into_string().expect("Failed to get file name");
                 let path = f.path();
 
@@ -759,10 +759,10 @@ impl HttpHandler {
                         path.file_name().map(|p| p.to_str().expect("Filename not UTF-8").replace('.', "_")).as_ref().unwrap_or(&fname),
                         fname,
                         if is_file { "" } else { "/" },
-                        file_time_modified(&path).strftime("%F %T").unwrap(),
+                        file_time_modified(&fmeta).strftime("%F %T").unwrap(),
                         if is_file { "<span class=\"size\">" } else { "" },
                         if is_file {
-                            human_readable_size(file_length(&f.metadata().expect("Failed to get requested file metadata"), &path))
+                            human_readable_size(file_length(&fmeta, &path))
                         } else {
                             String::new()
                         },
@@ -809,7 +809,7 @@ impl HttpHandler {
                          <td><a href=\"/{up_path}{up_path_slash}\">Parent directory</a></td> \
                          <td><a href=\"/{up_path}{up_path_slash}\" class=\"datetime\">{}</a></td> \
                          <td><a href=\"/{up_path}{up_path_slash}\">&nbsp;</a></td></tr>",
-                    file_time_modified(req_p.parent().expect("Failed to get requested directory's parent directory")).strftime("%F %T").unwrap(),
+                    file_time_modified_p(req_p.parent().expect("Failed to get requested directory's parent directory")).strftime("%F %T").unwrap(),
                     up_path = slash_idx.map(|i| &rel_noslash[0..i]).unwrap_or(""),
                     up_path_slash = if slash_idx.is_some() { "/" } else { "" })
         };
@@ -833,9 +833,10 @@ impl HttpHandler {
             })
             .fold("".to_string(), |cur, f| {
                 let is_file = is_actually_file(&f.file_type().expect("Failed to get file type"));
+                let fmeta = f.metadata().expect("Failed to get requested file metadata");
                 let fname = f.file_name().into_string().expect("Failed to get file name");
                 let path = f.path();
-                let len = file_length(&f.metadata().expect("Failed to get requested file metadata"), &path);
+                let len = file_length(&fmeta, &path);
 
                 format!("{}<tr><td><a href=\"{path}{fname}\" id=\"{}\" class=\"{}{}_icon\"></a></td> \
                            <td><a href=\"{path}{fname}\">{}{}</a></td> <td><a href=\"{path}{fname}\" class=\"datetime\">{}</a></td> \
@@ -846,7 +847,7 @@ impl HttpHandler {
                         file_icon_suffix(&path, is_file),
                         fname,
                         if is_file { "" } else { "/" },
-                        file_time_modified(&path).strftime("%F %T").unwrap(),
+                        file_time_modified(&fmeta).strftime("%F %T").unwrap(),
                         if is_file { "<abbr title=\"" } else { "&nbsp;" },
                         if is_file {
                             len.to_string()
@@ -1017,11 +1018,11 @@ impl HttpHandler {
     }
 
     fn handle_delete_path(&self, req: &mut Request, req_p: PathBuf, symlink: bool) -> IronResult<Response> {
-        let file = is_actually_file(&req_p.metadata().expect("failed to get file metadata").file_type());
+        let ft = req_p.metadata().expect("failed to get file metadata").file_type();
         log!(self.log,
              "{green}{}{reset} deleted {blue}{} {magenta}{}{reset}",
              req.remote_addr,
-             if file {
+             if is_actually_file(&ft) {
                  "file"
              } else if symlink {
                  "symlink"
@@ -1030,7 +1031,7 @@ impl HttpHandler {
              },
              req_p.display());
 
-        if file {
+        if is_actually_file(&ft) {
             fs::remove_file(req_p).expect("Failed to remove requested file");
         } else {
             fs::remove_dir_all(req_p).expect(if symlink {

@@ -22,11 +22,12 @@ use mime_guess::guess_mime_type_opt;
 use os_str_generic::OsStrGenericExt;
 use iron::url::Url as GenericUrl;
 use std::path::{PathBuf, Path};
+use std::fs::{self, Metadata};
 use self::super::HttpHandler;
 use itertools::Itertools;
 use std::borrow::Borrow;
 use iron::mime::Mime;
-use std::{fmt, fs};
+use std::fmt;
 
 
 lazy_static! {
@@ -117,9 +118,10 @@ impl HttpHandler {
         let mut out = intialise_xml_output()?;
         out.write(namespaces_for_props("D:multistatus", props.iter().flat_map(|pp| pp.iter())))?;
 
-        handle_propfind_path(&mut out, &url, &path, props, just_names)?;
+        let meta = path.metadata().expect("Failed to get requested file metadata");
+        handle_propfind_path(&mut out, &url, &path, &meta, props, just_names)?;
 
-        if path.metadata().expect("Failed to get requested file metadata").is_dir() {
+        if meta.is_dir() {
             if let Some(ir) = self.handle_webdav_propfind_path_recursive(req, &mut out, url, &path, props, just_names, depth)? {
                 return Ok(Err(ir));
             }
@@ -150,7 +152,12 @@ impl HttpHandler {
 
                 if !(!path.exists() || (symlink && !self.follow_symlinks) ||
                      (symlink && self.follow_symlinks && self.sandbox_symlinks && !is_descendant_of(&path, &self.hosted_directory.1))) {
-                    handle_propfind_path(out, &url, &path, props, just_names)?;
+                    handle_propfind_path(out,
+                                         &url,
+                                         &path,
+                                         &path.metadata().expect("Failed to get requested file metadata"),
+                                         props,
+                                         just_names)?;
                     self.handle_webdav_propfind_path_recursive(req, out, url, &path, props, just_names, next_depth)?;
                 }
             }
@@ -431,7 +438,8 @@ fn parse_propfind(req: &mut Request) -> Result<PropfindVariant, Result<String, X
 
 /// Adapted from
 /// https://github.com/tylerwhall/hyperdav-server/blob/415f512ac030478593ad389a3267aeed7441d826/src/lib.rs#L306
-fn handle_propfind_path<'n, W: Write, N: BorrowXmlName<'n>>(out: &mut XmlWriter<W>, url: &str, path: &Path, props: &[&'n [N]], just_names: bool)
+fn handle_propfind_path<'n, W: Write, N: BorrowXmlName<'n>>(out: &mut XmlWriter<W>, url: &str, path: &Path, meta: &Metadata, props: &[&'n [N]],
+                                                            just_names: bool)
                                                             -> Result<(), XmlWError> {
     out.write(XmlWEvent::start_element("D:response"))?;
 
@@ -449,7 +457,7 @@ fn handle_propfind_path<'n, W: Write, N: BorrowXmlName<'n>>(out: &mut XmlWriter<
         if just_names {
             start_client_prop_element(out, prop)?;
         } else {
-            if !handle_prop_path(out, path, prop)? {
+            if !handle_prop_path(out, path, meta, prop)? {
                 failed_props.push(prop);
             }
         }
@@ -492,17 +500,17 @@ fn handle_propfind_path<'n, W: Write, N: BorrowXmlName<'n>>(out: &mut XmlWriter<
 /// https://github.com/tylerwhall/hyperdav-server/blob/415f512ac030478593ad389a3267aeed7441d826/src/lib.rs#L245
 /// extended properties adapted from
 /// https://github.com/miquels/webdav-handler-rs/blob/02433c1acfccd848a7de26889f6857cbad559076/src/handle_props.rs#L655
-fn handle_prop_path<W: Write>(out: &mut XmlWriter<W>, path: &Path, prop: XmlName) -> Result<bool, XmlWError> {
+fn handle_prop_path<W: Write>(out: &mut XmlWriter<W>, path: &Path, meta: &Metadata, prop: XmlName) -> Result<bool, XmlWError> {
     if prop.namespace == Some(WEBDAV_XML_NAMESPACE_DAV.1) {
         match prop.local_name {
             "creationdate" => {
                 out.write(XmlWEvent::start_element((WEBDAV_XML_NAMESPACE_DAV.0, "creationdate")))?;
-                out.write(XmlWEvent::characters(&file_time_created(&path).rfc3339().to_string()))?;
+                out.write(XmlWEvent::characters(&file_time_created(meta).rfc3339().to_string()))?;
             }
 
             "getcontentlength" => {
                 out.write(XmlWEvent::start_element((WEBDAV_XML_NAMESPACE_DAV.0, "getcontentlength")))?;
-                out.write(XmlWEvent::characters(&file_length(&path.metadata().expect("Failed to get requested file metadata"), &path).to_string()))?;
+                out.write(XmlWEvent::characters(&file_length(&meta, &path).to_string()))?;
             }
 
             "getcontenttype" => {
@@ -517,12 +525,12 @@ fn handle_prop_path<W: Write>(out: &mut XmlWriter<W>, path: &Path, prop: XmlName
 
             "getlastmodified" => {
                 out.write(XmlWEvent::start_element((WEBDAV_XML_NAMESPACE_DAV.0, "getlastmodified")))?;
-                out.write(XmlWEvent::characters(&file_time_modified(&path).rfc3339().to_string()))?;
+                out.write(XmlWEvent::characters(&file_time_modified(meta).rfc3339().to_string()))?;
             }
 
             "resourcetype" => {
                 out.write(XmlWEvent::start_element((WEBDAV_XML_NAMESPACE_DAV.0, "resourcetype")))?;
-                if !is_actually_file(&path.metadata().expect("Failed to get requested file metadata").file_type()) {
+                if !is_actually_file(&meta.file_type()) {
                     out.write(XmlWEvent::start_element((WEBDAV_XML_NAMESPACE_DAV.0, "collection")))?;
                     out.write(XmlWEvent::end_element())?;
                 }
@@ -534,7 +542,7 @@ fn handle_prop_path<W: Write>(out: &mut XmlWriter<W>, path: &Path, prop: XmlName
         match prop.local_name {
             "Win32CreationTime" => {
                 out.write(XmlWEvent::start_element((WEBDAV_XML_NAMESPACE_MICROSOFT.0, "Win32CreationTime")))?;
-                out.write(XmlWEvent::characters(&file_time_created(&path).rfc3339().to_string()))?;
+                out.write(XmlWEvent::characters(&file_time_created(meta).rfc3339().to_string()))?;
             }
 
             // TODO: maybe use https://docs.microsoft.com/en-gb/windows/win32/api/fileapi/nf-fileapi-getfileattributesa?
@@ -542,13 +550,13 @@ fn handle_prop_path<W: Write>(out: &mut XmlWriter<W>, path: &Path, prop: XmlName
                 out.write(XmlWEvent::start_element((WEBDAV_XML_NAMESPACE_MICROSOFT.0, "Win32FileAttributes")))?;
 
                 let mut attr = 0u32;
-                if path.metadata().expect("Failed to get requested file metadata").permissions().readonly() {
+                if meta.permissions().readonly() {
                     attr |= 0x0001;
                 }
                 if path.file_name().map(|n| n.starts_with(".")).unwrap_or(false) {
                     attr |= 0x0002;
                 }
-                if !is_actually_file(&path.metadata().expect("Failed to get requested file metadata").file_type()) {
+                if !is_actually_file(&meta.file_type()) {
                     attr |= 0x0010;
                 } else {
                     // this is the 'Archive' bit, which is set by
@@ -562,12 +570,12 @@ fn handle_prop_path<W: Write>(out: &mut XmlWriter<W>, path: &Path, prop: XmlName
 
             "Win32LastAccessTime" => {
                 out.write(XmlWEvent::start_element((WEBDAV_XML_NAMESPACE_MICROSOFT.0, "Win32FileAttributes")))?;
-                out.write(XmlWEvent::characters(&file_time_accessed(&path).rfc3339().to_string()))?;
+                out.write(XmlWEvent::characters(&file_time_accessed(meta).rfc3339().to_string()))?;
             }
 
             "Win32LastModifiedTime" => {
                 out.write(XmlWEvent::start_element((WEBDAV_XML_NAMESPACE_MICROSOFT.0, "Win32LastModifiedTime")))?;
-                out.write(XmlWEvent::characters(&file_time_modified(&path).rfc3339().to_string()))?;
+                out.write(XmlWEvent::characters(&file_time_modified(meta).rfc3339().to_string()))?;
             }
 
             _ => return Ok(false),
@@ -576,11 +584,7 @@ fn handle_prop_path<W: Write>(out: &mut XmlWriter<W>, path: &Path, prop: XmlName
         match prop.local_name {
             "executable" => {
                 out.write(XmlWEvent::start_element((WEBDAV_XML_NAMESPACE_APACHE.0, "executable")))?;
-                out.write(XmlWEvent::characters(if file_executable(&path.metadata().expect("Failed to get requested file metadata")) {
-                        "T"
-                    } else {
-                        "F"
-                    }))?;
+                out.write(XmlWEvent::characters(if file_executable(&meta) { "T" } else { "F" }))?;
             }
 
             _ => return Ok(false),
