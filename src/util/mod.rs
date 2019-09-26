@@ -256,6 +256,11 @@ pub fn file_time_created(f: &Path) -> Tm {
     file_time_impl(f.metadata().expect("Failed to get file metadata").created().expect("Failed to get file created date"))
 }
 
+/// Get the timestamp of the file's last access as a `time::Tm` in UTC.
+pub fn file_time_accessed(f: &Path) -> Tm {
+    file_time_impl(f.metadata().expect("Failed to get file metadata").accessed().expect("Failed to get file accessed date"))
+}
+
 fn file_time_impl(time: SystemTime) -> Tm {
     match time.elapsed() {
         Ok(dur) => time::now_utc() - Duration::from_std(dur).unwrap(),

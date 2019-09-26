@@ -1,6 +1,7 @@
 extern crate hyper_native_tls;
 extern crate percent_encoding;
 extern crate trivial_colours;
+extern crate os_str_generic;
 #[macro_use]
 extern crate lazy_static;
 extern crate serde_json;

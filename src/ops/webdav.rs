@@ -6,9 +6,10 @@
 //! https://tools.ietf.org/html/rfc2518
 
 
-use self::super::super::util::{BorrowXmlName, Destination, CommaList, Overwrite, Depth, file_time_modified, file_time_created, client_microsoft,
-                               is_actually_file, is_descendant_of, html_response, file_length, file_binary, copy_dir, WEBDAV_ALLPROP_PROPERTIES_NON_WINDOWS,
-                               WEBDAV_ALLPROP_PROPERTIES_WINDOWS, WEBDAV_PROPNAME_PROPERTIES, WEBDAV_XML_NAMESPACE_DAV, WEBDAV_XML_NAMESPACES, ERROR_HTML};
+use self::super::super::util::{BorrowXmlName, Destination, CommaList, Overwrite, Depth, file_time_accessed, file_time_modified, file_time_created,
+                               client_microsoft, is_actually_file, is_descendant_of, file_executable, html_response, file_length, file_binary, copy_dir,
+                               WEBDAV_ALLPROP_PROPERTIES_NON_WINDOWS, WEBDAV_ALLPROP_PROPERTIES_WINDOWS, WEBDAV_XML_NAMESPACE_MICROSOFT,
+                               WEBDAV_XML_NAMESPACE_APACHE, WEBDAV_PROPNAME_PROPERTIES, WEBDAV_XML_NAMESPACE_DAV, WEBDAV_XML_NAMESPACES, ERROR_HTML};
 use xml::reader::{EventReader as XmlReader, XmlEvent as XmlREvent, Error as XmlRError};
 use xml::writer::{EventWriter as XmlWriter, XmlEvent as XmlWEvent, Error as XmlWError};
 use std::io::{ErrorKind as IoErrorKind, Result as IoResult, Error as IoError, Write};
@@ -18,6 +19,7 @@ use xml::common::{TextPosition as XmlTextPosition, XmlVersion, Position};
 use xml::name::{OwnedName as OwnedXmlName, Name as XmlName};
 use iron::{status, IronResult, Response, Request};
 use mime_guess::guess_mime_type_opt;
+use os_str_generic::OsStrGenericExt;
 use iron::url::Url as GenericUrl;
 use std::path::{PathBuf, Path};
 use self::super::HttpHandler;
@@ -107,7 +109,8 @@ impl HttpHandler {
         }
     }
 
-    /// Adapted from hyperdav-server
+    /// Adapted from
+    /// https://github.com/tylerwhall/hyperdav-server/blob/415f512ac030478593ad389a3267aeed7441d826/src/lib.rs#L459
     fn handle_webdav_propfind_write_output<'n, N: BorrowXmlName<'n>>(&self, req: &mut Request, url: String, path: &Path, props: &[&'n [N]], just_names: bool,
                                                                      depth: Depth)
                                                                      -> Result<Result<Vec<u8>, IronResult<Response>>, XmlWError> {
@@ -354,6 +357,7 @@ impl HttpHandler {
 
 
 /// https://tools.ietf.org/html/rfc2518#section-12.14
+#[derive(Debug, Clone, Hash, PartialEq, Eq)]
 enum PropfindVariant {
     AllProp,
     PropName,
@@ -385,7 +389,8 @@ impl fmt::Display for PropfindVariant {
 
 /// https://tools.ietf.org/html/rfc2518#section-12.14
 ///
-/// Adapted from hyperdav-server
+/// Adapted from
+/// https://github.com/tylerwhall/hyperdav-server/blob/415f512ac030478593ad389a3267aeed7441d826/src/lib.rs#L158
 fn parse_propfind(req: &mut Request) -> Result<PropfindVariant, Result<String, XmlRError>> {
     #[derive(Debug, Copy, Clone, Hash, PartialOrd, Ord, PartialEq, Eq)]
     enum State {
@@ -424,7 +429,8 @@ fn parse_propfind(req: &mut Request) -> Result<PropfindVariant, Result<String, X
     }
 }
 
-/// Adapted from hyperdav-server
+/// Adapted from
+/// https://github.com/tylerwhall/hyperdav-server/blob/415f512ac030478593ad389a3267aeed7441d826/src/lib.rs#L306
 fn handle_propfind_path<'n, W: Write, N: BorrowXmlName<'n>>(out: &mut XmlWriter<W>, url: &str, path: &Path, props: &[&'n [N]], just_names: bool)
                                                             -> Result<(), XmlWError> {
     out.write(XmlWEvent::start_element("D:response"))?;
@@ -482,59 +488,123 @@ fn handle_propfind_path<'n, W: Write, N: BorrowXmlName<'n>>(out: &mut XmlWriter<
     Ok(())
 }
 
-/// Adapted from hyperdav-server
+/// Adapted from
+/// https://github.com/tylerwhall/hyperdav-server/blob/415f512ac030478593ad389a3267aeed7441d826/src/lib.rs#L245
+/// extended properties adapted from
+/// https://github.com/miquels/webdav-handler-rs/blob/02433c1acfccd848a7de26889f6857cbad559076/src/handle_props.rs#L655
 fn handle_prop_path<W: Write>(out: &mut XmlWriter<W>, path: &Path, prop: XmlName) -> Result<bool, XmlWError> {
-    match (prop.namespace, prop.local_name) {
-        (Some("DAV:"), "resourcetype") => {
-            out.write(XmlWEvent::start_element("D:resourcetype"))?;
-            if !is_actually_file(&path.metadata().expect("Failed to get requested file metadata").file_type()) {
-                out.write(XmlWEvent::start_element("D:collection"))?;
-                out.write(XmlWEvent::end_element())?;
+    if prop.namespace == Some(WEBDAV_XML_NAMESPACE_DAV.1) {
+        match prop.local_name {
+            "creationdate" => {
+                out.write(XmlWEvent::start_element((WEBDAV_XML_NAMESPACE_DAV.0, "creationdate")))?;
+                out.write(XmlWEvent::characters(&file_time_created(&path).rfc3339().to_string()))?;
             }
-        }
 
-        (Some("DAV:"), "creationdate") => {
-            out.write(XmlWEvent::start_element("D:creationdate"))?;
-            out.write(XmlWEvent::characters(&file_time_created(&path).rfc3339().to_string()))?;
-        }
+            "getcontentlength" => {
+                out.write(XmlWEvent::start_element((WEBDAV_XML_NAMESPACE_DAV.0, "getcontentlength")))?;
+                out.write(XmlWEvent::characters(&file_length(&path.metadata().expect("Failed to get requested file metadata"), &path).to_string()))?;
+            }
 
-        (Some("DAV:"), "getlastmodified") => {
-            out.write(XmlWEvent::start_element("D:getlastmodified"))?;
-            out.write(XmlWEvent::characters(&file_time_modified(&path).rfc3339().to_string()))?;
-        }
+            "getcontenttype" => {
+                out.write(XmlWEvent::start_element((WEBDAV_XML_NAMESPACE_DAV.0, "getcontenttype")))?;
+                let mime_type = guess_mime_type_opt(&path).unwrap_or_else(|| if file_binary(&path) {
+                    "application/octet-stream".parse().unwrap()
+                } else {
+                    "text/plain".parse().unwrap()
+                });
+                out.write(XmlWEvent::characters(&mime_type.to_string()))?;
+            }
 
-        (Some("DAV:"), "getcontentlength") => {
-            out.write(XmlWEvent::start_element("D:getcontentlength"))?;
-            out.write(XmlWEvent::characters(&file_length(&path.metadata().expect("Failed to get requested file metadata"), &path).to_string()))?;
-        }
+            "getlastmodified" => {
+                out.write(XmlWEvent::start_element((WEBDAV_XML_NAMESPACE_DAV.0, "getlastmodified")))?;
+                out.write(XmlWEvent::characters(&file_time_modified(&path).rfc3339().to_string()))?;
+            }
 
-        (Some("DAV:"), "getcontenttype") => {
-            out.write(XmlWEvent::start_element("D:getcontenttype"))?;
-            let mime_type = guess_mime_type_opt(&path).unwrap_or_else(|| if file_binary(&path) {
-                "application/octet-stream".parse().unwrap()
-            } else {
-                "text/plain".parse().unwrap()
-            });
-            out.write(XmlWEvent::characters(&mime_type.to_string()))?;
-        }
+            "resourcetype" => {
+                out.write(XmlWEvent::start_element((WEBDAV_XML_NAMESPACE_DAV.0, "resourcetype")))?;
+                if !is_actually_file(&path.metadata().expect("Failed to get requested file metadata").file_type()) {
+                    out.write(XmlWEvent::start_element((WEBDAV_XML_NAMESPACE_DAV.0, "collection")))?;
+                    out.write(XmlWEvent::end_element())?;
+                }
+            }
 
-        _ => return Ok(false),
+            _ => return Ok(false),
+        }
+    } else if prop.namespace == Some(WEBDAV_XML_NAMESPACE_MICROSOFT.1) {
+        match prop.local_name {
+            "Win32CreationTime" => {
+                out.write(XmlWEvent::start_element((WEBDAV_XML_NAMESPACE_MICROSOFT.0, "Win32CreationTime")))?;
+                out.write(XmlWEvent::characters(&file_time_created(&path).rfc3339().to_string()))?;
+            }
+
+            // TODO: maybe use https://docs.microsoft.com/en-gb/windows/win32/api/fileapi/nf-fileapi-getfileattributesa?
+            "Win32FileAttributes" => {
+                out.write(XmlWEvent::start_element((WEBDAV_XML_NAMESPACE_MICROSOFT.0, "Win32FileAttributes")))?;
+
+                let mut attr = 0u32;
+                if path.metadata().expect("Failed to get requested file metadata").permissions().readonly() {
+                    attr |= 0x0001;
+                }
+                if path.file_name().map(|n| n.starts_with(".")).unwrap_or(false) {
+                    attr |= 0x0002;
+                }
+                if !is_actually_file(&path.metadata().expect("Failed to get requested file metadata").file_type()) {
+                    attr |= 0x0010;
+                } else {
+                    // this is the 'Archive' bit, which is set by
+                    // default on _all_ files on creation and on
+                    // modification.
+                    attr |= 0x0020;
+                }
+
+                out.write(XmlWEvent::characters(&format!("{:08x}", attr)))?;
+            }
+
+            "Win32LastAccessTime" => {
+                out.write(XmlWEvent::start_element((WEBDAV_XML_NAMESPACE_MICROSOFT.0, "Win32FileAttributes")))?;
+                out.write(XmlWEvent::characters(&file_time_accessed(&path).rfc3339().to_string()))?;
+            }
+
+            "Win32LastModifiedTime" => {
+                out.write(XmlWEvent::start_element((WEBDAV_XML_NAMESPACE_MICROSOFT.0, "Win32LastModifiedTime")))?;
+                out.write(XmlWEvent::characters(&file_time_modified(&path).rfc3339().to_string()))?;
+            }
+
+            _ => return Ok(false),
+        }
+    } else if prop.namespace == Some(WEBDAV_XML_NAMESPACE_APACHE.1) {
+        match prop.local_name {
+            "executable" => {
+                out.write(XmlWEvent::start_element((WEBDAV_XML_NAMESPACE_APACHE.0, "executable")))?;
+                out.write(XmlWEvent::characters(if file_executable(&path.metadata().expect("Failed to get requested file metadata")) {
+                        "T"
+                    } else {
+                        "F"
+                    }))?;
+            }
+
+            _ => return Ok(false),
+        }
+    } else {
+        return Ok(false);
     }
 
     out.write(XmlWEvent::end_element())?;
     Ok(true)
 }
 
-/// Adapted from hyperdav-server
+/// Adapted from
+/// https://github.com/tylerwhall/hyperdav-server/blob/415f512ac030478593ad389a3267aeed7441d826/src/lib.rs#L214
 fn start_client_prop_element<W: Write>(out: &mut XmlWriter<W>, prop: XmlName) -> Result<(), XmlWError> {
-    if let Some(prop_prefix) = prop.prefix {
-        if let Some(prop_namespace) = prop.namespace {
-            for (prefix, namespace) in WEBDAV_XML_NAMESPACES {
-                // Remap the client's prefix if it overlaps with one of ours
-                if prop_prefix == *prefix && prop_namespace != *namespace {
-                    return out.write(XmlWEvent::start_element(XmlName { prefix: Some("U"), ..prop }).ns("U", prop_namespace));
-                }
+    if let Some(prop_namespace) = prop.namespace {
+        if let Some(prop_prefix) = prop.prefix {
+            if WEBDAV_XML_NAMESPACES.iter().find(|(pf, _)| *pf == prop_prefix).is_some() {
+                return out.write(XmlWEvent::start_element(XmlName { prefix: Some("U"), ..prop }).ns("U", prop_namespace));
             }
+        }
+
+        if let Some((prefix, _)) = WEBDAV_XML_NAMESPACES.iter().find(|(_, ns)| *ns == prop_namespace) {
+            return out.write(XmlWEvent::start_element(XmlName { prefix: Some(prefix), ..prop }));
         }
     }
 
