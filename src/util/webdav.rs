@@ -42,15 +42,10 @@ pub static WEBDAV_XML_NAMESPACES: &[&(&str, &str)] = &[&WEBDAV_XML_NAMESPACE_DAV
 ///
 /// Based on https://github.com/miquels/webdav-handler-rs/blob/02433c1acfccd848a7de26889f6857cbad559076/src/handle_props.rs#L52
 pub static WEBDAV_ALLPROP_PROPERTIES_NON_WINDOWS: &[&[XmlName]] = &[&[xml_name!(WEBDAV_XML_NAMESPACE_DAV, "creationdate"),
-                                                                      xml_name!(WEBDAV_XML_NAMESPACE_DAV, "displayname"),
-                                                                      xml_name!(WEBDAV_XML_NAMESPACE_DAV, "getcontentlanguage"),
                                                                       xml_name!(WEBDAV_XML_NAMESPACE_DAV, "getcontentlength"),
                                                                       xml_name!(WEBDAV_XML_NAMESPACE_DAV, "getcontenttype"),
-                                                                      xml_name!(WEBDAV_XML_NAMESPACE_DAV, "getetag"),
                                                                       xml_name!(WEBDAV_XML_NAMESPACE_DAV, "getlastmodified"),
-                                                                      xml_name!(WEBDAV_XML_NAMESPACE_DAV, "lockdiscovery"),
-                                                                      xml_name!(WEBDAV_XML_NAMESPACE_DAV, "resourcetype"),
-                                                                      xml_name!(WEBDAV_XML_NAMESPACE_DAV, "supportedlock")]];
+                                                                      xml_name!(WEBDAV_XML_NAMESPACE_DAV, "resourcetype")]];
 
 /// Properties to return on empty body or [`<allprop />`](https://tools.ietf.org/html/rfc2518#section-12.14.1)
 /// for Windows clients
@@ -66,9 +61,7 @@ pub static WEBDAV_ALLPROP_PROPERTIES_WINDOWS: &[&[XmlName]] = &[&WEBDAV_ALLPROP_
 ///
 /// Based on https://github.com/miquels/webdav-handler-rs/blob/02433c1acfccd848a7de26889f6857cbad559076/src/handle_props.rs#L34
 pub static WEBDAV_PROPNAME_PROPERTIES: &[&[XmlName]] = &[&WEBDAV_ALLPROP_PROPERTIES_NON_WINDOWS[0],
-                                                         &[xml_name!(WEBDAV_XML_NAMESPACE_DAV, "quota-available-bytes"),
-                                                           xml_name!(WEBDAV_XML_NAMESPACE_DAV, "quota-used-bytes"),
-                                                           xml_name!(WEBDAV_XML_NAMESPACE_APACHE, "executable"),
+                                                         &[xml_name!(WEBDAV_XML_NAMESPACE_APACHE, "executable"),
                                                            xml_name!(WEBDAV_XML_NAMESPACE_MICROSOFT, "Win32LastAccessTime")]];
 
 
