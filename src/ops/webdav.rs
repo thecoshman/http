@@ -10,9 +10,9 @@ use self::super::super::util::{BorrowXmlName, Destination, CommaList, Overwrite,
                                file_time_created, client_microsoft, is_actually_file, is_descendant_of, file_executable, html_response, file_length,
                                file_binary, copy_dir, WEBDAV_ALLPROP_PROPERTIES_NON_WINDOWS, WEBDAV_ALLPROP_PROPERTIES_WINDOWS, WEBDAV_XML_NAMESPACE_MICROSOFT,
                                WEBDAV_XML_NAMESPACE_APACHE, WEBDAV_PROPNAME_PROPERTIES, WEBDAV_XML_NAMESPACE_DAV, WEBDAV_XML_NAMESPACES, ERROR_HTML};
+use std::io::{ErrorKind as IoErrorKind, Result as IoResult, Error as IoError, Write, Read};
 use xml::reader::{EventReader as XmlReader, XmlEvent as XmlREvent, Error as XmlRError};
 use xml::writer::{EventWriter as XmlWriter, XmlEvent as XmlWEvent, Error as XmlWError};
-use std::io::{ErrorKind as IoErrorKind, Result as IoResult, Error as IoError, Write};
 use xml::{EmitterConfig as XmlEmitterConfig, ParserConfig as XmlParserConfig};
 use xml::writer::events::StartElementBuilder as XmlWEventStartElementBuilder;
 use xml::common::{TextPosition as XmlTextPosition, XmlVersion, Position};
@@ -225,14 +225,18 @@ impl HttpHandler {
 
         if !req_p.parent().map(|pp| pp.exists()).unwrap_or(true) || (symlink && !self.follow_symlinks) ||
            (symlink && self.follow_symlinks && self.sandbox_symlinks && !is_descendant_of(&req_p, &self.hosted_directory.1)) {
-            return self.handle_nonexistant(req, req_p);
+            return self.handle_nonexistant_status(req, req_p, status::Conflict);
+        }
+
+        if req.body.read_exact(&mut [0]).is_ok() {
+            return Ok(Response::with(status::UnsupportedMediaType));
         }
 
         match fs::create_dir(&req_p) {
             Ok(()) => Ok(Response::with(status::Created)),
             Err(e) => {
                 match e.kind() {
-                    IoErrorKind::NotFound => self.handle_nonexistant(req, req_p),
+                    IoErrorKind::NotFound => self.handle_nonexistant_status(req, req_p, status::Conflict),
                     IoErrorKind::AlreadyExists => Ok(Response::with((status::MethodNotAllowed, "File exists"))),
                     _ => Ok(Response::with(status::Forbidden)),
                 }
@@ -289,11 +293,13 @@ impl HttpHandler {
         let overwrite = req.headers.get::<Overwrite>().copied().unwrap_or_default().0;
 
         log!(self.log,
-             "{green}{}{reset} requested to {red}COPY{reset} {yellow}{}{reset} to {yellow}{}{reset}",
+             "{green}{}{reset} requested to {}{red}{}{reset} {yellow}{}{reset} to {yellow}{}{reset} at depth {}",
              req.remote_addr,
+             if overwrite { "overwrite-" } else { "" },
              if !is_move { "COPY" } else { "MOVE" },
              req_p.display(),
-             dest_p.display());
+             dest_p.display(),
+             depth);
 
         if self.writes_temp_dir.is_none() {
             return self.handle_forbidden_method(req, "-w", "write requests");
@@ -453,12 +459,15 @@ fn handle_propfind_path<'n, W: Write, N: BorrowXmlName<'n>>(out: &mut XmlWriter<
     for prop in props.iter().flat_map(|pp| pp.iter()) {
         let prop = prop.borrow_xml_name();
 
-        if just_names {
+        let mut write_name = false;
+        if !just_names && !handle_prop_path(out, path, meta, prop)? {
+            failed_props.push(prop);
+            write_name = true;
+        }
+
+        if just_names || write_name {
             start_client_prop_element(out, prop)?;
-        } else {
-            if !handle_prop_path(out, path, meta, prop)? {
-                failed_props.push(prop);
-            }
+            out.write(XmlWEvent::end_element())?;
         }
     }
     out.write(XmlWEvent::end_element())?; // prop
@@ -471,6 +480,7 @@ fn handle_propfind_path<'n, W: Write, N: BorrowXmlName<'n>>(out: &mut XmlWriter<
         out.write(XmlWEvent::end_element())?; // response
         return Ok(());
     }
+
     out.write(XmlWEvent::characters("HTTP/1.1 200 OK"))?;
     out.write(XmlWEvent::end_element())?; // status
     out.write(XmlWEvent::end_element())?; // propstat
@@ -584,14 +594,12 @@ fn handle_prop_path<W: Write>(out: &mut XmlWriter<W>, path: &Path, meta: &Metada
 /// https://github.com/tylerwhall/hyperdav-server/blob/415f512ac030478593ad389a3267aeed7441d826/src/lib.rs#L214
 fn start_client_prop_element<W: Write>(out: &mut XmlWriter<W>, prop: XmlName) -> Result<(), XmlWError> {
     if let Some(prop_namespace) = prop.namespace {
-        if let Some(prop_prefix) = prop.prefix {
-            if WEBDAV_XML_NAMESPACES.iter().any(|(pf, _)| *pf == prop_prefix) {
-                return out.write(XmlWEvent::start_element(XmlName { prefix: Some("U"), ..prop }).ns("U", prop_namespace));
-            }
-        }
-
         if let Some((prefix, _)) = WEBDAV_XML_NAMESPACES.iter().find(|(_, ns)| *ns == prop_namespace) {
             return out.write(XmlWEvent::start_element(XmlName { prefix: Some(prefix), ..prop }));
+        }
+
+        if prop.prefix.map(|prop_prefix| WEBDAV_XML_NAMESPACES.iter().any(|(pf, _)| *pf == prop_prefix)).unwrap_or(true) {
+            return out.write(XmlWEvent::start_element(XmlName { prefix: Some("U"), ..prop }).ns("U", prop_namespace));
         }
     }
 

@@ -328,7 +328,12 @@ impl HttpHandler {
                                                 html_response(ERROR_HTML, &["400 Bad Request", "The request URL was invalid.", cause]))
     }
 
+    #[inline(always)]
     fn handle_nonexistant(&self, req: &mut Request, req_p: PathBuf) -> IronResult<Response> {
+        self.handle_nonexistant_status(req, req_p, status::NotFound)
+    }
+
+    fn handle_nonexistant_status(&self, req: &mut Request, req_p: PathBuf, status: status::Status) -> IronResult<Response> {
         log!(self.log,
              "{green}{}{reset} requested to {red}{}{reset} nonexistant entity {magenta}{}{reset}",
              req.remote_addr,
@@ -337,9 +342,9 @@ impl HttpHandler {
 
         let url_p = url_path(&req.url);
         self.handle_generated_response_encoding(req,
-                                                status::NotFound,
+                                                status,
                                                 html_response(ERROR_HTML,
-                                                              &["404 Not Found", &format!("The requested entity \"{}\" doesn't exist.", url_p), ""]))
+                                                              &[&status.to_string()[..], &format!("The requested entity \"{}\" doesn't exist.", url_p), ""]))
     }
 
     fn handle_get_raw_fs_file(&self, req: &mut Request, req_p: PathBuf) -> IronResult<Response> {
