@@ -775,6 +775,7 @@ impl HttpHandler {
     fn handle_get_dir_listing(&self, req: &mut Request, req_p: PathBuf) -> IronResult<Response> {
         let relpath = (url_path(&req.url) + "/").replace("//", "/");
         let is_root = req.url.as_ref().path_segments().unwrap().count() == 1;
+        let show_file_management_controls = self.writes_temp_dir.is_some() && self.webdav;
         log!("{green}{}{reset} was served directory listing for {magenta}{}{reset}",
              req.remote_addr,
              req_p.display());
@@ -787,8 +788,13 @@ impl HttpHandler {
             format!("<tr><td><a href=\"/{up_path}{up_path_slash}\" id=\"parent_dir\" class=\"back_arrow_icon\"></a></td> \
                          <td><a href=\"/{up_path}{up_path_slash}\">Parent directory</a></td> \
                          <td><a href=\"/{up_path}{up_path_slash}\" class=\"datetime\">{}</a></td> \
-                         <td><a href=\"/{up_path}{up_path_slash}\">&nbsp;</a></td></tr>",
+                         <td><a href=\"/{up_path}{up_path_slash}\">&nbsp;</a></td> {}</tr>",
                     file_time_modified_p(req_p.parent().expect("Failed to get requested directory's parent directory")).strftime("%F %T").unwrap(),
+                    if show_file_management_controls {
+                        "<td><a href=\"/{up_path}{up_path_slash}\">&nbsp;</a></td>"
+                    } else {
+                        ""
+                    },
                     up_path = slash_idx.map(|i| &rel_noslash[0..i]).unwrap_or(""),
                     up_path_slash = if slash_idx.is_some() { "/" } else { "" })
         };
@@ -818,8 +824,8 @@ impl HttpHandler {
                 let len = file_length(&fmeta, &path);
 
                 format!("{}<tr><td><a href=\"{path}{fname}\" id=\"{}\" class=\"{}{}_icon\"></a></td> \
-                           <td><a href=\"{path}{fname}\">{}{}</a></td> <td><a href=\"{path}{fname}\" class=\"datetime\">{}</a></td> \
-                           <td><a href=\"{path}{fname}\">{}{}{}{}{}</a></td></tr>\n",
+                               <td><a href=\"{path}{fname}\">{}{}</a></td> <td><a href=\"{path}{fname}\" class=\"datetime\">{}</a></td> \
+                               <td><a href=\"{path}{fname}\">{}{}{}{}{}</a></td> {}</tr>\n",
                         cur,
                         path.file_name().map(|p| p.to_str().expect("Filename not UTF-8").replace('.', "_")).as_ref().unwrap_or(&fname),
                         if is_file { "file" } else { "dir" },
@@ -840,6 +846,11 @@ impl HttpHandler {
                             String::new()
                         },
                         if is_file { "</abbr>" } else { "" },
+                        if show_file_management_controls {
+                            "<td><a class=\"delete_file_icon\"></a> <a class=\"edit_filename_icon\"></a></td>"
+                        } else {
+                            ""
+                        },
                         path = format!("/{}", relpath).replace("//", "/").replace('%', "%25").replace('#', "%23"),
                         fname = fname.replace('%', "%25").replace('#', "%23"))
             });
@@ -860,6 +871,20 @@ impl HttpHandler {
                                                                      <p> \
                                                                        Drag&amp;Drop to upload or <input id=\"file_upload\" type=\"file\" multiple />. \
                                                                      </p>"
+                                                                } else {
+                                                                    ""
+                                                                },
+                                                                if show_file_management_controls {
+                                                                    "<th>Manage</th>"
+                                                                } else {
+                                                                    ""
+                                                                },
+                                                                if show_file_management_controls {
+                                                                    "<tr id=\"new_directory\"><td><a class=\"new_dir_icon\"></a></td> \
+                                                                                              <td><a>Create directory</a></td> \
+                                                                                              <td></td> \
+                                                                                              <td></td> \
+                                                                                              <td></td></tr>"
                                                                 } else {
                                                                     ""
                                                                 }]))
