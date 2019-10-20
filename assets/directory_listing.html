@@ -76,14 +76,32 @@
       .back_arrow_icon:before {
         content: url('{back_arrow_icon}');
       }
+
+      .new_dir_icon:before {
+        content: url('{new_dir_icon}');
+      }
+
+      .delete_file_icon:before {
+        content: url('{delete_file_icon}');
+        vertical-align: middle;
+      }
+
+      .edit_filename_icon:before {
+        content: url('{edit_filename_icon}');
+      }
+
+      .delete_file_icon, .edit_filename_icon {
+        display: inline-block;
+      }
     </style>
   </head>
   <body>
     <div>
       <p class="pre-list">The requested directory {0} contains the following files:</p>
       <table>
-        <tr><th></th> <th>Name</th> <th>Last modified (UTC)</th> <th>Size</th></tr>
+        <tr><th></th> <th>Name</th> <th>Last modified (UTC)</th> <th>Size</th> {5}</tr>
         {2}
+        {6}
         {3}
       </table>
     </div>
