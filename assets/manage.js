@@ -5,6 +5,8 @@ window.addEventListener("load", function() {
 
   let new_directory_filename_input = null;
 
+  let delete_file_links = document.getElementsByClassName("delete_file_icon");
+
 
   new_directory_line.addEventListener("click", function(ev) {
     if(new_directory_filename_input === null)
@@ -20,12 +22,23 @@ window.addEventListener("load", function() {
 
       new_directory_filename_input.addEventListener("keypress", function(ev) {
         if(ev.keyCode === 13)  // Enter
-          create_new_directory(new_directory_filename_input.value);
+          create_new_directory(new_directory_filename_input.value, new_directory_status_output);
       });
 
       new_directory_filename_input.focus();
     }
   });
+
+  for(let i = delete_file_links.length - 1; i >= 0; --i) {
+    let link = delete_file_links[i];
+
+    link.addEventListener("click", function(ev) {
+      ev.preventDefault();
+
+      let line = link.parentElement.parentElement;
+      make_request("DELETE", line.children[0].children[0].href, link);
+    });
+  }
 
 
   function create_new_directory(fname, status_out) {
@@ -34,14 +47,20 @@ window.addEventListener("load", function() {
       req_url += "/";
     req_url += encodeURIComponent(fname);
 
+    make_request("MKCOL", req_url, status_out);
+  };
+
+  function make_request(verb, url, status_out) {
     let request = new XMLHttpRequest();
     request.addEventListener("loadend", function(ev) {
       if(request.status >= 200 && request.status < 300)
         window.location.reload();
-      else
+      else {
         status_out.innerHTML = request.status + " " + request.statusText + " — " + request.response;
+        status_out.classList.add("has-log");
+      }
     });
-    request.open("MKCOL", req_url);
+    request.open(verb, url);
     request.send();
   };
 });
