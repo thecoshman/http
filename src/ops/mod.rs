@@ -788,13 +788,9 @@ impl HttpHandler {
             format!("<tr><td><a href=\"/{up_path}{up_path_slash}\" id=\"parent_dir\" class=\"back_arrow_icon\"></a></td> \
                          <td><a href=\"/{up_path}{up_path_slash}\">Parent directory</a></td> \
                          <td><a href=\"/{up_path}{up_path_slash}\" class=\"datetime\">{}</a></td> \
-                         <td><a href=\"/{up_path}{up_path_slash}\">&nbsp;</a></td> {}</tr>",
+                         <td><a href=\"/{up_path}{up_path_slash}\">&nbsp;</a></td> \
+                         <td><a href=\"/{up_path}{up_path_slash}\">&nbsp;</a></td></tr>",
                     file_time_modified_p(req_p.parent().expect("Failed to get requested directory's parent directory")).strftime("%F %T").unwrap(),
-                    if show_file_management_controls {
-                        "<td><a href=\"/{up_path}{up_path_slash}\">&nbsp;</a></td>"
-                    } else {
-                        ""
-                    },
                     up_path = slash_idx.map(|i| &rel_noslash[0..i]).unwrap_or(""),
                     up_path_slash = if slash_idx.is_some() { "/" } else { "" })
         };
@@ -880,11 +876,16 @@ impl HttpHandler {
                                                                     ""
                                                                 },
                                                                 if show_file_management_controls {
-                                                                    "<tr id=\"new_directory\"><td><a class=\"new_dir_icon\"></a></td> \
-                                                                                              <td><a>Create directory</a></td> \
-                                                                                              <td></td> \
-                                                                                              <td></td> \
-                                                                                              <td></td></tr>"
+                                                                    "<tr id=\"new_directory\"><td><a href=\"#new_directory\" class=\"new_dir_icon\"></a></td> \
+                                                                                              <td><a href=\"#new_directory\">Create directory</a></td> \
+                                                                                              <td><a href=\"#new_directory\">&nbsp;</a></td> \
+                                                                                              <td><a href=\"#new_directory\">&nbsp;</a></td> \
+                                                                                              <td><a href=\"#new_directory\">&nbsp;</a></td></tr>"
+                                                                } else {
+                                                                    ""
+                                                                },
+                                                                if show_file_management_controls {
+                                                                    r#"<script type="text/javascript">{manage}</script>"#
                                                                 } else {
                                                                     ""
                                                                 }]))
