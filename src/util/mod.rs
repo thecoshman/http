@@ -83,6 +83,7 @@ lazy_static! {
                                get_mime_type_str("png").unwrap(),
                                Base64Display::with_config(&include_bytes!("../../assets/icons/edit_filename_icon.png")[..], base64::STANDARD))));
         ass.insert("date", Cow::Borrowed(include_str!("../../assets/date.js")));
+        ass.insert("manage", Cow::Borrowed(include_str!("../../assets/manage.js")));
         ass.insert("upload", Cow::Borrowed(include_str!("../../assets/upload.js")));
         ass.insert("adjust_tz", Cow::Borrowed(include_str!("../../assets/adjust_tz.js")));
         ass

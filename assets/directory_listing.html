@@ -9,6 +9,7 @@
     <script type="text/javascript">{date}</script>
     <script type="text/javascript">{adjust_tz}</script>
     {1}
+    {7}
     <title>Directory listing — {0}</title>
     <style type="text/css">
       abbr[title] {
@@ -28,7 +29,7 @@
         padding-right: 5pt;
       }
 
-      td:nth-child(3) a, td:nth-child(4) a {
+      td:nth-child(3) a, td:nth-child(4) a, td:nth-child(5) a {
         color: inherit;
       }
 
@@ -36,9 +37,21 @@
         text-align: right;
       }
 
+      td:nth-child(5) {
+        padding-left: 5pt;
+      }
+
+      tr:nth-child(n+4) td:nth-child(5) a {
+        display: inline-block;
+      }
+
       td > a {
         display: block;
         text-decoration: none;
+      }
+
+      td > input {
+        height: 1em;
       }
 
       tr:hover {
@@ -83,15 +96,10 @@
 
       .delete_file_icon:before {
         content: url('{delete_file_icon}');
-        vertical-align: middle;
       }
 
       .edit_filename_icon:before {
         content: url('{edit_filename_icon}');
-      }
-
-      .delete_file_icon, .edit_filename_icon {
-        display: inline-block;
       }
     </style>
   </head>
