@@ -844,7 +844,7 @@ impl HttpHandler {
                         if is_file { "</abbr>" } else { "" },
                         if show_file_management_controls {
                             "<td><a href=\"#delete_file\" class=\"delete_file_icon\">Delete</a> \
-                                 <a href=\"#edit_filename\" class=\"edit_filename_icon\">Rename</a></td>"
+                                 <a href=\"#rename\" class=\"rename_icon\">Rename</a></td>"
                         } else {
                             ""
                         },
