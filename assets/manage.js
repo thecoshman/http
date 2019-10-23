@@ -12,15 +12,21 @@ window.addEventListener("load", function() {
   new_directory_line.addEventListener("click", function(ev) {
     if(new_directory_filename_input === null)
       ev.preventDefault();
+    else if(ev.target === new_directory_status_output)
+      ;
     else if(ev.target !== new_directory_filename_input) {
       ev.preventDefault();
       new_directory_filename_input.focus();
     }
 
-    if(new_directory_filename_input === null)
-      new_directory_filename_input = make_filename_input(new_directory_filename_cell, "", function() {
+    if(new_directory_filename_input === null) {
+      let submit_callback = function() {
         create_new_directory(new_directory_filename_input.value, new_directory_status_output);
-      });
+      };
+
+      new_directory_filename_input = make_filename_input(new_directory_filename_cell, "", submit_callback);
+      make_confirm_icon(new_directory_status_output, submit_callback);
+    }
   }, true);
 
   for(let i = delete_file_links.length - 1; i >= 0; --i) {
@@ -40,14 +46,14 @@ window.addEventListener("load", function() {
     let line = link.parentElement.parentElement;
     let filename_cell = line.children[1];
     let original_name = filename_cell.innerText;
-    let new_name_input = make_filename_input(filename_cell, original_name, function() {
+
+    let submit_callback = function() {
       rename(original_name, new_name_input.value, link);
-    });
+    };
+    let new_name_input = make_filename_input(filename_cell, original_name, submit_callback);
 
     link.removeEventListener("click", first_onclick);
-    link.addEventListener("click", function() {
-      new_name_input.focus();
-    });
+    make_confirm_icon(link, submit_callback);
   };
   for(let i = rename_links.length - 1; i >= 0; --i) {
     let link = rename_links[i];
@@ -74,11 +80,18 @@ window.addEventListener("load", function() {
     return input_elem;
   };
 
+  function make_confirm_icon(element, callback) {
+    element.classList.add("confirm_icon");
+    element.href = "#confirm";
+    element.innerText = "Confirm";
+    element.addEventListener("click", callback);
+  };
+
   function create_new_directory(fname, status_out) {
     let req_url = window.location.origin + window.location.pathname;
     if(!req_url.endsWith("/"))
       req_url += "/";
-    req_url += fname;
+    req_url += encodeURI(fname);
 
     make_request("MKCOL", req_url, status_out);
   };
@@ -93,8 +106,8 @@ window.addEventListener("load", function() {
     if(fname_to.endsWith("/"))
       fname_to = fname_to.substr(0, fname_to.length - 1);
 
-    make_request("MOVE", root_url + fname_from, status_out, function(request) {
-      request.setRequestHeader("Destination", root_url + fname_to);
+    make_request("MOVE", root_url + encodeURI(fname_from), status_out, function(request) {
+      request.setRequestHeader("Destination", root_url + encodeURI(fname_to));
     });
   };
 
