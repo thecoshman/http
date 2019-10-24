@@ -59,6 +59,10 @@
         word-wrap: break-word;
       }
 
+      input[type="text"] {
+        margin-left: 0.5em;
+      }
+
       .dir_icon:before {
         content: url('{dir_icon}');
         margin-right: 0.5em;
@@ -88,12 +92,38 @@
         content: url('{back_arrow_icon}');
         margin-right: 0.5em;
       }
+
+      .new_dir_icon:before {
+        content: url('{new_dir_icon}');
+        margin-right: 0.5em;
+      }
+
+      .delete_file_icon:before {
+        content: url('{delete_file_icon}');
+      }
+
+      .rename_icon:before {
+        content: url('{rename_icon}');
+      }
+
+      .confirm_icon:before {
+        content: url('{confirm_icon}');
+      }
+
+      .delete_file_icon, .rename_icon, .confirm_icon {
+        font-size: 0;
+      }
+
+      .has-log {
+        font-size: inherit;
+      }
     </style>
   </head>
   <body>
     <div>
       <a href="{1}{0}" class="list heading top bottom">{0}</a>
       {3}
+      {6}
       {4}
     </div>
     {5}

@@ -23,11 +23,11 @@ use rfsapi::{RawFsApiHeader, FilesetData, RawFileData};
 use rand::distributions::uniform::Uniform as UniformDistribution;
 use rand::distributions::Alphanumeric as AlphanumericDistribution;
 use iron::{headers, status, method, mime, IronResult, Listening, Response, TypeMap, Request, Handler, Iron};
-use self::super::util::{WwwAuthenticate, DisplayThree, CommaList, Dav, url_path, file_hash, is_symlink, encode_str, encode_file, file_length,
-                        hash_string, html_response, file_binary, client_mobile, percent_decode, file_icon_suffix, is_actually_file, is_descendant_of,
-                        response_encoding, detect_file_as_dir, encoding_extension, file_time_modified, file_time_modified_p, get_raw_fs_metadata,
-                        human_readable_size, is_nonexistant_descendant_of, USER_AGENT, ERROR_HTML, INDEX_EXTENSIONS, MIN_ENCODING_GAIN, MAX_ENCODING_SIZE,
-                        MIN_ENCODING_SIZE, DAV_LEVEL_1_METHODS, DIRECTORY_LISTING_HTML, MOBILE_DIRECTORY_LISTING_HTML, BLACKLISTED_ENCODING_EXTENSIONS};
+use self::super::util::{WwwAuthenticate, DisplayThree, CommaList, Dav, url_path, file_hash, is_symlink, encode_str, encode_file, file_length, hash_string,
+                        html_response, file_binary, client_mobile, percent_decode, file_icon_suffix, is_actually_file, is_descendant_of, response_encoding,
+                        detect_file_as_dir, encoding_extension, file_time_modified, file_time_modified_p, get_raw_fs_metadata, human_readable_size,
+                        is_nonexistant_descendant_of, USER_AGENT, ERROR_HTML, INDEX_EXTENSIONS, MIN_ENCODING_GAIN, MAX_ENCODING_SIZE, MIN_ENCODING_SIZE,
+                        DAV_LEVEL_1_METHODS, DIRECTORY_LISTING_HTML, MOBILE_DIRECTORY_LISTING_HTML, BLACKLISTED_ENCODING_EXTENSIONS};
 
 
 macro_rules! log {
@@ -688,6 +688,7 @@ impl HttpHandler {
     fn handle_get_mobile_dir_listing(&self, req: &mut Request, req_p: PathBuf) -> IronResult<Response> {
         let relpath = (url_path(&req.url) + "/").replace("//", "/");
         let is_root = req.url.as_ref().path_segments().unwrap().count() == 1;
+        let show_file_management_controls = self.writes_temp_dir.is_some();
         log!("{green}{}{reset} was served mobile directory listing for {magenta}{}{reset}",
              req.remote_addr,
              req_p.display());
@@ -753,17 +754,28 @@ impl HttpHandler {
                                                 html_response(MOBILE_DIRECTORY_LISTING_HTML,
                                                               &[&relpath[..],
                                                                 if is_root { "" } else { "/" },
-                                                                if self.writes_temp_dir.is_some() {
-                                                                    r#"<script type="text/javascript">{upload}</script>"#
+                                                                if show_file_management_controls {
+                                                                    r#"<script type="text/javascript">{upload}{manage_mobile}{manage}</script>"#
                                                                 } else {
                                                                     ""
                                                                 },
                                                                 &parent_s[..],
                                                                 &list_s[..],
-                                                                if self.writes_temp_dir.is_some() {
+                                                                if show_file_management_controls {
                                                                     "<span class=\"list heading top top-border bottom\"> \
                                                                        Upload files: <input id=\"file_upload\" type=\"file\" multiple /> \
                                                                      </span>"
+                                                                } else {
+                                                                    ""
+                                                                },
+                                                                if show_file_management_controls && self.webdav {
+                                                                    "<a id=\"new_directory\" href=\"#new_directory\" class=\"list entry top bottom\">
+                                                                         <span class=\"new_dir_icon\">Create directory</span></a>"
+                                                                } else {
+                                                                    ""
+                                                                },
+                                                                if show_file_management_controls {
+                                                                    r#"<script type="text/javascript">{upload}</script>"#
                                                                 } else {
                                                                     ""
                                                                 }]))
@@ -857,7 +869,7 @@ impl HttpHandler {
                                                 html_response(DIRECTORY_LISTING_HTML,
                                                               &[&relpath[..],
                                                                 if show_file_management_controls {
-                                                                    r#"<script type="text/javascript">{upload}</script>"#
+                                                                    r#"<script type="text/javascript">{upload}{manage_desktop}{manage}</script>"#
                                                                 } else {
                                                                     ""
                                                                 },
@@ -882,11 +894,6 @@ impl HttpHandler {
                                                                                               <td><a href=\"#new_directory\">&nbsp;</a></td> \
                                                                                               <td><a href=\"#new_directory\">&nbsp;</a></td> \
                                                                                               <td><a href=\"#new_directory\">&nbsp;</a></td></tr>"
-                                                                } else {
-                                                                    ""
-                                                                },
-                                                                if show_file_management_controls {
-                                                                    r#"<script type="text/javascript">{manage}</script>"#
                                                                 } else {
                                                                     ""
                                                                 }]))
