@@ -23,11 +23,11 @@ use rfsapi::{RawFsApiHeader, FilesetData, RawFileData};
 use rand::distributions::uniform::Uniform as UniformDistribution;
 use rand::distributions::Alphanumeric as AlphanumericDistribution;
 use iron::{headers, status, method, mime, IronResult, Listening, Response, TypeMap, Request, Handler, Iron};
-use self::super::util::{WwwAuthenticate, CommaList, Dav, url_path, file_hash, is_symlink, encode_str, encode_file, file_length, hash_string, html_response,
-                        file_binary, client_mobile, percent_decode, file_icon_suffix, is_actually_file, is_descendant_of, response_encoding, detect_file_as_dir,
-                        encoding_extension, file_time_modified, file_time_modified_p, get_raw_fs_metadata, human_readable_size, is_nonexistant_descendant_of,
-                        USER_AGENT, ERROR_HTML, INDEX_EXTENSIONS, MIN_ENCODING_GAIN, MAX_ENCODING_SIZE, MIN_ENCODING_SIZE, DAV_LEVEL_1_METHODS,
-                        DIRECTORY_LISTING_HTML, MOBILE_DIRECTORY_LISTING_HTML, BLACKLISTED_ENCODING_EXTENSIONS};
+use self::super::util::{WwwAuthenticate, DisplayThree, CommaList, Dav, url_path, file_hash, is_symlink, encode_str, encode_file, file_length,
+                        hash_string, html_response, file_binary, client_mobile, percent_decode, file_icon_suffix, is_actually_file, is_descendant_of,
+                        response_encoding, detect_file_as_dir, encoding_extension, file_time_modified, file_time_modified_p, get_raw_fs_metadata,
+                        human_readable_size, is_nonexistant_descendant_of, USER_AGENT, ERROR_HTML, INDEX_EXTENSIONS, MIN_ENCODING_GAIN, MAX_ENCODING_SIZE,
+                        MIN_ENCODING_SIZE, DAV_LEVEL_1_METHODS, DIRECTORY_LISTING_HTML, MOBILE_DIRECTORY_LISTING_HTML, BLACKLISTED_ENCODING_EXTENSIONS};
 
 
 macro_rules! log {
@@ -731,8 +731,7 @@ impl HttpHandler {
                 let path = f.path();
 
                 format!("{}<a href=\"{path}{fname}\" class=\"list entry top\"><span class=\"{}{}_icon\" id=\"{}\">{}{}</span></a> \
-                         <a href=\"{path}{fname}\" class=\"list entry bottom\"><span class=\"marker\">@</span><span class=\"datetime\">{} UTC</span> \
-                         {}{}{}</a>\n",
+                           <a href=\"{path}{fname}\" class=\"list entry bottom\"><span class=\"marker\">@</span><span class=\"datetime\">{} UTC</span>{}</a>\n",
                         cur,
                         if is_file { "file" } else { "dir" },
                         file_icon_suffix(&path, is_file),
@@ -740,13 +739,11 @@ impl HttpHandler {
                         fname,
                         if is_file { "" } else { "/" },
                         file_time_modified(&fmeta).strftime("%F %T").unwrap(),
-                        if is_file { "<span class=\"size\">" } else { "" },
                         if is_file {
-                            human_readable_size(file_length(&fmeta, &path))
+                            DisplayThree("<span class=\"size\">", human_readable_size(file_length(&fmeta, &path)), "</span>")
                         } else {
-                            String::new()
+                            DisplayThree("", String::new(), "")
                         },
-                        if is_file { "</span>" } else { "" },
                         path = format!("/{}", relpath).replace("//", "/").replace('%', "%25").replace('#', "%23"),
                         fname = fname.replace('%', "%25").replace('#', "%23"))
             });
@@ -775,7 +772,7 @@ impl HttpHandler {
     fn handle_get_dir_listing(&self, req: &mut Request, req_p: PathBuf) -> IronResult<Response> {
         let relpath = (url_path(&req.url) + "/").replace("//", "/");
         let is_root = req.url.as_ref().path_segments().unwrap().count() == 1;
-        let show_file_management_controls = self.writes_temp_dir.is_some() && self.webdav;
+        let show_file_management_controls = self.writes_temp_dir.is_some();
         log!("{green}{}{reset} was served directory listing for {magenta}{}{reset}",
              req.remote_addr,
              req_p.display());
@@ -821,7 +818,7 @@ impl HttpHandler {
 
                 format!("{}<tr><td><a href=\"{path}{fname}\" id=\"{}\" class=\"{}{}_icon\"></a></td> \
                                <td><a href=\"{path}{fname}\">{}{}</a></td> <td><a href=\"{path}{fname}\" class=\"datetime\">{}</a></td> \
-                               <td><a href=\"{path}{fname}\">{}{}{}{}{}</a></td> {}</tr>\n",
+                               <td><a href=\"{path}{fname}\">{}{}{}</a></td> {}</tr>\n",
                         cur,
                         path.file_name().map(|p| p.to_str().expect("Filename not UTF-8").replace('.', "_")).as_ref().unwrap_or(&fname),
                         if is_file { "file" } else { "dir" },
@@ -829,13 +826,11 @@ impl HttpHandler {
                         fname,
                         if is_file { "" } else { "/" },
                         file_time_modified(&fmeta).strftime("%F %T").unwrap(),
-                        if is_file { "<abbr title=\"" } else { "&nbsp;" },
                         if is_file {
-                            len.to_string()
+                            DisplayThree("<abbr title=\"", len.to_string(), " B\">")
                         } else {
-                            String::new()
+                            DisplayThree("&nbsp;", String::new(), "")
                         },
-                        if is_file { " B\">" } else { "" },
                         if is_file {
                             human_readable_size(len)
                         } else {
@@ -843,10 +838,15 @@ impl HttpHandler {
                         },
                         if is_file { "</abbr>" } else { "" },
                         if show_file_management_controls {
-                            "<td><a href=\"#delete_file\" class=\"delete_file_icon\">Delete</a> \
-                                 <a href=\"#rename\" class=\"rename_icon\">Rename</a></td>"
+                            DisplayThree("<td><a href=\"#delete_file\" class=\"delete_file_icon\">Delete</a>",
+                                         if self.webdav {
+                                             " <a href=\"#rename\" class=\"rename_icon\">Rename</a>"
+                                         } else {
+                                             ""
+                                         },
+                                         "</td>")
                         } else {
-                            ""
+                            DisplayThree("", "", "")
                         },
                         path = format!("/{}", relpath).replace("//", "/").replace('%', "%25").replace('#', "%23"),
                         fname = fname.replace('%', "%25").replace('#', "%23"))
@@ -856,14 +856,14 @@ impl HttpHandler {
                                                 status::Ok,
                                                 html_response(DIRECTORY_LISTING_HTML,
                                                               &[&relpath[..],
-                                                                if self.writes_temp_dir.is_some() {
+                                                                if show_file_management_controls {
                                                                     r#"<script type="text/javascript">{upload}</script>"#
                                                                 } else {
                                                                     ""
                                                                 },
                                                                 &parent_s[..],
                                                                 &list_s[..],
-                                                                if self.writes_temp_dir.is_some() {
+                                                                if show_file_management_controls {
                                                                     "<hr /> \
                                                                      <p> \
                                                                        Drag&amp;Drop to upload or <input id=\"file_upload\" type=\"file\" multiple />. \
@@ -876,7 +876,7 @@ impl HttpHandler {
                                                                 } else {
                                                                     ""
                                                                 },
-                                                                if show_file_management_controls {
+                                                                if show_file_management_controls && self.webdav {
                                                                     "<tr id=\"new_directory\"><td><a href=\"#new_directory\" class=\"new_dir_icon\"></a></td> \
                                                                                               <td><a href=\"#new_directory\">Create directory</a></td> \
                                                                                               <td><a href=\"#new_directory\">&nbsp;</a></td> \

@@ -149,6 +149,18 @@ impl<D: fmt::Display, I: Iterator<Item = D> + Clone> fmt::Display for CommaList<
     }
 }
 
+#[derive(Debug, Copy, Clone, Hash, PartialOrd, Ord, PartialEq, Eq)]
+pub struct DisplayThree<Df: fmt::Display, Ds: fmt::Display, Dt: fmt::Display>(pub Df, pub Ds, pub Dt);
+
+impl<Df: fmt::Display, Ds: fmt::Display, Dt: fmt::Display> fmt::Display for DisplayThree<Df, Ds, Dt> {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        self.0.fmt(f)?;
+        self.1.fmt(f)?;
+        self.2.fmt(f)?;
+        Ok(())
+    }
+}
+
 
 /// `xml`'s `OwnedName::borrow()` returns a value not a reference, so it cannot be used with the libstd `Borrow` trait
 pub trait BorrowXmlName<'n> {
