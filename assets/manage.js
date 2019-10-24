@@ -1,33 +1,34 @@
 window.addEventListener("load", function() {
   let new_directory_line = document.getElementById("new_directory");
-  let new_directory_filename_cell = new_directory_line.children[1];
-  let new_directory_status_output = new_directory_line.children[4].children[0];
-
-  let new_directory_filename_input = null;
-
   let delete_file_links = document.getElementsByClassName("delete_file_icon");
   let rename_links = document.getElementsByClassName("rename_icon");
 
 
-  new_directory_line.addEventListener("click", function(ev) {
-    if(new_directory_filename_input === null)
-      ev.preventDefault();
-    else if(ev.target === new_directory_status_output)
-      ;
-    else if(ev.target !== new_directory_filename_input) {
-      ev.preventDefault();
-      new_directory_filename_input.focus();
-    }
+  if(new_directory_line) {
+    let new_directory_filename_cell = new_directory_line.children[1];
+    let new_directory_status_output = new_directory_line.children[4].children[0];
+    let new_directory_filename_input = null;
 
-    if(new_directory_filename_input === null) {
-      let submit_callback = function() {
-        create_new_directory(new_directory_filename_input.value, new_directory_status_output);
-      };
+    new_directory_line.addEventListener("click", function(ev) {
+      if(new_directory_filename_input === null)
+        ev.preventDefault();
+      else if(ev.target === new_directory_status_output)
+        ;
+      else if(ev.target !== new_directory_filename_input) {
+        ev.preventDefault();
+        new_directory_filename_input.focus();
+      }
 
-      new_directory_filename_input = make_filename_input(new_directory_filename_cell, "", submit_callback);
-      make_confirm_icon(new_directory_status_output, submit_callback);
-    }
-  }, true);
+      if(new_directory_filename_input === null) {
+        let submit_callback = function() {
+          create_new_directory(new_directory_filename_input.value, new_directory_status_output);
+        };
+
+        new_directory_filename_input = make_filename_input(new_directory_filename_cell, "", submit_callback);
+        make_confirm_icon(new_directory_status_output, submit_callback);
+      }
+    }, true);
+  }
 
   for(let i = delete_file_links.length - 1; i >= 0; --i) {
     let link = delete_file_links[i];
