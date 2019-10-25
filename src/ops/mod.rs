@@ -756,7 +756,7 @@ impl HttpHandler {
                 let fname = f.file_name().into_string().expect("Failed to get file name");
                 let path = f.path();
 
-                format!("{}<a href=\"{path}{fname}\" class=\"list entry top\"><span class=\"{}{}_icon\" id=\"{}\">{}{}</span></a> \
+                format!("{}<a href=\"{path}{fname}\" class=\"list entry top\"><span class=\"{}{}_icon\" id=\"{}\">{}{}</span>{}</a> \
                            <a href=\"{path}{fname}\" class=\"list entry bottom\"><span class=\"marker\">@</span><span class=\"datetime\">{} UTC</span>{}</a>\n",
                         cur,
                         if is_file { "file" } else { "dir" },
@@ -764,6 +764,17 @@ impl HttpHandler {
                         path.file_name().map(|p| p.to_str().expect("Filename not UTF-8").replace('.', "_")).as_ref().unwrap_or(&fname),
                         fname,
                         if is_file { "" } else { "/" },
+                        if show_file_management_controls {
+                            DisplayThree("<span class=\"manage\"><span class=\"delete_file_icon\">Delete</span>",
+                                         if self.webdav {
+                                            " <span class=\"rename_icon\">Rename</span>"
+                                         } else {
+                                             ""
+                                         },
+                                         "</span>")
+                        } else {
+                            DisplayThree("", "", "")
+                        },
                         file_time_modified(&fmeta).strftime("%F %T").unwrap(),
                         if is_file {
                             DisplayThree("<span class=\"size\">", human_readable_size(file_length(&fmeta, &path)), "</span>")
@@ -796,11 +807,6 @@ impl HttpHandler {
                                                                 if show_file_management_controls && self.webdav {
                                                                     "<a id=\"new_directory\" href=\"#new_directory\" class=\"list entry top bottom\">
                                                                          <span class=\"new_dir_icon\">Create directory</span></a>"
-                                                                } else {
-                                                                    ""
-                                                                },
-                                                                if show_file_management_controls {
-                                                                    r#"<script type="text/javascript">{upload}</script>"#
                                                                 } else {
                                                                     ""
                                                                 }]))
