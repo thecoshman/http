@@ -711,7 +711,7 @@ impl HttpHandler {
 
     fn handle_get_mobile_dir_listing(&self, req: &mut Request, req_p: PathBuf) -> IronResult<Response> {
         let relpath = (url_path(&req.url) + "/").replace("//", "/");
-        let is_root = req.url.as_ref().path_segments().unwrap().count() == 1;
+        let is_root = req.url.as_ref().path_segments().unwrap().count() + !req.url.as_ref().as_str().ends_with('/') as usize == 1;
         let show_file_management_controls = self.writes_temp_dir.is_some();
         log!(self.log,
              "{green}{}{reset} was served mobile directory listing for {magenta}{}{reset}",
@@ -767,7 +767,7 @@ impl HttpHandler {
                         if show_file_management_controls {
                             DisplayThree("<span class=\"manage\"><span class=\"delete_file_icon\">Delete</span>",
                                          if self.webdav {
-                                            " <span class=\"rename_icon\">Rename</span>"
+                                             " <span class=\"rename_icon\">Rename</span>"
                                          } else {
                                              ""
                                          },
@@ -814,7 +814,7 @@ impl HttpHandler {
 
     fn handle_get_dir_listing(&self, req: &mut Request, req_p: PathBuf) -> IronResult<Response> {
         let relpath = (url_path(&req.url) + "/").replace("//", "/");
-        let is_root = req.url.as_ref().path_segments().unwrap().count() == 1;
+        let is_root = req.url.as_ref().path_segments().unwrap().count() + !req.url.as_ref().as_str().ends_with('/') as usize == 1;
         let show_file_management_controls = self.writes_temp_dir.is_some();
         log!(self.log,
              "{green}{}{reset} was served directory listing for {magenta}{}{reset}",
