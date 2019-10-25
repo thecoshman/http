@@ -10,7 +10,7 @@ window.addEventListener("load", function() {
       ev.preventDefault();
 
       let line = link.parentElement.parentElement;
-      make_request("DELETE", line.children[0].children[0].href, link);
+      make_request("DELETE", get_href_for_line(line), link);
     });
   }
 
@@ -18,7 +18,7 @@ window.addEventListener("load", function() {
     ev.preventDefault();
 
     let line = link.parentElement.parentElement;
-    let filename_cell = line.children[1];
+    let filename_cell = get_filename_cell_for_line(line);
     let original_name = filename_cell.innerText;
 
     let submit_callback = function() {
@@ -62,8 +62,13 @@ function make_filename_input(input_container, initial, callback) {
   input_elem.value = initial;
 
   input_elem.addEventListener("keypress", function(ev) {
-    if(ev.keyCode === 13)  // Enter
+    if(ev.keyCode === 13) {  // Enter
+      ev.preventDefault();
       callback();
+    }
+  });
+  input_container.addEventListener("click", function(ev) {
+    ev.preventDefault();
   });
 
   input_elem.focus();
@@ -75,7 +80,10 @@ function make_confirm_icon(element, callback) {
   element.classList.add("confirm_icon");
   element.href = "#confirm";
   element.innerText = "Confirm";
-  element.addEventListener("click", callback);
+  element.addEventListener("click", function(ev) {
+    ev.preventDefault();
+    callback();
+  });
 };
 
 function create_new_directory(fname, status_out) {
