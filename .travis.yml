@@ -37,7 +37,7 @@ script:
   -
   - if [ "$LANGUAGE" == "Rust" ] && [ "$DEPLOY" ] && [ "$TRAVIS_TAG" ]; then cargo build --verbose --release; fi
   - if [ "$LANGUAGE" == "Rust" ] && [ "$CLIPPY" ]; then
-      cargo install -f clippy;
+      rustup component add clippy-preview || cargo install --git https://github.com/rust-lang/rust-clippy clippy -f;
       cargo clippy;
     fi
   -
