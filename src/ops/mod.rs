@@ -1216,7 +1216,12 @@ impl HttpHandler {
                 while let Ok(newlink) = cur.read_link() {
                     sk = true;
                     if follow_symlinks {
-                        cur = newlink;
+                        if newlink.is_absolute() {
+                            cur = newlink;
+                        } else {
+                            cur.pop();
+                            cur.push(newlink);
+                        }
                     } else {
                         break;
                     }

@@ -146,7 +146,12 @@ impl HttpHandler {
                 let mut symlink = false;
                 while let Ok(newlink) = path.read_link() {
                     symlink = true;
-                    path = newlink;
+                    if newlink.is_absolute() {
+                        path = newlink;
+                    } else {
+                        path.pop();
+                        path.push(newlink);
+                    }
                 }
 
                 if !(!path.exists() || (symlink && !self.follow_symlinks) ||
