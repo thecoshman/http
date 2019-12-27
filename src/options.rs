@@ -18,8 +18,10 @@ use self::super::ops::LogLevel;
 use std::env::{self, temp_dir};
 use std::path::PathBuf;
 use std::str::FromStr;
+use std::borrow::Cow;
 use std::net::IpAddr;
 use regex::Regex;
+use cidr::IpCidr;
 use std::fs;
 
 
@@ -71,6 +73,8 @@ pub struct Options {
     pub path_auth_data: BTreeMap<String, Option<String>>,
     /// Paths for which to generate auth data
     pub generate_path_auth: BTreeSet<String>,
+    /// Header names and who we trust them from in `HEADER-NAME:CIDR` format
+    pub proxies: BTreeMap<String, IpCidr>,
 }
 
 impl Options {
@@ -103,6 +107,8 @@ impl Options {
             .arg(Arg::from_usage("--path-auth [PATH=[USERNAME[:PASSWORD]]]... 'Data for authentication under PATH'")
                 .validator(Options::path_credentials_validator))
             .arg(Arg::from_usage("--gen-path-auth [PATH]... 'Generate a one-off username:password set for authentication under PATH'"))
+            .arg(Arg::from_usage("--proxy [HEADER-NAME:CIDR]... 'Treat HEADER-NAME as proxy forwarded-for header when request comes from CIDR'")
+                .validator(|s| Options::proxy_parse(s.into()).map(|_| ())))
             .get_matches();
 
         let dir = matches.value_of("DIR").unwrap_or(".");
@@ -174,6 +180,7 @@ impl Options {
             generate_tls: matches.is_present("gen-ssl"),
             path_auth_data: path_auth_data,
             generate_path_auth: generate_path_auth,
+            proxies: matches.values_of("proxy").unwrap_or_default().map(Cow::from).map(Options::proxy_parse).map(Result::unwrap).collect(),
         }
     }
 
@@ -260,5 +267,19 @@ impl Options {
 
     fn u16_validator(s: String) -> Result<(), String> {
         u16::from_str(&s).map(|_| ()).map_err(|_| format!("{} is not a valid port number", s))
+    }
+
+    fn proxy_parse<'s>(s: Cow<'s, str>) -> Result<(String, IpCidr), String> {
+        match s.find(":") {
+            None => Err(format!("{} not in HEADER-NAME:CIDR format", s)),
+            Some(0) => Err(format!("{} sets invalid zero-length header", s)),
+            Some(col_idx) => {
+                let cidr = s[col_idx + 1..].parse().map_err(|e| format!("{} not a valid CIDR: {}", &s[col_idx + 1..], e))?;
+
+                let mut s = s.into_owned();
+                s.truncate(col_idx);
+                Ok((s, cidr))
+            }
+        }
     }
 }

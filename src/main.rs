@@ -22,6 +22,7 @@ extern crate bzip2;
 extern crate ctrlc;
 extern crate serde;
 extern crate regex;
+extern crate cidr;
 #[macro_use]
 extern crate clap;
 extern crate iron;
@@ -123,6 +124,17 @@ fn result_main() -> Result<(), Error> {
             print!(" and no authentication");
         }
         println!("...");
+
+        if !opts.proxies.is_empty()  {
+            println!("Trusted proxies:");
+
+            let mut out = TabWriter::new(stdout());
+            writeln!(out, "Header\tNetwork").unwrap();
+            for (header, network) in &opts.proxies {
+                writeln!(out, "{}\t{}", header, network).unwrap();
+            }
+            out.flush().unwrap();
+        }
     }
     if !opts.path_auth_data.is_empty() && opts.loglevel < ops::LogLevel::NoAuth {
         println!("Basic authentication credentials:");

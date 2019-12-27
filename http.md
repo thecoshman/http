@@ -113,6 +113,15 @@ pass parameters like what port to use.
 
     Exclusive with --path-auth with the equivalent PATH. Default: empty.
 
+  --proxy [HEADER-NAME:CIDR]
+
+    Treat HEADER-NAME as a proxy forwarded-for header when the request
+    originates from an address inside the network specified by the CIDR.
+
+    If the header is set but the request isn't in the network, it's ignored.
+
+    Can be specified any amount of times. Default: none.
+
   -s --no-follow-symlinks
 
     Don't follow symlinks when requesting file access.
@@ -347,6 +356,18 @@ pass parameters like what port to use.
 
     Example output change:
       127.0.0.1:47916 requested to GET nonexistant entity S:\Rust-target\doc\main.css
+
+  `http --proxy X-Forwarded-For:127.0.0.1 --proxy X-Proxied-For:192.168.1.0/24`
+
+    As in the first example, but treat the X-Forwarded-For and X-Proxied-For
+    as proxy headers for requests from localhost and the 192.168.1.0/24 network,
+    respectively.
+
+    Example output change:
+      Trusted proxies:
+      Header           Network
+      X-Forwarded-For  127.0.0.1
+      X-Proxied-For    192.168.1.0/24
 
 ## AUTHOR
 
