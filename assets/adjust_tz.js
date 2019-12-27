@@ -1,3 +1,5 @@
+"use strict";
+
 window.addEventListener("load", function() {
   const FORMAT = "yyyy-MM-dd HH:mm:ss";
 

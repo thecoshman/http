@@ -1,3 +1,5 @@
+"use strict";
+
 window.addEventListener("load", function() {
   let delete_file_links = document.getElementsByClassName("delete_file_icon");
   let rename_links = document.getElementsByClassName("rename_icon");

@@ -1,3 +1,5 @@
+"use strict";
+
 window.addEventListener("load", function() {
   let new_directory_line = document.getElementById("new_directory");
 

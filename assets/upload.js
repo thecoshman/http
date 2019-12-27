@@ -1,3 +1,5 @@
+"use strict";
+
 window.addEventListener("load", function() {
   const SUPPORTED_TYPES = ["Files", "application/x-moz-file"];
 
