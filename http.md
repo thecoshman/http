@@ -193,7 +193,7 @@ pass parameters like what port to use.
       127.0.0.1:47880 was served directory listing for \\?\P:\Rust\http
       127.0.0.1:47902 was served file \\?\P:\Rust\http\http.1.html as text/html
       127.0.0.1:47916 was served file S:\Rust-target\doc\main.css as text/css
-      127.0.0.1:48049 asked for options
+      127.0.0.1:48049 asked for OPTIONS
       127.0.0.1:47936 used disabled request method DELETE
       127.0.0.1:48222 used disabled request method PUT
       ^C
@@ -363,11 +363,22 @@ pass parameters like what port to use.
     as proxy headers for requests from localhost and the 192.168.1.0/24 network,
     respectively.
 
-    Example output change:
+    Given, that requests from 127.0.0.1, 192.168.1.109, and 93.184.216.34
+    have the following headers set:
+      X-Forwarded-For: OwO
+      X-Proxied-For: UwU
+
+    Then the output will be as follows:
+      Hosting "." on port 8000 without TLS and no authentication...
       Trusted proxies:
       Header           Network
       X-Forwarded-For  127.0.0.1
       X-Proxied-For    192.168.1.0/24
+      Ctrl-C to stop.
+
+      [2020-02-17 17:48:41] 127.0.0.1:1392 for OwO was served directory listing for \\?\P:\Rust\http
+      [2020-02-17 17:49:12] 192.168.1.109:1403 for UwU was served directory listing for \\?\P:\Rust\http
+      [2020-02-17 17:49:29] 93.184.216.34:1397 was served directory listing for \\?\P:\Rust\http
 
 ## AUTHOR
 

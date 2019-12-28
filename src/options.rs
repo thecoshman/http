@@ -74,7 +74,7 @@ pub struct Options {
     /// Paths for which to generate auth data
     pub generate_path_auth: BTreeSet<String>,
     /// Header names and who we trust them from in `HEADER-NAME:CIDR` format
-    pub proxies: BTreeMap<String, IpCidr>,
+    pub proxies: BTreeMap<IpCidr, String>,
 }
 
 impl Options {
@@ -269,7 +269,7 @@ impl Options {
         u16::from_str(&s).map(|_| ()).map_err(|_| format!("{} is not a valid port number", s))
     }
 
-    fn proxy_parse<'s>(s: Cow<'s, str>) -> Result<(String, IpCidr), String> {
+    fn proxy_parse<'s>(s: Cow<'s, str>) -> Result<(IpCidr, String), String> {
         match s.find(":") {
             None => Err(format!("{} not in HEADER-NAME:CIDR format", s)),
             Some(0) => Err(format!("{} sets invalid zero-length header", s)),
@@ -278,7 +278,7 @@ impl Options {
 
                 let mut s = s.into_owned();
                 s.truncate(col_idx);
-                Ok((s, cidr))
+                Ok((cidr, s))
             }
         }
     }

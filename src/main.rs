@@ -130,7 +130,7 @@ fn result_main() -> Result<(), Error> {
 
             let mut out = TabWriter::new(stdout());
             writeln!(out, "Header\tNetwork").unwrap();
-            for (header, network) in &opts.proxies {
+            for (network, header) in &opts.proxies {
                 writeln!(out, "{}\t{}", header, network).unwrap();
             }
             out.flush().unwrap();

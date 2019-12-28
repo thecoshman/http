@@ -35,7 +35,6 @@ bzip2 = "0.3"
 ctrlc = "3.1"
 regex = "1.2"
 serde = "0.9"
-cidr = "0.1"
 clap = "2.33"
 rand = "0.7"
 time = "0.1"
@@ -43,6 +42,10 @@ md6 = "2.0"
 
 [dependencies.trivial_colours]
 version = "0.3"
+default-features = false
+
+[dependencies.cidr]
+version = "0.1"
 default-features = false
 
 [dependencies.iron]

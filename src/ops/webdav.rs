@@ -66,8 +66,8 @@ impl HttpHandler {
                 } {
                     Ok(e) => {
                         log!(self.log,
-                             "{green}{}{reset} tried to {red}PROPFIND{reset} {yellow}{}{reset} with invalid XML",
-                             req.remote_addr,
+                             "{} tried to {red}PROPFIND{reset} {yellow}{}{reset} with invalid XML",
+                             self.remote_addresses(&req),
                              req_p.display());
                         return self.handle_generated_response_encoding(req,
                                                                        status::BadRequest,
@@ -79,8 +79,8 @@ impl HttpHandler {
         };
 
         log!(self.log,
-             "{green}{}{reset} requested {red}PROPFIND{reset} of {} on {yellow}{}{reset} at depth {}",
-             req.remote_addr,
+             "{} requested {red}PROPFIND{reset} of {} on {yellow}{}{reset} at depth {}",
+             self.remote_addresses(&req),
              props,
              req_p.display(),
              depth);
@@ -191,8 +191,8 @@ impl HttpHandler {
             Ok(props) => props,
             Err(e) => {
                 log!(self.log,
-                     "{green}{}{reset} tried to {red}PROPPATCH{reset} {yellow}{}{reset} with invalid XML",
-                     req.remote_addr,
+                     "{} tried to {red}PROPPATCH{reset} {yellow}{}{reset} with invalid XML",
+                     self.remote_addresses(&req),
                      req_p.display());
                 return self.handle_generated_response_encoding(req,
                                                                status::BadRequest,
@@ -201,8 +201,8 @@ impl HttpHandler {
         };
 
         log!(self.log,
-             "{green}{}{reset} requested {red}PROPPATCH{reset} of {} on {yellow}{}{reset}",
-             req.remote_addr,
+             "{} requested {red}PROPPATCH{reset} of {} on {yellow}{}{reset}",
+             self.remote_addresses(&req),
              CommaList(props.iter().map(|p| &p.0.local_name)),
              req_p.display());
 
@@ -216,8 +216,8 @@ impl HttpHandler {
         let (req_p, symlink, url_err) = self.parse_requested_path(req);
 
         log!(self.log,
-             "{green}{}{reset} requested to {red}MKCOL{reset} at {yellow}{}{reset}",
-             req.remote_addr,
+             "{} requested to {red}MKCOL{reset} at {yellow}{}{reset}",
+             self.remote_addresses(&req),
              req_p.display());
 
         if url_err {
@@ -298,8 +298,8 @@ impl HttpHandler {
         let overwrite = req.headers.get::<Overwrite>().copied().unwrap_or_default().0;
 
         log!(self.log,
-             "{green}{}{reset} requested to {}{red}{}{reset} {yellow}{}{reset} to {yellow}{}{reset} at depth {}",
-             req.remote_addr,
+             "{} requested to {}{red}{}{reset} {yellow}{}{reset} to {yellow}{}{reset} at depth {}",
+             self.remote_addresses(&req),
              if overwrite { "overwrite-" } else { "" },
              if !is_move { "COPY" } else { "MOVE" },
              req_p.display(),

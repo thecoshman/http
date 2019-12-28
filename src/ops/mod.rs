@@ -1,5 +1,5 @@
 use md6;
-use std::iter;
+use std::fmt;
 use serde_json;
 use std::borrow::Cow;
 use std::net::IpAddr;
@@ -9,6 +9,7 @@ use iron::mime::Mime;
 use std::sync::RwLock;
 use lazysort::SortedBy;
 use std::path::PathBuf;
+use cidr::{Cidr, IpCidr};
 use std::fs::{self, File};
 use std::default::Default;
 use rand::{Rng, thread_rng};
@@ -24,11 +25,11 @@ use rfsapi::{RawFsApiHeader, FilesetData, RawFileData};
 use rand::distributions::uniform::Uniform as UniformDistribution;
 use rand::distributions::Alphanumeric as AlphanumericDistribution;
 use iron::{headers, status, method, mime, IronResult, Listening, Response, TypeMap, Request, Handler, Iron};
-use self::super::util::{WwwAuthenticate, DisplayThree, CommaList, Dav, url_path, file_hash, is_symlink, encode_str, encode_file, file_length, hash_string,
-                        html_response, file_binary, client_mobile, percent_decode, file_icon_suffix, is_actually_file, is_descendant_of, response_encoding,
-                        detect_file_as_dir, encoding_extension, file_time_modified, file_time_modified_p, get_raw_fs_metadata, human_readable_size,
-                        is_nonexistant_descendant_of, USER_AGENT, ERROR_HTML, INDEX_EXTENSIONS, MIN_ENCODING_GAIN, MAX_ENCODING_SIZE, MIN_ENCODING_SIZE,
-                        DAV_LEVEL_1_METHODS, DIRECTORY_LISTING_HTML, MOBILE_DIRECTORY_LISTING_HTML, BLACKLISTED_ENCODING_EXTENSIONS};
+use self::super::util::{WwwAuthenticate, DisplayThree, CommaList, Spaces, Dav, url_path, file_hash, is_symlink, encode_str, encode_file, file_length,
+                        hash_string, html_response, file_binary, client_mobile, percent_decode, file_icon_suffix, is_actually_file, is_descendant_of,
+                        response_encoding, detect_file_as_dir, encoding_extension, file_time_modified, file_time_modified_p, get_raw_fs_metadata,
+                        human_readable_size, is_nonexistant_descendant_of, USER_AGENT, ERROR_HTML, INDEX_EXTENSIONS, MIN_ENCODING_GAIN, MAX_ENCODING_SIZE,
+                        MIN_ENCODING_SIZE, DAV_LEVEL_1_METHODS, DIRECTORY_LISTING_HTML, MOBILE_DIRECTORY_LISTING_HTML, BLACKLISTED_ENCODING_EXTENSIONS};
 
 
 macro_rules! log {
@@ -88,6 +89,7 @@ pub struct HttpHandler {
     pub path_auth_data: BTreeMap<String, Option<(String, Option<String>)>>,
     pub writes_temp_dir: Option<(String, PathBuf)>,
     pub encoded_temp_dir: Option<(String, PathBuf)>,
+    pub proxies: BTreeMap<IpCidr, String>,
     cache_gen: RwLock<CacheT<Vec<u8>>>,
     cache_fs: RwLock<CacheT<(PathBuf, bool)>>,
 }
@@ -124,6 +126,7 @@ impl HttpHandler {
             encoded_temp_dir: HttpHandler::temp_subdir(&opts.temp_directory, opts.encode_fs, "encoded"),
             cache_gen: Default::default(),
             cache_fs: Default::default(),
+            proxies: opts.proxies.clone(),
         }
     }
 
@@ -235,16 +238,16 @@ impl HttpHandler {
 
                 if &auth.0 == username && &auth.1 == pwd {
                     log!(self.log,
-                         "{green}{}{reset} correctly authorised to {red}{}{reset} {yellow}{}{reset}",
-                         req.remote_addr,
+                         "{} correctly authorised to {red}{}{reset} {yellow}{}{reset}",
+                         self.remote_addresses(&req),
                          req.method,
                          req.url);
 
                     Ok(None)
                 } else {
                     log!(self.log,
-                         "{green}{}{reset} requested to {red}{}{reset} {yellow}{}{reset} with invalid credentials \"{}{}{}\"",
-                         req.remote_addr,
+                         "{} requested to {red}{}{reset} {yellow}{}{reset} with invalid credentials \"{}{}{}\"",
+                         self.remote_addresses(&req),
                          req.method,
                          req.url,
                          username,
@@ -256,8 +259,8 @@ impl HttpHandler {
             }
             None => {
                 log!(self.log,
-                     "{green}{}{reset} requested to {red}{}{reset} {yellow}{}{reset} without authorisation",
-                     req.remote_addr,
+                     "{} requested to {red}{}{reset} {yellow}{}{reset} without authorisation",
+                     self.remote_addresses(&req),
                      req.method,
                      req.url);
 
@@ -267,7 +270,7 @@ impl HttpHandler {
     }
 
     fn handle_options(&self, req: &mut Request) -> IronResult<Response> {
-        log!(self.log, "{green}{}{reset} asked for {red}OPTIONS{reset}", req.remote_addr);
+        log!(self.log, "{} asked for {red}OPTIONS{reset}", self.remote_addresses(&req));
 
         let mut allowed_methods = Vec::with_capacity(6 +
                                                      if self.webdav {
@@ -317,8 +320,8 @@ impl HttpHandler {
 
     fn handle_invalid_url(&self, req: &mut Request, cause: &str) -> IronResult<Response> {
         log!(self.log,
-             "{green}{}{reset} requested to {red}{}{reset} {yellow}{}{reset} with invalid URL -- {}",
-             req.remote_addr,
+             "{} requested to {red}{}{reset} {yellow}{}{reset} with invalid URL -- {}",
+             self.remote_addresses(&req),
              req.method,
              req.url,
              &cause[3..cause.len() - 4]); // Strip <p> tags
@@ -335,8 +338,8 @@ impl HttpHandler {
 
     fn handle_nonexistant_status(&self, req: &mut Request, req_p: PathBuf, status: status::Status) -> IronResult<Response> {
         log!(self.log,
-             "{green}{}{reset} requested to {red}{}{reset} nonexistant entity {magenta}{}{reset}",
-             req.remote_addr,
+             "{} requested to {red}{}{reset} nonexistant entity {magenta}{}{reset}",
+             self.remote_addresses(&req),
              req.method,
              req_p.display());
 
@@ -349,8 +352,8 @@ impl HttpHandler {
 
     fn handle_get_raw_fs_file(&self, req: &mut Request, req_p: PathBuf) -> IronResult<Response> {
         log!(self.log,
-             "{green}{}{reset} was served metadata for file {magenta}{}{reset}",
-             req.remote_addr,
+             "{} was served metadata for file {magenta}{}{reset}",
+             self.remote_addresses(&req),
              req_p.display());
         self.handle_raw_fs_api_response(status::Ok,
                                         &FilesetData {
@@ -399,8 +402,8 @@ impl HttpHandler {
             "text/plain".parse().unwrap()
         });
         log!(self.log,
-             "{green}{}{reset} was served byte range {}-{} of file {magenta}{}{reset} as {blue}{}{reset}",
-             req.remote_addr,
+             "{} was served byte range {}-{} of file {magenta}{}{reset} as {blue}{}{reset}",
+             self.remote_addresses(&req),
              from,
              to,
              req_p.display(),
@@ -430,8 +433,8 @@ impl HttpHandler {
             "text/plain".parse().unwrap()
         });
         log!(self.log,
-             "{green}{}{reset} was served file {magenta}{}{reset} from byte {} as {blue}{}{reset}",
-             req.remote_addr,
+             "{} was served file {magenta}{}{reset} from byte {} as {blue}{}{reset}",
+             self.remote_addresses(&req),
              req_p.display(),
              from,
              mime_type);
@@ -447,8 +450,8 @@ impl HttpHandler {
             "text/plain".parse().unwrap()
         });
         log!(self.log,
-             "{green}{}{reset} was served last {} bytes of file {magenta}{}{reset} as {blue}{}{reset}",
-             req.remote_addr,
+             "{} was served last {} bytes of file {magenta}{}{reset} as {blue}{}{reset}",
+             self.remote_addresses(&req),
              from,
              req_p.display(),
              mime_type);
@@ -494,8 +497,8 @@ impl HttpHandler {
             "text/plain".parse().unwrap()
         });
         log!(self.log,
-             "{green}{}{reset} was served an empty range from file {magenta}{}{reset} as {blue}{}{reset}",
-             req.remote_addr,
+             "{} was served an empty range from file {magenta}{}{reset} as {blue}{}{reset}",
+             self.remote_addresses(&req),
              req_p.display(),
              mime_type);
 
@@ -517,8 +520,8 @@ impl HttpHandler {
             "text/plain".parse().unwrap()
         });
         log!(self.log,
-             "{green}{}{reset} was served file {magenta}{}{reset} as {blue}{}{reset}",
-             req.remote_addr,
+             "{} was served file {magenta}{}{reset} as {blue}{}{reset}",
+             self.remote_addresses(&req),
              req_p.display(),
              mime_type);
 
@@ -548,7 +551,7 @@ impl HttpHandler {
                     Some(&(ref resp_p, true)) => {
                         log!(self.log,
                              "{} encoded as {} for {:.1}% ratio (cached)",
-                             iter::repeat(' ').take(req.remote_addr.to_string().len()).collect::<String>(),
+                             Spaces(self.remote_addresses(req).to_string().len()),
                              encoding,
                              ((file_length(&req_p.metadata().expect("Failed to get requested file metadata"), &req_p) as f64) /
                               (file_length(&resp_p.metadata().expect("Failed to get encoded file metadata"), &resp_p) as f64)) *
@@ -591,7 +594,7 @@ impl HttpHandler {
                 } else {
                     log!(self.log,
                          "{} encoded as {} for {:.1}% ratio",
-                         iter::repeat(' ').take(req.remote_addr.to_string().len()).collect::<String>(),
+                         Spaces(self.remote_addresses(req).to_string().len()),
                          encoding,
                          gain * 100f64);
 
@@ -608,7 +611,7 @@ impl HttpHandler {
             } else {
                 log!(self.log,
                      "{} failed to encode as {}, sending identity",
-                     iter::repeat(' ').take(req.remote_addr.to_string().len()).collect::<String>(),
+                     Spaces(self.remote_addresses(req).to_string().len()),
                      encoding);
             }
         }
@@ -624,8 +627,8 @@ impl HttpHandler {
 
     fn handle_get_raw_fs_dir(&self, req: &mut Request, req_p: PathBuf) -> IronResult<Response> {
         log!(self.log,
-             "{green}{}{reset} was served metadata for directory {magenta}{}{reset}",
-             req.remote_addr,
+             "{} was served metadata for directory {magenta}{}{reset}",
+             self.remote_addresses(&req),
              req_p.display());
         self.handle_raw_fs_api_response(status::Ok,
                                         &FilesetData {
@@ -676,7 +679,7 @@ impl HttpHandler {
                     let r = self.handle_get_file(req, idx);
                     log!(self.log,
                          "{} found index file for directory {magenta}{}{reset}",
-                         iter::repeat(' ').take(req.remote_addr.to_string().len()).collect::<String>(),
+                         Spaces(self.remote_addresses(req).to_string().len()),
                          req_p.display());
                     return r;
                 } else {
@@ -695,8 +698,8 @@ impl HttpHandler {
     fn handle_get_dir_index_no_slash(&self, req: &mut Request, idx_ext: &str) -> IronResult<Response> {
         let new_url = req.url.to_string() + "/";
         log!(self.log,
-             "Redirecting {green}{}{reset} to {yellow}{}{reset} - found index file {magenta}index.{}{reset}",
-             req.remote_addr,
+             "Redirecting {} to {yellow}{}{reset} - found index file {magenta}index.{}{reset}",
+             self.remote_addresses(&req),
              new_url,
              idx_ext);
 
@@ -714,8 +717,8 @@ impl HttpHandler {
         let is_root = req.url.as_ref().path_segments().unwrap().count() + !req.url.as_ref().as_str().ends_with('/') as usize == 1;
         let show_file_management_controls = self.writes_temp_dir.is_some();
         log!(self.log,
-             "{green}{}{reset} was served mobile directory listing for {magenta}{}{reset}",
-             req.remote_addr,
+             "{} was served mobile directory listing for {magenta}{}{reset}",
+             self.remote_addresses(&req),
              req_p.display());
 
         let parent_s = if is_root {
@@ -817,8 +820,8 @@ impl HttpHandler {
         let is_root = req.url.as_ref().path_segments().unwrap().count() + !req.url.as_ref().as_str().ends_with('/') as usize == 1;
         let show_file_management_controls = self.writes_temp_dir.is_some();
         log!(self.log,
-             "{green}{}{reset} was served directory listing for {magenta}{}{reset}",
-             req.remote_addr,
+             "{} was served directory listing for {magenta}{}{reset}",
+             self.remote_addresses(&req),
              req_p.display());
 
         let parent_s = if is_root {
@@ -980,8 +983,8 @@ impl HttpHandler {
             .to_string();
 
         log!(self.log,
-             "{green}{}{reset} tried to {red}{}{reset} on {magenta}{}{reset} ({blue}{}{reset}) but only {red}{}{reset} are allowed",
-             req.remote_addr,
+             "{} tried to {red}{}{reset} on {magenta}{}{reset} ({blue}{}{reset}) but only {red}{}{reset} are allowed",
+             self.remote_addresses(&req),
              req.method,
              url_path(&req.url),
              tpe,
@@ -999,8 +1002,8 @@ impl HttpHandler {
 
     fn handle_put_partial_content(&self, req: &mut Request) -> IronResult<Response> {
         log!(self.log,
-             "{green}{}{reset} tried to {red}PUT{reset} partial content to {yellow}{}{reset}",
-             req.remote_addr,
+             "{} tried to {red}PUT{reset} partial content to {yellow}{}{reset}",
+             self.remote_addresses(&req),
              url_path(&req.url));
 
         self.handle_generated_response_encoding(req,
@@ -1015,8 +1018,8 @@ impl HttpHandler {
     fn handle_put_file(&self, req: &mut Request, req_p: PathBuf, legal: bool) -> IronResult<Response> {
         let existant = !legal || req_p.exists();
         log!(self.log,
-             "{green}{}{reset} {} {magenta}{}{reset}, size: {}B",
-             req.remote_addr,
+             "{} {} {magenta}{}{reset}, size: {}B",
+             self.remote_addresses(&req),
              if !legal {
                  "tried to illegally create"
              } else if existant {
@@ -1065,8 +1068,8 @@ impl HttpHandler {
     fn handle_delete_path(&self, req: &mut Request, req_p: PathBuf, symlink: bool) -> IronResult<Response> {
         let ft = req_p.metadata().expect("failed to get file metadata").file_type();
         log!(self.log,
-             "{green}{}{reset} deleted {blue}{} {magenta}{}{reset}",
-             req.remote_addr,
+             "{} deleted {blue}{} {magenta}{}{reset}",
+             self.remote_addresses(&req),
              if is_actually_file(&ft) {
                  "file"
              } else if symlink {
@@ -1091,8 +1094,8 @@ impl HttpHandler {
 
     fn handle_trace(&self, req: &mut Request) -> IronResult<Response> {
         log!(self.log,
-             "{green}{}{reset} requested {red}TRACE{reset} for {magenta}{}{reset}",
-             req.remote_addr,
+             "{} requested {red}TRACE{reset} for {magenta}{}{reset}",
+             self.remote_addresses(&req),
              url_path(&req.url));
 
         let mut hdr = req.headers.clone();
@@ -1108,8 +1111,8 @@ impl HttpHandler {
 
     fn handle_forbidden_method(&self, req: &mut Request, switch: &str, desc: &str) -> IronResult<Response> {
         log!(self.log,
-             "{green}{}{reset} used disabled request method {red}{}{reset} grouped under {}",
-             req.remote_addr,
+             "{} used disabled request method {red}{}{reset} grouped under {}",
+             self.remote_addresses(&req),
              req.method,
              desc);
 
@@ -1126,8 +1129,8 @@ impl HttpHandler {
 
     fn handle_bad_method(&self, req: &mut Request) -> IronResult<Response> {
         log!(self.log,
-             "{green}{}{reset} used invalid request method {red}{}{reset}",
-             req.remote_addr,
+             "{} used invalid request method {red}{}{reset}",
+             self.remote_addresses(&req),
              req.method);
 
         let last_p = format!("<p>Unsupported request method: {}.<br />\nSupported methods: {}{}OPTIONS, GET, PUT, DELETE, HEAD, and TRACE.</p>",
@@ -1153,7 +1156,7 @@ impl HttpHandler {
                 if let Some(enc_resp) = self.cache_gen.read().expect("Generated file cache read lock poisoned").get(&cache_key) {
                     log!(self.log,
                          "{} encoded as {} for {:.1}% ratio (cached)",
-                         iter::repeat(' ').take(req.remote_addr.to_string().len()).collect::<String>(),
+                         Spaces(self.remote_addresses(req).to_string().len()),
                          encoding,
                          ((resp.len() as f64) / (enc_resp.len() as f64)) * 100f64);
 
@@ -1168,7 +1171,7 @@ impl HttpHandler {
             if let Some(enc_resp) = encode_str(&resp, &encoding) {
                 log!(self.log,
                      "{} encoded as {} for {:.1}% ratio",
-                     iter::repeat(' ').take(req.remote_addr.to_string().len()).collect::<String>(),
+                     Spaces(self.remote_addresses(req).to_string().len()),
                      encoding,
                      ((resp.len() as f64) / (enc_resp.len() as f64)) * 100f64);
 
@@ -1183,7 +1186,7 @@ impl HttpHandler {
             } else {
                 log!(self.log,
                      "{} failed to encode as {}, sending identity",
-                     iter::repeat(' ').take(req.remote_addr.to_string().len()).collect::<String>(),
+                     Spaces(self.remote_addresses(req).to_string().len()),
                      encoding);
             }
         }
@@ -1236,6 +1239,14 @@ impl HttpHandler {
             log!(self.log, "Created temp dir {magenta}{}{reset}", temp_name);
         }
     }
+
+    #[inline(always)]
+    fn remote_addresses<'s, 'r, 'ra, 'rb: 'ra>(&'s self, req: &'r Request<'ra, 'rb>) -> AddressWriter<'r, 's, 'ra, 'rb> {
+        AddressWriter {
+            request: req,
+            proxies: &self.proxies,
+        }
+    }
 }
 
 impl Clone for HttpHandler {
@@ -1251,6 +1262,7 @@ impl Clone for HttpHandler {
             path_auth_data: self.path_auth_data.clone(),
             writes_temp_dir: self.writes_temp_dir.clone(),
             encoded_temp_dir: self.encoded_temp_dir.clone(),
+            proxies: self.proxies.clone(),
             cache_gen: Default::default(),
             cache_fs: Default::default(),
         }
@@ -1278,6 +1290,32 @@ impl From<u64> for LogLevel {
             2 => LogLevel::NoStartup,
             _ => LogLevel::NoAuth,
         }
+    }
+}
+
+
+pub struct AddressWriter<'r, 'p, 'ra, 'rb: 'ra> {
+    pub request: &'r Request<'ra, 'rb>,
+    pub proxies: &'p BTreeMap<IpCidr, String>,
+}
+
+impl<'r, 'p, 'ra, 'rb: 'ra> fmt::Display for AddressWriter<'r, 'p, 'ra, 'rb> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        use trivial_colours::{Reset as CReset, Colour as C};
+
+        write!(f, "{green}{}{reset}", self.request.remote_addr, green = C::Green, reset = CReset)?;
+
+        for (network, header) in self.proxies {
+            if network.contains(&self.request.remote_addr.ip()) {
+                if let Some(saddrs) = self.request.headers.get_raw(header) {
+                    for saddr in saddrs {
+                        write!(f, " for {green}{}{reset}", String::from_utf8_lossy(saddr), green = C::Green, reset = CReset)?;
+                    }
+                }
+            }
+        }
+
+        Ok(())
     }
 }
 

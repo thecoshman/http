@@ -11,12 +11,13 @@ use percent_encoding;
 use walkdir::WalkDir;
 use std::borrow::Cow;
 use rfsapi::RawFileData;
+use std::{cmp, f64, str};
 use std::time::SystemTime;
-use std::{cmp, f64, fmt, str};
 use std::collections::HashMap;
 use time::{self, Duration, Tm};
 use iron::{mime, Headers, Url};
 use base64::display::Base64Display;
+use std::fmt::{self, Write as FmtWrite};
 use iron::error::HttpResult as HyperResult;
 use std::fs::{self, FileType, Metadata, File};
 use iron::headers::{HeaderFormat, UserAgent, Header};
@@ -180,6 +181,18 @@ impl<'n> BorrowXmlName<'n> for OwnedXmlName {
     #[inline(always)]
     fn borrow_xml_name(&'n self) -> XmlName<'n> {
         self.borrow()
+    }
+}
+
+#[derive(Debug, Copy, Clone, Hash, PartialOrd, Ord, PartialEq, Eq)]
+pub struct Spaces(pub usize);
+
+impl fmt::Display for Spaces {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        for _ in 0..self.0 {
+            f.write_char(' ')?;
+        }
+        Ok(())
     }
 }
 
