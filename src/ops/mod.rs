@@ -1207,10 +1207,11 @@ impl HttpHandler {
     }
 
     fn parse_requested_path_custom_symlink(&self, req_url: &GenericUrl, follow_symlinks: bool) -> (PathBuf, bool, bool) {
-        req_url.path_segments()
+        let (mut cur, sk, err, abs) = req_url.path_segments()
             .unwrap()
             .filter(|p| !p.is_empty())
-            .fold((self.hosted_directory.1.clone(), false, false), |(mut cur, mut sk, mut err), pp| {
+            .fold((self.hosted_directory.1.clone(), false, false, true),
+                  |(mut cur, mut sk, mut err, mut abs), pp| {
                 if let Some(pp) = percent_decode(pp) {
                     cur.push(&*pp);
                 } else {
@@ -1222,6 +1223,7 @@ impl HttpHandler {
                         if newlink.is_absolute() {
                             cur = newlink;
                         } else {
+                            abs = false;
                             cur.pop();
                             cur.push(newlink);
                         }
@@ -1229,8 +1231,16 @@ impl HttpHandler {
                         break;
                     }
                 }
-                (cur, sk, err)
-            })
+                (cur, sk, err, abs)
+            });
+
+        if !abs {
+            if let Ok(full) = cur.canonicalize() {
+                cur = full;
+            }
+        }
+
+        (cur, sk, err)
     }
 
     fn create_temp_dir(&self, td: &Option<(String, PathBuf)>) {
