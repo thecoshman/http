@@ -14,7 +14,6 @@
 use clap::{AppSettings, ErrorKind as ClapErrorKind, Error as ClapError, Arg, App};
 use std::collections::btree_map::{BTreeMap, Entry as BTreeMapEntry};
 use std::collections::BTreeSet;
-use self::super::ops::LogLevel;
 use std::env::{self, temp_dir};
 use std::path::PathBuf;
 use std::str::FromStr;
@@ -28,6 +27,30 @@ use std::fs;
 lazy_static! {
     static ref CREDENTIALS_REGEX: Regex = Regex::new("[^:]+(?::[^:]+)?").unwrap();
     static ref PATH_CREDENTIALS_REGEX: Regex = Regex::new("(.+)=([^:]+(?::[^:]+)?)?").unwrap();
+}
+
+
+#[derive(Debug, Copy, Clone, Hash, PartialEq, Eq, PartialOrd, Ord)]
+pub enum LogLevel {
+    /// Write everything
+    All,
+    /// No serving messages
+    NoServeStatus,
+    /// No startup messages, but yes auth data
+    NoStartup,
+    /// No auth data
+    NoAuth,
+}
+
+impl From<u64> for LogLevel {
+    fn from(raw: u64) -> LogLevel {
+        match raw {
+            0 => LogLevel::All,
+            1 => LogLevel::NoServeStatus,
+            2 => LogLevel::NoStartup,
+            _ => LogLevel::NoAuth,
+        }
+    }
 }
 
 

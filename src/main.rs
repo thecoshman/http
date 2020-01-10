@@ -40,7 +40,7 @@ pub mod ops;
 pub mod util;
 
 pub use error::Error;
-pub use options::Options;
+pub use options::{LogLevel, Options};
 
 use std::mem;
 use iron::Iron;
@@ -104,7 +104,7 @@ fn result_main() -> Result<(), Error> {
                        &opts.tls_data)
     }?;
 
-    if opts.loglevel < ops::LogLevel::NoStartup {
+    if opts.loglevel < options::LogLevel::NoStartup {
         print!("{}Hosting \"{}\" on port {}",
                trivial_colours::Reset,
                opts.hosted_directory.0,
@@ -136,7 +136,7 @@ fn result_main() -> Result<(), Error> {
             out.flush().unwrap();
         }
     }
-    if !opts.path_auth_data.is_empty() && opts.loglevel < ops::LogLevel::NoAuth {
+    if !opts.path_auth_data.is_empty() && opts.loglevel < options::LogLevel::NoAuth {
         println!("Basic authentication credentials:");
 
         let mut out = TabWriter::new(stdout());
@@ -157,7 +157,7 @@ fn result_main() -> Result<(), Error> {
 
         out.flush().unwrap();
     }
-    if opts.loglevel < ops::LogLevel::NoStartup {
+    if opts.loglevel < options::LogLevel::NoStartup {
         println!("Ctrl-C to stop.");
         println!();
     }
