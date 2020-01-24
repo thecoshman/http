@@ -61,7 +61,7 @@ pub struct Options {
     ///   * >= 2 – suppress startup except for auth data, if present
     ///   * >= 3 – suppress all startup messages
     pub loglevel: LogLevel,
-    /// Whether to handle WebDAV requests. Default: true
+    /// Whether to handle WebDAV requests. Default: false
     pub webdav: bool,
     /// Data for HTTPS, identity file and password. Default: `None`
     pub tls_data: Option<((String, PathBuf), String)>,
