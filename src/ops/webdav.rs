@@ -45,7 +45,7 @@ impl HttpHandler {
 
         if !req_p.exists() || (symlink && !self.follow_symlinks) ||
            (symlink && self.follow_symlinks && self.sandbox_symlinks && !is_descendant_of(&req_p, &self.hosted_directory.1)) {
-            return self.handle_nonexistant(req, req_p);
+            return self.handle_nonexistent(req, req_p);
         }
 
 
@@ -184,7 +184,7 @@ impl HttpHandler {
 
         if !req_p.exists() || (symlink && !self.follow_symlinks) ||
            (symlink && self.follow_symlinks && self.sandbox_symlinks && !is_descendant_of(&req_p, &self.hosted_directory.1)) {
-            return self.handle_nonexistant(req, req_p);
+            return self.handle_nonexistent(req, req_p);
         }
 
         let props = match parse_proppatch(req) {
@@ -230,7 +230,7 @@ impl HttpHandler {
 
         if !req_p.parent().map(|pp| pp.exists()).unwrap_or(true) || (symlink && !self.follow_symlinks) ||
            (symlink && self.follow_symlinks && self.sandbox_symlinks && !is_descendant_of(&req_p, &self.hosted_directory.1)) {
-            return self.handle_nonexistant_status(req, req_p, status::Conflict);
+            return self.handle_nonexistent_status(req, req_p, status::Conflict);
         }
 
         if req.body.read_exact(&mut [0]).is_ok() {
@@ -241,7 +241,7 @@ impl HttpHandler {
             Ok(()) => Ok(Response::with(status::Created)),
             Err(e) => {
                 match e.kind() {
-                    IoErrorKind::NotFound => self.handle_nonexistant_status(req, req_p, status::Conflict),
+                    IoErrorKind::NotFound => self.handle_nonexistent_status(req, req_p, status::Conflict),
                     IoErrorKind::AlreadyExists => Ok(Response::with((status::MethodNotAllowed, "File exists"))),
                     _ => Ok(Response::with(status::Forbidden)),
                 }
@@ -291,7 +291,7 @@ impl HttpHandler {
 
                 (dest_p, dest_symlink)
             }
-            None => return self.handle_invalid_url(req, "<p>Destination URL invalid or nonexistant.</p>"),
+            None => return self.handle_invalid_url(req, "<p>Destination URL invalid or nonexistent.</p>"),
         };
 
         let depth = req.headers.get::<Depth>().copied().unwrap_or(Depth::Infinity);
@@ -316,7 +316,7 @@ impl HttpHandler {
 
         if !req_p.exists() || (symlink && !self.follow_symlinks) ||
            (symlink && self.follow_symlinks && self.sandbox_symlinks && !is_descendant_of(&req_p, &self.hosted_directory.1)) {
-            return self.handle_nonexistant(req, req_p);
+            return self.handle_nonexistent(req, req_p);
         }
 
         if !dest_p.parent().map(|pp| pp.exists()).unwrap_or(true) || (dest_symlink && !self.follow_symlinks) ||

@@ -211,7 +211,7 @@ impl Options {
         fs::canonicalize(&s).map_err(|_| format!("{} \"{}\" not found", prefix, s)).and_then(|f| if f.is_dir() {
             Ok(())
         } else {
-            Err(format!("{} \"{}\" not actualy a directory", prefix, s))
+            Err(format!("{} \"{}\" not actually a directory", prefix, s))
         })
     }
 
@@ -219,7 +219,7 @@ impl Options {
         fs::canonicalize(&s).map_err(|_| format!("TLS identity file \"{}\" not found", s)).and_then(|f| if f.is_file() {
             Ok(())
         } else {
-            Err(format!("TLS identity file \"{}\" not actualy a file", s))
+            Err(format!("TLS identity file \"{}\" not actually a file", s))
         })
     }
 

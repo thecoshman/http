@@ -215,7 +215,7 @@ pass parameters like what port to use.
     As in the first example, but don't follow symlinks.
 
     Example output change:
-      127.0.0.1:47916 requested to GET nonexistant entity S:\Rust-target\doc\main.css
+      127.0.0.1:47916 requested to GET nonexistent entity S:\Rust-target\doc\main.css
 
   `http -w`
 
@@ -355,7 +355,7 @@ pass parameters like what port to use.
     to direct descendants of the hosted directory.
 
     Example output change:
-      127.0.0.1:47916 requested to GET nonexistant entity S:\Rust-target\doc\main.css
+      127.0.0.1:47916 requested to GET nonexistent entity S:\Rust-target\doc\main.css
 
   `http --proxy X-Forwarded-For:127.0.0.1 --proxy X-Proxied-For:192.168.1.0/24`
 

@@ -390,7 +390,7 @@ pub fn is_descendant_of<Pw: AsRef<Path>, Po: AsRef<Path>>(who: Pw, of_whom: Po) 
 
 /// Check if the specified path is a direct descendant (or an equal) of the specified path, without without requiring it to
 /// exist in the first place.
-pub fn is_nonexistant_descendant_of<Pw: AsRef<Path>, Po: AsRef<Path>>(who: Pw, of_whom: Po) -> bool {
+pub fn is_nonexistent_descendant_of<Pw: AsRef<Path>, Po: AsRef<Path>>(who: Pw, of_whom: Po) -> bool {
     let mut who = fs::canonicalize(&who).unwrap_or_else(|_| who.as_ref().to_path_buf());
     let of_whom = if let Ok(p) = fs::canonicalize(of_whom) {
         p

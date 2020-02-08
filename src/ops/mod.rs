@@ -28,7 +28,7 @@ use iron::{headers, status, method, mime, IronResult, Listening, Response, TypeM
 use self::super::util::{WwwAuthenticate, DisplayThree, CommaList, Spaces, Dav, url_path, file_hash, is_symlink, encode_str, encode_file, file_length,
                         hash_string, html_response, file_binary, client_mobile, percent_decode, file_icon_suffix, is_actually_file, is_descendant_of,
                         response_encoding, detect_file_as_dir, encoding_extension, file_time_modified, file_time_modified_p, get_raw_fs_metadata,
-                        human_readable_size, is_nonexistant_descendant_of, USER_AGENT, ERROR_HTML, INDEX_EXTENSIONS, MIN_ENCODING_GAIN, MAX_ENCODING_SIZE,
+                        human_readable_size, is_nonexistent_descendant_of, USER_AGENT, ERROR_HTML, INDEX_EXTENSIONS, MIN_ENCODING_GAIN, MAX_ENCODING_SIZE,
                         MIN_ENCODING_SIZE, DAV_LEVEL_1_METHODS, DIRECTORY_LISTING_HTML, MOBILE_DIRECTORY_LISTING_HTML, BLACKLISTED_ENCODING_EXTENSIONS};
 
 
@@ -295,7 +295,7 @@ impl HttpHandler {
 
         if !req_p.exists() || (symlink && !self.follow_symlinks) ||
            (symlink && self.follow_symlinks && self.sandbox_symlinks && !is_descendant_of(&req_p, &self.hosted_directory.1)) {
-            return self.handle_nonexistant(req, req_p);
+            return self.handle_nonexistent(req, req_p);
         }
 
         let is_file = is_actually_file(&req_p.metadata().expect("Failed to get file metadata").file_type());
@@ -332,13 +332,13 @@ impl HttpHandler {
     }
 
     #[inline(always)]
-    fn handle_nonexistant(&self, req: &mut Request, req_p: PathBuf) -> IronResult<Response> {
-        self.handle_nonexistant_status(req, req_p, status::NotFound)
+    fn handle_nonexistent(&self, req: &mut Request, req_p: PathBuf) -> IronResult<Response> {
+        self.handle_nonexistent_status(req, req_p, status::NotFound)
     }
 
-    fn handle_nonexistant_status(&self, req: &mut Request, req_p: PathBuf, status: status::Status) -> IronResult<Response> {
+    fn handle_nonexistent_status(&self, req: &mut Request, req_p: PathBuf, status: status::Status) -> IronResult<Response> {
         log!(self.log,
-             "{} requested to {red}{}{reset} nonexistant entity {magenta}{}{reset}",
+             "{} requested to {red}{}{reset} nonexistent entity {magenta}{}{reset}",
              self.remote_addresses(&req),
              req.method,
              req_p.display());
@@ -484,7 +484,7 @@ impl HttpHandler {
                                                 status::RangeNotSatisfiable,
                                                 html_response(ERROR_HTML,
                                                               &["416 Range Not Satisfiable",
-                                                                &format!("Requested range <samp>{}</samp> could not be fullfilled for file {}.",
+                                                                &format!("Requested range <samp>{}</samp> could not be fulfilled for file {}.",
                                                                          range,
                                                                          req_p.display()),
                                                                 reason]))
@@ -957,7 +957,7 @@ impl HttpHandler {
         } else if req.headers.has::<headers::ContentRange>() {
             self.handle_put_partial_content(req)
         } else if (symlink && !self.follow_symlinks) ||
-                  (symlink && self.follow_symlinks && self.sandbox_symlinks && !is_nonexistant_descendant_of(&req_p, &self.hosted_directory.1)) {
+                  (symlink && self.follow_symlinks && self.sandbox_symlinks && !is_nonexistent_descendant_of(&req_p, &self.hosted_directory.1)) {
             self.create_temp_dir(&self.writes_temp_dir);
             self.handle_put_file(req, req_p, false)
         } else {
@@ -1059,7 +1059,7 @@ impl HttpHandler {
             self.handle_invalid_url(req, "<p>Percent-encoding decoded to invalid UTF-8.</p>")
         } else if !req_p.exists() || (symlink && !self.follow_symlinks) ||
                   (symlink && self.follow_symlinks && self.sandbox_symlinks && !is_descendant_of(&req_p, &self.hosted_directory.1)) {
-            self.handle_nonexistant(req, req_p)
+            self.handle_nonexistent(req, req_p)
         } else {
             self.handle_delete_path(req, req_p, symlink)
         }
