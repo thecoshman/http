@@ -255,7 +255,7 @@ pass parameters like what port to use.
 
   `http -a 192.168.65.1`
 
-    As in the first example, but listen on address 192.168.65.21.
+    As in the first example, but listen on address 192.168.65.1.
 
     Assuming the address can be used, example output change:
       Hosting "." on port 8000 under address 192.168.65.1 without TLS and no authentication...
