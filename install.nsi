@@ -12,12 +12,19 @@ Section
 SectionEnd
 
 Section "Update PATH"
-  ${EnvVarUpdate} $0 "PATH" "A" "HKLM" "$PROGRAMFILES\http"
+  EnVar::SetHKLM
+  EnVar::AddValue "PATH" "$PROGRAMFILES\http"
+  Pop $0
+  DetailPrint "Adding $PROGRAMFILES\http to %PATH%: $0"
 SectionEnd
 
 Section "Uninstall"
   Delete "$INSTDIR\uninstall http ${HTTP_VERSION}.exe"
   Delete "$INSTDIR\http.exe"
   Delete "$INSTDIR"
-  ${un.EnvVarUpdate} $0 "PATH" "R" "HKLM" "$PROGRAMFILES\http"
+
+  EnVar::SetHKLM
+  EnVar::DeleteValue "PATH" "$PROGRAMFILES\http"
+  Pop $0
+  DetailPrint "deleting $PROGRAMFILES\http from %PATH%: $0"
 SectionEnd
