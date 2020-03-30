@@ -73,6 +73,9 @@ macro_rules! log {
 }
 
 mod webdav;
+mod bandwidth;
+
+pub use self::bandwidth::{LimitBandwidthMiddleware, SimpleChain};
 
 
 // TODO: ideally this String here would be Encoding instead but hyper is bad

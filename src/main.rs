@@ -76,10 +76,14 @@ fn result_main() -> Result<(), Error> {
         opts.path_auth_data.insert(path, Some(ops::generate_auth_data()));
     }
 
+    let handler = ops::SimpleChain {
+        handler: ops::HttpHandler::new(&opts),
+        after: opts.request_bandwidth.map(ops::LimitBandwidthMiddleware::new),
+    };
     let mut responder = if let Some(p) = opts.port {
         if let Some(&((ref id, _), ref pw)) = opts.tls_data.as_ref() {
-                Iron::new(ops::HttpHandler::new(&opts)).https((opts.bind_address, p),
-                                                              NativeTlsServer::new(id, pw).map_err(|err| {
+                Iron::new(handler).https((opts.bind_address, p),
+                                         NativeTlsServer::new(id, pw).map_err(|err| {
                         Error {
                             desc: "TLS certificate",
                             op: "open",
@@ -87,7 +91,7 @@ fn result_main() -> Result<(), Error> {
                         }
                     })?)
             } else {
-                Iron::new(ops::HttpHandler::new(&opts)).http((opts.bind_address, p))
+                Iron::new(handler).http((opts.bind_address, p))
             }
             .map_err(|_| {
                 Error {
@@ -97,11 +101,7 @@ fn result_main() -> Result<(), Error> {
                 }
             })
     } else {
-        ops::try_ports(ops::HttpHandler::new(&opts),
-                       opts.bind_address,
-                       util::PORT_SCAN_LOWEST,
-                       util::PORT_SCAN_HIGHEST,
-                       &opts.tls_data)
+        ops::try_ports(handler, opts.bind_address, util::PORT_SCAN_LOWEST, util::PORT_SCAN_HIGHEST, &opts.tls_data)
     }?;
 
     if opts.loglevel < options::LogLevel::NoStartup {
@@ -129,7 +129,7 @@ fn result_main() -> Result<(), Error> {
             println!("Requests limited to {}B/s.", band);
         }
 
-        if !opts.proxies.is_empty()  {
+        if !opts.proxies.is_empty() {
             println!("Trusted proxies:");
 
             let mut out = TabWriter::new(stdout());
