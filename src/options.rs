@@ -15,6 +15,7 @@ use clap::{AppSettings, ErrorKind as ClapErrorKind, Error as ClapError, Arg, App
 use std::collections::btree_map::{BTreeMap, Entry as BTreeMapEntry};
 use std::collections::BTreeSet;
 use std::env::{self, temp_dir};
+use std::num::NonZeroU64;
 use std::path::PathBuf;
 use std::str::FromStr;
 use std::borrow::Cow;
@@ -98,6 +99,8 @@ pub struct Options {
     pub generate_path_auth: BTreeSet<String>,
     /// Header names and who we trust them from in `HEADER-NAME:CIDR` format
     pub proxies: BTreeMap<IpCidr, String>,
+    /// Max amount of data per second each request is allowed to return. Default: `None`
+    pub request_bandwidth: Option<NonZeroU64>,
 }
 
 impl Options {
@@ -132,6 +135,8 @@ impl Options {
             .arg(Arg::from_usage("--gen-path-auth [PATH]... 'Generate a one-off username:password set for authentication under PATH'"))
             .arg(Arg::from_usage("--proxy [HEADER-NAME:CIDR]... 'Treat HEADER-NAME as proxy forwarded-for header when request comes from CIDR'")
                 .validator(|s| Options::proxy_parse(s.into()).map(|_| ())))
+            .arg(Arg::from_usage("--request-bandwidth [BYTES] 'Limit each request to returning BYTES per second, or 0 for unlimited. Default: 0'")
+                .validator(|s| Options::bandwidth_parse(s.into()).map(|_| ())))
             .get_matches();
 
         let dir = matches.value_of("DIR").unwrap_or(".");
@@ -204,6 +209,7 @@ impl Options {
             path_auth_data: path_auth_data,
             generate_path_auth: generate_path_auth,
             proxies: matches.values_of("proxy").unwrap_or_default().map(Cow::from).map(Options::proxy_parse).map(Result::unwrap).collect(),
+            request_bandwidth: matches.value_of("request-bandwidth").map(Cow::from).map(Options::bandwidth_parse).map(Result::unwrap).unwrap_or_default(),
         }
     }
 
@@ -304,5 +310,33 @@ impl Options {
                 Ok((cidr, s))
             }
         }
+    }
+
+    fn bandwidth_parse<'s>(s_orig: Cow<'s, str>) -> Result<Option<NonZeroU64>, String> {
+        let s = s_orig.trim();
+        let multiplier_b = s.as_bytes().get(s.len() - 1).ok_or_else(|| format!("\"{}\" bandwidth specifier empty", s_orig))?;
+        let multiplier_order = match multiplier_b {
+            b'k' | b'K' => 1,
+            b'm' | b'M' => 2,
+            b'g' | b'G' => 3,
+            b't' | b'T' => 4,
+            b'p' | b'P' => 5,
+            b'e' | b'E' => 6,
+            _ => 0,
+        };
+        let (multiplier, s) = match multiplier_order {
+            0 => (1, s),
+            mo => {
+                let base: u64 = if (*multiplier_b as char).is_uppercase() {
+                    1024
+                } else {
+                    1000
+                };
+                (base.pow(mo), &s[..s.len() - 1]) // No need to check, E is 2^60
+            }
+        };
+
+        let number = u64::from_str(s).map_err(|e| format!("\"{}\" not band width size: {}", s, e))?;
+        Ok(NonZeroU64::new(number.checked_mul(multiplier).ok_or_else(|| format!("{} * {} too big", number, multiplier))?))
     }
 }

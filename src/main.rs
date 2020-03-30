@@ -125,6 +125,10 @@ fn result_main() -> Result<(), Error> {
         }
         println!("...");
 
+        if let Some(band) = opts.request_bandwidth {
+            println!("Requests limited to {}B/s.", band);
+        }
+
         if !opts.proxies.is_empty()  {
             println!("Trusted proxies:");
 

@@ -122,6 +122,15 @@ pass parameters like what port to use.
 
     Can be specified any amount of times. Default: none.
 
+  --request-bandwidth [BYTES]
+
+    Limit the band for each request to BYTES/second wide.
+
+    Can be suffixed with [KMGTPE] binary prefixes or [kmgtpe] SI prefixes.
+    Zero disables capping.
+
+    Default: 0.
+
   -s --no-follow-symlinks
 
     Don't follow symlinks when requesting file access.
@@ -379,6 +388,15 @@ pass parameters like what port to use.
       [2020-02-17 17:48:41] 127.0.0.1:1392 for OwO was served directory listing for \\?\P:\Rust\http
       [2020-02-17 17:49:12] 192.168.1.109:1403 for UwU was served directory listing for \\?\P:\Rust\http
       [2020-02-17 17:49:29] 93.184.216.34:1397 was served directory listing for \\?\P:\Rust\http
+
+  `http --request-bandwidth 4K`
+
+    As in the first example, but limit each request to 4096 bytes per second.
+
+    Example output change:
+      Hosting "." on port 8000 without TLS and no authentication...
+      Requests limited to 4096B/s.
+      Ctrl-C to stop.
 
 ## AUTHOR
 
