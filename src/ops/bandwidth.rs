@@ -1,8 +1,8 @@
 use iron::{AfterMiddleware, IronResult, Response, Handler, Request};
 use std::num::{NonZeroUsize, NonZeroU64};
 use std::io::{Result as IoResult, Write};
+use std::time::{Duration, Instant};
 use iron::response::WriteBody;
-use std::time::Duration;
 use std::thread;
 
 
@@ -91,11 +91,16 @@ impl<'o> Write for LimitBandwidthWriter<'o> {
     }
 
     fn write_all(&mut self, buf: &[u8]) -> IoResult<()> {
+    	// eprintln!("write_all(len={}); chlen={}", buf.len(), self.chunk_len.get());
         for chunk in buf.chunks(self.chunk_len.get()) {
+        	let start = Instant::now();
             self.output.write_all(chunk)?;
-            self.output.flush()?;
-            thread::sleep(DEFAULT_SLEEP);
+            // self.output.flush()?;
+            if let Some(sleep) = DEFAULT_SLEEP.checked_sub(start.elapsed()) {
+	            thread::sleep(sleep);
+	        }
         }
+    	// eprintln!("write_all() done");
 
         Ok(())
     }
