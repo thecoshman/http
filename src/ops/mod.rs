@@ -19,11 +19,11 @@ use mime_guess::guess_mime_type_opt;
 use hyper_native_tls::NativeTlsServer;
 use std::collections::{BTreeMap, HashMap};
 use self::super::{LogLevel, Options, Error};
-use std::io::{self, SeekFrom, Write, Read, Seek};
 use std::process::{ExitStatus, Command, Child, Stdio};
 use rfsapi::{RawFsApiHeader, FilesetData, RawFileData};
 use rand::distributions::uniform::Uniform as UniformDistribution;
 use rand::distributions::Alphanumeric as AlphanumericDistribution;
+use std::io::{self, ErrorKind as IoErrorKind, SeekFrom, Write, Error as IoError, Read, Seek};
 use iron::{headers, status, method, mime, IronResult, Listening, Response, TypeMap, Request, Handler, Iron};
 use self::super::util::{WwwAuthenticate, DisplayThree, CommaList, Spaces, Dav, url_path, file_hash, is_symlink, encode_str, encode_file, file_length,
                         hash_string, html_response, file_binary, client_mobile, percent_decode, file_icon_suffix, is_actually_file, is_descendant_of,
@@ -531,11 +531,15 @@ impl HttpHandler {
            req_p.extension().and_then(|s| s.to_str()).map(|s| !BLACKLISTED_ENCODING_EXTENSIONS.contains(&UniCase::new(s))).unwrap_or(true) {
             self.handle_get_file_encoded(req, req_p, mime_type)
         } else {
+            let file = match File::open(&req_p) {
+                Ok(file) => file,
+                Err(err) => return self.handle_requested_entity_forbidden(req, err, "file"),
+            };
             Ok(Response::with((status::Ok,
                                (Header(headers::Server(USER_AGENT.to_string())),
                                 Header(headers::LastModified(headers::HttpDate(file_time_modified(&metadata)))),
                                 Header(headers::AcceptRanges(vec![headers::RangeUnit::Bytes]))),
-                               req_p.as_path(),
+                               file,
                                Header(headers::ContentLength(file_length(&metadata, &req_p))),
                                mime_type)))
         }
@@ -838,9 +842,13 @@ impl HttpHandler {
                     up_path = slash_idx.map(|i| &rel_noslash[0..i]).unwrap_or(""),
                     up_path_slash = if slash_idx.is_some() { "/" } else { "" })
         };
-        let list_s = req_p.read_dir()
-            .expect("Failed to read requested directory")
-            .map(|p| p.expect("Failed to iterate over requested directory"))
+
+
+        let rd = match req_p.read_dir() {
+            Ok(rd) => rd,
+            Err(err) => return self.handle_requested_entity_forbidden(req, err, "directory"),
+        };
+        let list_s = rd.map(|p| p.expect("Failed to iterate over requested directory"))
             .filter(|f| {
                 let fp = f.path();
                 let mut symlink = false;
@@ -1192,6 +1200,18 @@ impl HttpHandler {
         }
 
         Ok(Response::with((st, Header(headers::Server(USER_AGENT.to_string())), "text/html;charset=utf-8".parse::<mime::Mime>().unwrap(), resp)))
+    }
+
+    fn handle_requested_entity_forbidden(&self, req: &mut Request, e: IoError, entity_type: &str) -> IronResult<Response> {
+        if e.kind() == IoErrorKind::PermissionDenied {
+            self.handle_generated_response_encoding(req,
+                                                    status::Forbidden,
+                                                    html_response(ERROR_HTML, &["403 Forbidden", &format!("Can't access {}.", url_path(&req.url)), ""]))
+        } else {
+            // The ops that get here (File::open(), fs::read_dir()) can't return any other errors by the time they're run
+            // (and even if it could, there isn't much we can do about them)
+            panic!("Failed to read requested {}: {:?}", entity_type, e)
+        }
     }
 
     fn handle_raw_fs_api_response<R: Serialize>(&self, st: status::Status, resp: &R) -> IronResult<Response> {
