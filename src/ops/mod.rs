@@ -637,7 +637,8 @@ impl HttpHandler {
         self.handle_raw_fs_api_response(status::Ok,
                                         &FilesetData {
                                             writes_supported: self.writes_temp_dir.is_some(),
-                                            is_root: req.url.as_ref().path_segments().unwrap().count() == 1,
+                                            is_root: req.url.as_ref().path_segments().unwrap().count() + !req.url.as_ref().as_str().ends_with('/') as usize ==
+                                                     1,
                                             is_file: false,
                                             files: req_p.read_dir()
                                                 .expect("Failed to read requested directory")
