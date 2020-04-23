@@ -533,7 +533,7 @@ impl HttpHandler {
         } else {
             let file = match File::open(&req_p) {
                 Ok(file) => file,
-                Err(err) => return self.handle_requested_entity_forbidden(req, err, "file"),
+                Err(err) => return self.handle_requested_entity_unopenable(req, err, "file"),
             };
             Ok(Response::with((status::Ok,
                                (Header(headers::Server(USER_AGENT.to_string())),
@@ -847,7 +847,7 @@ impl HttpHandler {
 
         let rd = match req_p.read_dir() {
             Ok(rd) => rd,
-            Err(err) => return self.handle_requested_entity_forbidden(req, err, "directory"),
+            Err(err) => return self.handle_requested_entity_unopenable(req, err, "directory"),
         };
         let list_s = rd.map(|p| p.expect("Failed to iterate over requested directory"))
             .filter(|f| {
@@ -1203,7 +1203,7 @@ impl HttpHandler {
         Ok(Response::with((st, Header(headers::Server(USER_AGENT.to_string())), "text/html;charset=utf-8".parse::<mime::Mime>().unwrap(), resp)))
     }
 
-    fn handle_requested_entity_forbidden(&self, req: &mut Request, e: IoError, entity_type: &str) -> IronResult<Response> {
+    fn handle_requested_entity_unopenable(&self, req: &mut Request, e: IoError, entity_type: &str) -> IronResult<Response> {
         if e.kind() == IoErrorKind::PermissionDenied {
             self.handle_generated_response_encoding(req,
                                                     status::Forbidden,
