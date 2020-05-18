@@ -15,7 +15,7 @@ use std::fs::{self, File};
 /// The last line of this, after running it through a preprocessor, will expand to the value of `BLKGETSIZE`
 #[cfg(not(any(target_os = "windows", target_os = "macos")))]
 static IOCTL_CHECK_SOURCE: &str = r#"
-#include <linux/fs.h>
+#include <sys/mount.h>
 
 BLKGETSIZE
 "#;
