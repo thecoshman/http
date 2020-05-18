@@ -24,8 +24,14 @@ BLKGETSIZE
 #[cfg(not(any(target_os = "windows", target_os = "macos")))]
 static IOCTL_INCLUDE_SKELETON: &str = r#"
 /// Return `device size / 512` (`long *` arg)
-static BLKGETSIZE: c_ulong = {};
+static BLKGETSIZE: {type} = {expr} as {type};
 "#;
+
+#[cfg(all(not(any(target_os = "windows", target_os = "macos")), not(target_env = "musl")))]
+static IOCTL_REQUEST_TYPE: &str = "libc::c_ulong";
+
+#[cfg(all(not(any(target_os = "windows", target_os = "macos")), target_env = "musl"))]
+static IOCTL_REQUEST_TYPE: &str = "libc::c_int";
 
 
 fn main() {
@@ -49,8 +55,11 @@ fn get_ioctl_data() {
     File::create(&ioctl_source).unwrap().write_all(IOCTL_CHECK_SOURCE.as_bytes()).unwrap();
 
     let ioctl_preprocessed = String::from_utf8(cc::Build::new().file(ioctl_source).expand()).unwrap();
-    let blkgetsize_expr = ioctl_preprocessed.lines().next_back().unwrap().replace("U", " as c_ulong");
+    let blkgetsize_expr = ioctl_preprocessed.lines().next_back().unwrap().replace("U", "");
 
     let ioctl_include = ioctl_dir.join("ioctl.rs");
-    File::create(&ioctl_include).unwrap().write_all(IOCTL_INCLUDE_SKELETON.replace("{}", &blkgetsize_expr).as_bytes()).unwrap();
+    File::create(&ioctl_include)
+        .unwrap()
+        .write_all(IOCTL_INCLUDE_SKELETON.replace("{type}", IOCTL_REQUEST_TYPE).replace("{expr}", &blkgetsize_expr).as_bytes())
+        .unwrap();
 }
