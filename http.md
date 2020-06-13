@@ -384,7 +384,8 @@ pass parameters like what port to use.
 
 Written by thecoshman &lt;<rust@thecoshman.com>&gt;,
            nabijaczleweli &lt;<nabijaczleweli@gmail.com>&gt;,
-       and pheki.
+           pheki,
+       and Adrian Herath &lt;<adrianisuru@gmail.com>&gt;.
 
 ## REPORTING BUGS
 

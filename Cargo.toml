@@ -13,7 +13,8 @@ version = "1.9.3"
 # Remember to also update in http.md
 authors = ["thecoshman <rust@thecoshman.com>",
            "nabijaczleweli <nabijaczleweli@gmail.com>",
-           "pheki"]
+           "pheki",
+           "Adrian Herath <adrianisuru@gmail.com>"]
 
 [dependencies]
 hyper-native-tls = "0.3"
