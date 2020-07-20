@@ -19,6 +19,7 @@ use std::num::NonZeroU64;
 use std::path::PathBuf;
 use std::str::FromStr;
 use std::borrow::Cow;
+use iron::mime::Mime;
 use std::net::IpAddr;
 use regex::Regex;
 use cidr::IpCidr;
@@ -99,6 +100,8 @@ pub struct Options {
     pub generate_path_auth: BTreeSet<String>,
     /// Header names and who we trust them from in `HEADER-NAME:CIDR` format
     pub proxies: BTreeMap<IpCidr, String>,
+    /// Extension -> MIME type mapping overrides; empty string for no extension
+    pub mime_type_overrides: BTreeMap<String, Mime>,
     /// Max amount of data per second each request is allowed to return. Default: `None`
     pub request_bandwidth: Option<NonZeroU64>,
 }
@@ -135,6 +138,8 @@ impl Options {
             .arg(Arg::from_usage("--gen-path-auth [PATH]... 'Generate a one-off username:password set for authentication under PATH'"))
             .arg(Arg::from_usage("--proxy [HEADER-NAME:CIDR]... 'Treat HEADER-NAME as proxy forwarded-for header when request comes from CIDR'")
                 .validator(|s| Options::proxy_parse(s.into()).map(|_| ())))
+            .arg(Arg::from_usage("-m --mime-type [EXTENSION:MIME-TYPE]... 'Always return MIME-TYPE for files with EXTENSION'")
+                .validator(|s| Options::mime_type_override_parse(s.into()).map(|_| ())))
             .arg(Arg::from_usage("--request-bandwidth [BYTES] 'Limit each request to returning BYTES per second, or 0 for unlimited. Default: 0'")
                 .validator(|s| Options::bandwidth_parse(s.into()).map(|_| ())))
             .get_matches();
@@ -209,6 +214,12 @@ impl Options {
             path_auth_data: path_auth_data,
             generate_path_auth: generate_path_auth,
             proxies: matches.values_of("proxy").unwrap_or_default().map(Cow::from).map(Options::proxy_parse).map(Result::unwrap).collect(),
+            mime_type_overrides: matches.values_of("mime-type")
+                .unwrap_or_default()
+                .map(Cow::from)
+                .map(Options::mime_type_override_parse)
+                .map(Result::unwrap)
+                .collect(),
             request_bandwidth: matches.value_of("request-bandwidth").map(Cow::from).map(Options::bandwidth_parse).map(Result::unwrap).unwrap_or_default(),
         }
     }
@@ -338,5 +349,18 @@ impl Options {
 
         let number = u64::from_str(s).map_err(|e| format!("\"{}\" not band width size: {}", s, e))?;
         Ok(NonZeroU64::new(number.checked_mul(multiplier).ok_or_else(|| format!("{} * {} too big", number, multiplier))?))
+    }
+
+    fn mime_type_override_parse<'s>(s: Cow<'s, str>) -> Result<(String, Mime), String> {
+        match s.find(":") {
+            None => Err(format!("{} not in EXTENSION:MIME-TYPE format", s)),
+            Some(col_idx) => {
+                let mt = s[col_idx + 1..].parse().map_err(|()| format!("{} not a valid MIME type", &s[col_idx + 1..]))?;
+
+                let mut s = s.into_owned();
+                s.truncate(col_idx);
+                Ok((s, mt))
+            }
+        }
     }
 }

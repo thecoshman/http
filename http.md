@@ -122,6 +122,17 @@ pass parameters like what port to use.
 
     Can be specified any amount of times. Default: none.
 
+  -m --mime-type [EXTENSION:MIME-TYPE]
+
+    Return MIME-TYPE for files with EXTENSION.
+
+    If EXTENSION is the empty string, return that MIME-TYPE for files with no extension.
+
+    The default MIME type is as returned by the mime_guess crate, if any,
+    otherwise "application/octet-stream" for binary files or "text/plain".
+
+    Can be specified any amount of times. Default: none.
+
   --request-bandwidth [BYTES]
 
     Limit the band for each request to BYTES/second wide.
@@ -388,6 +399,20 @@ pass parameters like what port to use.
       [2020-02-17 17:48:41] 127.0.0.1:1392 for OwO was served directory listing for \\?\P:\Rust\http
       [2020-02-17 17:49:12] 192.168.1.109:1403 for UwU was served directory listing for \\?\P:\Rust\http
       [2020-02-17 17:49:29] 93.184.216.34:1397 was served directory listing for \\?\P:\Rust\http
+
+  `http --mime-type css:text/css;charset=utf-8 --mime-type :image/jpeg`
+
+    As in the first example, but send .css with the charset=utf8 attribute and
+    treat files with no extension as JPEGs.
+
+    Then the output will be as follows:
+      Hosting "." on port 8000 without TLS and no authentication...
+      Serving files with no extension as image/jpeg.
+      Serving files with .css extension as text/css; charset=utf-8.
+      Ctrl-C to stop.
+
+      [2020-07-20 12:32:24] 127.0.0.1:47916 was served file \\?\S:\Rust-target\doc\main.css as text/css; charset=utf-8
+      [2020-07-20 12:32:25] 127.0.0.1:2803 was served file \\?\P:\121D800E\http\DSC_6505 as image/jpeg
 
   `http --request-bandwidth 4K`
 

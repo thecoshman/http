@@ -129,6 +129,13 @@ fn result_main() -> Result<(), Error> {
             println!("Requests limited to {}B/s.", band);
         }
 
+        for (ext, mime_type) in opts.mime_type_overrides {
+            match &ext[..] {
+                "" => println!("Serving files with no extension as {}.", mime_type),
+                _ => println!("Serving files with .{} extension as {}.", ext, mime_type),
+            }
+        }
+
         if !opts.proxies.is_empty() {
             println!("Trusted proxies:");
 

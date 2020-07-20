@@ -132,7 +132,7 @@ impl HttpHandler {
             cache_gen: Default::default(),
             cache_fs: Default::default(),
             proxies: opts.proxies.clone(),
-            mime_type_overrides: Default::default(),
+            mime_type_overrides: opts.mime_type_overrides.clone(),
         }
     }
 
