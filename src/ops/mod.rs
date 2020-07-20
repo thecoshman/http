@@ -1,11 +1,11 @@
 use md6;
 use std::fmt;
 use serde_json;
+use std::ffi::OsStr;
 use std::borrow::Cow;
 use std::net::IpAddr;
 use serde::Serialize;
 use unicase::UniCase;
-use iron::mime::Mime;
 use std::sync::RwLock;
 use lazysort::SortedBy;
 use cidr::{Cidr, IpCidr};
@@ -15,7 +15,7 @@ use rand::{Rng, thread_rng};
 use iron::modifiers::Header;
 use std::path::{PathBuf, Path};
 use iron::url::Url as GenericUrl;
-use mime_guess::guess_mime_type_opt;
+use mime_guess::get_mime_type_opt;
 use hyper_native_tls::NativeTlsServer;
 use std::collections::{BTreeMap, HashMap};
 use self::super::{LogLevel, Options, Error};
@@ -23,6 +23,7 @@ use std::process::{ExitStatus, Command, Child, Stdio};
 use rfsapi::{RawFsApiHeader, FilesetData, RawFileData};
 use rand::distributions::uniform::Uniform as UniformDistribution;
 use rand::distributions::Alphanumeric as AlphanumericDistribution;
+use iron::mime::{Mime, SubLevel as MimeSubLevel, TopLevel as MimeTopLevel};
 use std::io::{self, ErrorKind as IoErrorKind, SeekFrom, Write, Error as IoError, Read, Seek};
 use iron::{headers, status, method, mime, IronResult, Listening, Response, TypeMap, Request, Handler, Iron};
 use self::super::util::{WwwAuthenticate, DisplayThree, CommaList, Spaces, Dav, url_path, file_hash, is_symlink, encode_str, encode_file, file_length,
@@ -93,6 +94,7 @@ pub struct HttpHandler {
     pub writes_temp_dir: Option<(String, PathBuf)>,
     pub encoded_temp_dir: Option<(String, PathBuf)>,
     pub proxies: BTreeMap<IpCidr, String>,
+    pub mime_type_overrides: BTreeMap<String, Mime>,
     cache_gen: RwLock<CacheT<Vec<u8>>>,
     cache_fs: RwLock<CacheT<(PathBuf, bool)>>,
 }
@@ -130,6 +132,7 @@ impl HttpHandler {
             cache_gen: Default::default(),
             cache_fs: Default::default(),
             proxies: opts.proxies.clone(),
+            mime_type_overrides: Default::default(),
         }
     }
 
@@ -1263,11 +1266,16 @@ impl HttpHandler {
     }
 
     fn guess_mime_type(&self, req_p: &Path) -> Mime {
-        guess_mime_type_opt(&req_p).unwrap_or_else(|| if file_binary(&req_p) {
-            "application/octet-stream".parse().unwrap()
-        } else {
-            "text/plain".parse().unwrap()
-        })
+        // Based on mime_guess::guess_mime_type_opt(); that one does to_str() instead of to_string_lossy()
+        let ext = req_p.extension().map(OsStr::to_string_lossy).unwrap_or("".into());
+
+        (self.mime_type_overrides.get(&*ext).cloned())
+            .or_else(|| get_mime_type_opt(&*ext))
+            .unwrap_or_else(|| if file_binary(req_p) {
+                Mime(MimeTopLevel::Application, MimeSubLevel::OctetStream, Default::default()) // "application/octet-stream"
+            } else {
+                Mime(MimeTopLevel::Text, MimeSubLevel::Plain, Default::default()) // "text/plain"
+            })
     }
 }
 
@@ -1285,6 +1293,7 @@ impl Clone for HttpHandler {
             writes_temp_dir: self.writes_temp_dir.clone(),
             encoded_temp_dir: self.encoded_temp_dir.clone(),
             proxies: self.proxies.clone(),
+            mime_type_overrides: self.mime_type_overrides.clone(),
             cache_gen: Default::default(),
             cache_fs: Default::default(),
         }
