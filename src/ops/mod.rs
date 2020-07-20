@@ -8,12 +8,12 @@ use unicase::UniCase;
 use iron::mime::Mime;
 use std::sync::RwLock;
 use lazysort::SortedBy;
-use std::path::PathBuf;
 use cidr::{Cidr, IpCidr};
 use std::fs::{self, File};
 use std::default::Default;
 use rand::{Rng, thread_rng};
 use iron::modifiers::Header;
+use std::path::{PathBuf, Path};
 use iron::url::Url as GenericUrl;
 use mime_guess::guess_mime_type_opt;
 use hyper_native_tls::NativeTlsServer;
@@ -399,11 +399,7 @@ impl HttpHandler {
     }
 
     fn handle_get_file_closed_range(&self, req: &mut Request, req_p: PathBuf, from: u64, to: u64) -> IronResult<Response> {
-        let mime_type = guess_mime_type_opt(&req_p).unwrap_or_else(|| if file_binary(&req_p) {
-            "application/octet-stream".parse().unwrap()
-        } else {
-            "text/plain".parse().unwrap()
-        });
+        let mime_type = self.guess_mime_type(&req_p);
         log!(self.log,
              "{} was served byte range {}-{} of file {magenta}{}{reset} as {blue}{}{reset}",
              self.remote_addresses(&req),
@@ -430,11 +426,7 @@ impl HttpHandler {
     }
 
     fn handle_get_file_right_opened_range(&self, req: &mut Request, req_p: PathBuf, from: u64) -> IronResult<Response> {
-        let mime_type = guess_mime_type_opt(&req_p).unwrap_or_else(|| if file_binary(&req_p) {
-            "application/octet-stream".parse().unwrap()
-        } else {
-            "text/plain".parse().unwrap()
-        });
+        let mime_type = self.guess_mime_type(&req_p);
         log!(self.log,
              "{} was served file {magenta}{}{reset} from byte {} as {blue}{}{reset}",
              self.remote_addresses(&req),
@@ -447,11 +439,7 @@ impl HttpHandler {
     }
 
     fn handle_get_file_left_opened_range(&self, req: &mut Request, req_p: PathBuf, from: u64) -> IronResult<Response> {
-        let mime_type = guess_mime_type_opt(&req_p).unwrap_or_else(|| if file_binary(&req_p) {
-            "application/octet-stream".parse().unwrap()
-        } else {
-            "text/plain".parse().unwrap()
-        });
+        let mime_type = self.guess_mime_type(&req_p);
         log!(self.log,
              "{} was served last {} bytes of file {magenta}{}{reset} as {blue}{}{reset}",
              self.remote_addresses(&req),
@@ -494,11 +482,7 @@ impl HttpHandler {
     }
 
     fn handle_get_file_empty_range(&self, req: &mut Request, req_p: PathBuf, from: u64, to: u64) -> IronResult<Response> {
-        let mime_type = guess_mime_type_opt(&req_p).unwrap_or_else(|| if file_binary(&req_p) {
-            "application/octet-stream".parse().unwrap()
-        } else {
-            "text/plain".parse().unwrap()
-        });
+        let mime_type = self.guess_mime_type(&req_p);
         log!(self.log,
              "{} was served an empty range from file {magenta}{}{reset} as {blue}{}{reset}",
              self.remote_addresses(&req),
@@ -517,11 +501,7 @@ impl HttpHandler {
     }
 
     fn handle_get_file(&self, req: &mut Request, req_p: PathBuf) -> IronResult<Response> {
-        let mime_type = guess_mime_type_opt(&req_p).unwrap_or_else(|| if file_binary(&req_p) {
-            "application/octet-stream".parse().unwrap()
-        } else {
-            "text/plain".parse().unwrap()
-        });
+        let mime_type = self.guess_mime_type(&req_p);
         log!(self.log,
              "{} was served file {magenta}{}{reset} as {blue}{}{reset}",
              self.remote_addresses(&req),
@@ -1280,6 +1260,14 @@ impl HttpHandler {
             request: req,
             proxies: &self.proxies,
         }
+    }
+
+    fn guess_mime_type(&self, req_p: &Path) -> Mime {
+        guess_mime_type_opt(&req_p).unwrap_or_else(|| if file_binary(&req_p) {
+            "application/octet-stream".parse().unwrap()
+        } else {
+            "text/plain".parse().unwrap()
+        })
     }
 }
 

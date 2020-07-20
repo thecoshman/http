@@ -7,8 +7,8 @@
 
 
 use self::super::super::util::{BorrowXmlName, Destination, CommaList, Overwrite, Depth, win32_file_attributes, file_time_accessed, file_time_modified,
-                               file_time_created, client_microsoft, is_actually_file, is_descendant_of, file_executable, html_response, file_length,
-                               file_binary, copy_dir, WEBDAV_ALLPROP_PROPERTIES_NON_WINDOWS, WEBDAV_ALLPROP_PROPERTIES_WINDOWS, WEBDAV_XML_NAMESPACE_MICROSOFT,
+                               file_time_created, client_microsoft, is_actually_file, is_descendant_of, file_executable, html_response, file_length, copy_dir,
+                               WEBDAV_ALLPROP_PROPERTIES_NON_WINDOWS, WEBDAV_ALLPROP_PROPERTIES_WINDOWS, WEBDAV_XML_NAMESPACE_MICROSOFT,
                                WEBDAV_XML_NAMESPACE_APACHE, WEBDAV_PROPNAME_PROPERTIES, WEBDAV_XML_NAMESPACE_DAV, WEBDAV_XML_NAMESPACES, ERROR_HTML};
 use std::io::{ErrorKind as IoErrorKind, Result as IoResult, Error as IoError, Write, Read};
 use xml::reader::{EventReader as XmlReader, XmlEvent as XmlREvent, Error as XmlRError};
@@ -18,7 +18,6 @@ use xml::writer::events::StartElementBuilder as XmlWEventStartElementBuilder;
 use xml::common::{TextPosition as XmlTextPosition, XmlVersion, Position};
 use xml::name::{OwnedName as OwnedXmlName, Name as XmlName};
 use iron::{status, IronResult, Response, Request};
-use mime_guess::guess_mime_type_opt;
 use iron::url::Url as GenericUrl;
 use std::path::{PathBuf, Path};
 use std::fs::{self, Metadata};
@@ -118,7 +117,7 @@ impl HttpHandler {
         out.write(namespaces_for_props("D:multistatus", props.iter().flat_map(|pp| pp.iter())))?;
 
         let meta = path.metadata().expect("Failed to get requested file metadata");
-        handle_propfind_path(&mut out, &url, &path, &meta, props, just_names)?;
+        self.handle_propfind_path(&mut out, &url, &path, &meta, props, just_names)?;
 
         if meta.is_dir() {
             if let Some(ir) = self.handle_webdav_propfind_path_recursive(req, &mut out, url, &path, props, just_names, depth)? {
@@ -156,12 +155,12 @@ impl HttpHandler {
 
                 if !(!path.exists() || (symlink && !self.follow_symlinks) ||
                      (symlink && self.follow_symlinks && self.sandbox_symlinks && !is_descendant_of(&path, &self.hosted_directory.1))) {
-                    handle_propfind_path(out,
-                                         &url,
-                                         &path,
-                                         &path.metadata().expect("Failed to get requested file metadata"),
-                                         props,
-                                         just_names)?;
+                    self.handle_propfind_path(out,
+                                              &url,
+                                              &path,
+                                              &path.metadata().expect("Failed to get requested file metadata"),
+                                              props,
+                                              just_names)?;
                     self.handle_webdav_propfind_path_recursive(req, out, url, &path, props, just_names, next_depth)?;
                 }
             }
@@ -370,6 +369,150 @@ impl HttpHandler {
             }
         }
     }
+
+    /// Adapted from
+    /// https://github.com/tylerwhall/hyperdav-server/blob/415f512ac030478593ad389a3267aeed7441d826/src/lib.rs#L306
+    fn handle_propfind_path<'n, W: Write, N: BorrowXmlName<'n>>(&self, out: &mut XmlWriter<W>, url: &str, path: &Path, meta: &Metadata, props: &[&'n [N]],
+                                                                just_names: bool)
+                                                                -> Result<(), XmlWError> {
+        out.write(XmlWEvent::start_element("D:response"))?;
+
+        out.write(XmlWEvent::start_element("D:href"))?;
+        out.write(XmlWEvent::characters(url))?;
+        out.write(XmlWEvent::end_element())?; // href
+
+        let prop_count = props.iter().map(|pp| pp.len()).sum();
+        let mut failed_props = Vec::with_capacity(prop_count);
+        out.write(XmlWEvent::start_element("D:propstat"))?;
+        out.write(XmlWEvent::start_element("D:prop"))?;
+        for prop in props.iter().flat_map(|pp| pp.iter()) {
+            let prop = prop.borrow_xml_name();
+
+            let mut write_name = false;
+            if !just_names && !self.handle_prop_path(out, path, meta, prop)? {
+                failed_props.push(prop);
+                write_name = true;
+            }
+
+            if just_names || write_name {
+                start_client_prop_element(out, prop)?;
+                out.write(XmlWEvent::end_element())?;
+            }
+        }
+        out.write(XmlWEvent::end_element())?; // prop
+        out.write(XmlWEvent::start_element("D:status"))?;
+        if failed_props.len() >= prop_count {
+            // If they all failed, make this a failure response and return
+            out.write(XmlWEvent::characters("HTTP/1.1 404 Not Found"))?;
+            out.write(XmlWEvent::end_element())?; // status
+            out.write(XmlWEvent::end_element())?; // propstat
+            out.write(XmlWEvent::end_element())?; // response
+            return Ok(());
+        }
+
+        out.write(XmlWEvent::characters("HTTP/1.1 200 OK"))?;
+        out.write(XmlWEvent::end_element())?; // status
+        out.write(XmlWEvent::end_element())?; // propstat
+
+        if !failed_props.is_empty() {
+            // Handle the failed properties
+            out.write(XmlWEvent::start_element("D:propstat"))?;
+            out.write(XmlWEvent::start_element("D:prop"))?;
+            for prop in failed_props {
+                start_client_prop_element(out, prop)?;
+                out.write(XmlWEvent::end_element())?;
+            }
+            out.write(XmlWEvent::end_element())?; // prop
+            out.write(XmlWEvent::start_element("D:status"))?;
+            out.write(XmlWEvent::characters("HTTP/1.1 404 Not Found"))?;
+            out.write(XmlWEvent::end_element())?; // status
+            out.write(XmlWEvent::end_element())?; // propstat
+        }
+
+        out.write(XmlWEvent::end_element())?; // response
+
+        Ok(())
+    }
+
+    /// Adapted from
+    /// https://github.com/tylerwhall/hyperdav-server/blob/415f512ac030478593ad389a3267aeed7441d826/src/lib.rs#L245
+    /// extended properties adapted from
+    /// https://github.com/miquels/webdav-handler-rs/blob/02433c1acfccd848a7de26889f6857cbad559076/src/handle_props.rs#L655
+    fn handle_prop_path<W: Write>(&self, out: &mut XmlWriter<W>, path: &Path, meta: &Metadata, prop: XmlName) -> Result<bool, XmlWError> {
+        if prop.namespace == Some(WEBDAV_XML_NAMESPACE_DAV.1) {
+            match prop.local_name {
+                "creationdate" => {
+                    out.write(XmlWEvent::start_element((WEBDAV_XML_NAMESPACE_DAV.0, "creationdate")))?;
+                    out.write(XmlWEvent::characters(&file_time_created(meta).rfc3339().to_string()))?;
+                }
+
+                "getcontentlength" => {
+                    out.write(XmlWEvent::start_element((WEBDAV_XML_NAMESPACE_DAV.0, "getcontentlength")))?;
+                    out.write(XmlWEvent::characters(&file_length(&meta, &path).to_string()))?;
+                }
+
+                "getcontenttype" => {
+                    out.write(XmlWEvent::start_element((WEBDAV_XML_NAMESPACE_DAV.0, "getcontenttype")))?;
+                    out.write(XmlWEvent::characters(&self.guess_mime_type(&path).to_string()))?;
+                }
+
+                "getlastmodified" => {
+                    out.write(XmlWEvent::start_element((WEBDAV_XML_NAMESPACE_DAV.0, "getlastmodified")))?;
+                    out.write(XmlWEvent::characters(&file_time_modified(meta).rfc3339().to_string()))?;
+                }
+
+                "resourcetype" => {
+                    out.write(XmlWEvent::start_element((WEBDAV_XML_NAMESPACE_DAV.0, "resourcetype")))?;
+                    if !is_actually_file(&meta.file_type()) {
+                        out.write(XmlWEvent::start_element((WEBDAV_XML_NAMESPACE_DAV.0, "collection")))?;
+                        out.write(XmlWEvent::end_element())?;
+                    }
+                }
+
+                _ => return Ok(false),
+            }
+        } else if prop.namespace == Some(WEBDAV_XML_NAMESPACE_MICROSOFT.1) {
+            match prop.local_name {
+                "Win32CreationTime" => {
+                    out.write(XmlWEvent::start_element((WEBDAV_XML_NAMESPACE_MICROSOFT.0, "Win32CreationTime")))?;
+                    out.write(XmlWEvent::characters(&file_time_created(meta).rfc3339().to_string()))?;
+                }
+
+                "Win32FileAttributes" => {
+                    out.write(XmlWEvent::start_element((WEBDAV_XML_NAMESPACE_MICROSOFT.0, "Win32FileAttributes")))?;
+
+                    let attr = win32_file_attributes(meta, path);
+                    out.write(XmlWEvent::characters(&format!("{:08x}", attr)))?;
+                }
+
+                "Win32LastAccessTime" => {
+                    out.write(XmlWEvent::start_element((WEBDAV_XML_NAMESPACE_MICROSOFT.0, "Win32FileAttributes")))?;
+                    out.write(XmlWEvent::characters(&file_time_accessed(meta).rfc3339().to_string()))?;
+                }
+
+                "Win32LastModifiedTime" => {
+                    out.write(XmlWEvent::start_element((WEBDAV_XML_NAMESPACE_MICROSOFT.0, "Win32LastModifiedTime")))?;
+                    out.write(XmlWEvent::characters(&file_time_modified(meta).rfc3339().to_string()))?;
+                }
+
+                _ => return Ok(false),
+            }
+        } else if prop.namespace == Some(WEBDAV_XML_NAMESPACE_APACHE.1) {
+            match prop.local_name {
+                "executable" => {
+                    out.write(XmlWEvent::start_element((WEBDAV_XML_NAMESPACE_APACHE.0, "executable")))?;
+                    out.write(XmlWEvent::characters(if file_executable(&meta) { "T" } else { "F" }))?;
+                }
+
+                _ => return Ok(false),
+            }
+        } else {
+            return Ok(false);
+        }
+
+        out.write(XmlWEvent::end_element())?;
+        Ok(true)
+    }
 }
 
 
@@ -444,155 +587,6 @@ fn parse_propfind(req: &mut Request) -> Result<PropfindVariant, Result<String, X
             (st, ev) => return Err(Ok(format!("Unexpected event {:?} during state {:?}", ev, st))),
         }
     }
-}
-
-/// Adapted from
-/// https://github.com/tylerwhall/hyperdav-server/blob/415f512ac030478593ad389a3267aeed7441d826/src/lib.rs#L306
-fn handle_propfind_path<'n, W: Write, N: BorrowXmlName<'n>>(out: &mut XmlWriter<W>, url: &str, path: &Path, meta: &Metadata, props: &[&'n [N]],
-                                                            just_names: bool)
-                                                            -> Result<(), XmlWError> {
-    out.write(XmlWEvent::start_element("D:response"))?;
-
-    out.write(XmlWEvent::start_element("D:href"))?;
-    out.write(XmlWEvent::characters(url))?;
-    out.write(XmlWEvent::end_element())?; // href
-
-    let prop_count = props.iter().map(|pp| pp.len()).sum();
-    let mut failed_props = Vec::with_capacity(prop_count);
-    out.write(XmlWEvent::start_element("D:propstat"))?;
-    out.write(XmlWEvent::start_element("D:prop"))?;
-    for prop in props.iter().flat_map(|pp| pp.iter()) {
-        let prop = prop.borrow_xml_name();
-
-        let mut write_name = false;
-        if !just_names && !handle_prop_path(out, path, meta, prop)? {
-            failed_props.push(prop);
-            write_name = true;
-        }
-
-        if just_names || write_name {
-            start_client_prop_element(out, prop)?;
-            out.write(XmlWEvent::end_element())?;
-        }
-    }
-    out.write(XmlWEvent::end_element())?; // prop
-    out.write(XmlWEvent::start_element("D:status"))?;
-    if failed_props.len() >= prop_count {
-        // If they all failed, make this a failure response and return
-        out.write(XmlWEvent::characters("HTTP/1.1 404 Not Found"))?;
-        out.write(XmlWEvent::end_element())?; // status
-        out.write(XmlWEvent::end_element())?; // propstat
-        out.write(XmlWEvent::end_element())?; // response
-        return Ok(());
-    }
-
-    out.write(XmlWEvent::characters("HTTP/1.1 200 OK"))?;
-    out.write(XmlWEvent::end_element())?; // status
-    out.write(XmlWEvent::end_element())?; // propstat
-
-    if !failed_props.is_empty() {
-        // Handle the failed properties
-        out.write(XmlWEvent::start_element("D:propstat"))?;
-        out.write(XmlWEvent::start_element("D:prop"))?;
-        for prop in failed_props {
-            start_client_prop_element(out, prop)?;
-            out.write(XmlWEvent::end_element())?;
-        }
-        out.write(XmlWEvent::end_element())?; // prop
-        out.write(XmlWEvent::start_element("D:status"))?;
-        out.write(XmlWEvent::characters("HTTP/1.1 404 Not Found"))?;
-        out.write(XmlWEvent::end_element())?; // status
-        out.write(XmlWEvent::end_element())?; // propstat
-    }
-
-    out.write(XmlWEvent::end_element())?; // response
-
-    Ok(())
-}
-
-/// Adapted from
-/// https://github.com/tylerwhall/hyperdav-server/blob/415f512ac030478593ad389a3267aeed7441d826/src/lib.rs#L245
-/// extended properties adapted from
-/// https://github.com/miquels/webdav-handler-rs/blob/02433c1acfccd848a7de26889f6857cbad559076/src/handle_props.rs#L655
-fn handle_prop_path<W: Write>(out: &mut XmlWriter<W>, path: &Path, meta: &Metadata, prop: XmlName) -> Result<bool, XmlWError> {
-    if prop.namespace == Some(WEBDAV_XML_NAMESPACE_DAV.1) {
-        match prop.local_name {
-            "creationdate" => {
-                out.write(XmlWEvent::start_element((WEBDAV_XML_NAMESPACE_DAV.0, "creationdate")))?;
-                out.write(XmlWEvent::characters(&file_time_created(meta).rfc3339().to_string()))?;
-            }
-
-            "getcontentlength" => {
-                out.write(XmlWEvent::start_element((WEBDAV_XML_NAMESPACE_DAV.0, "getcontentlength")))?;
-                out.write(XmlWEvent::characters(&file_length(&meta, &path).to_string()))?;
-            }
-
-            "getcontenttype" => {
-                out.write(XmlWEvent::start_element((WEBDAV_XML_NAMESPACE_DAV.0, "getcontenttype")))?;
-                let mime_type = guess_mime_type_opt(&path).unwrap_or_else(|| if file_binary(&path) {
-                    "application/octet-stream".parse().unwrap()
-                } else {
-                    "text/plain".parse().unwrap()
-                });
-                out.write(XmlWEvent::characters(&mime_type.to_string()))?;
-            }
-
-            "getlastmodified" => {
-                out.write(XmlWEvent::start_element((WEBDAV_XML_NAMESPACE_DAV.0, "getlastmodified")))?;
-                out.write(XmlWEvent::characters(&file_time_modified(meta).rfc3339().to_string()))?;
-            }
-
-            "resourcetype" => {
-                out.write(XmlWEvent::start_element((WEBDAV_XML_NAMESPACE_DAV.0, "resourcetype")))?;
-                if !is_actually_file(&meta.file_type()) {
-                    out.write(XmlWEvent::start_element((WEBDAV_XML_NAMESPACE_DAV.0, "collection")))?;
-                    out.write(XmlWEvent::end_element())?;
-                }
-            }
-
-            _ => return Ok(false),
-        }
-    } else if prop.namespace == Some(WEBDAV_XML_NAMESPACE_MICROSOFT.1) {
-        match prop.local_name {
-            "Win32CreationTime" => {
-                out.write(XmlWEvent::start_element((WEBDAV_XML_NAMESPACE_MICROSOFT.0, "Win32CreationTime")))?;
-                out.write(XmlWEvent::characters(&file_time_created(meta).rfc3339().to_string()))?;
-            }
-
-            "Win32FileAttributes" => {
-                out.write(XmlWEvent::start_element((WEBDAV_XML_NAMESPACE_MICROSOFT.0, "Win32FileAttributes")))?;
-
-                let attr = win32_file_attributes(meta, path);
-                out.write(XmlWEvent::characters(&format!("{:08x}", attr)))?;
-            }
-
-            "Win32LastAccessTime" => {
-                out.write(XmlWEvent::start_element((WEBDAV_XML_NAMESPACE_MICROSOFT.0, "Win32FileAttributes")))?;
-                out.write(XmlWEvent::characters(&file_time_accessed(meta).rfc3339().to_string()))?;
-            }
-
-            "Win32LastModifiedTime" => {
-                out.write(XmlWEvent::start_element((WEBDAV_XML_NAMESPACE_MICROSOFT.0, "Win32LastModifiedTime")))?;
-                out.write(XmlWEvent::characters(&file_time_modified(meta).rfc3339().to_string()))?;
-            }
-
-            _ => return Ok(false),
-        }
-    } else if prop.namespace == Some(WEBDAV_XML_NAMESPACE_APACHE.1) {
-        match prop.local_name {
-            "executable" => {
-                out.write(XmlWEvent::start_element((WEBDAV_XML_NAMESPACE_APACHE.0, "executable")))?;
-                out.write(XmlWEvent::characters(if file_executable(&meta) { "T" } else { "F" }))?;
-            }
-
-            _ => return Ok(false),
-        }
-    } else {
-        return Ok(false);
-    }
-
-    out.write(XmlWEvent::end_element())?;
-    Ok(true)
 }
 
 /// Adapted from
