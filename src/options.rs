@@ -88,6 +88,8 @@ pub struct Options {
     ///   * >= 2 – suppress startup except for auth data, if present
     ///   * >= 3 – suppress all startup messages
     pub loglevel: LogLevel,
+    /// Whether to colourise the log output. Default: `true`
+    pub log_colour: bool,
     /// Whether to handle WebDAV requests. Default: false
     pub webdav: bool,
     /// Data for HTTPS, identity file and password. Default: `None`
@@ -127,6 +129,7 @@ impl Options {
             .arg(Arg::from_usage("-i --no-indices 'Always generate dir listings even if index files are available. Default: false'"))
             .arg(Arg::from_usage("-e --no-encode 'Do not encode filesystem files. Default: false'"))
             .arg(Arg::from_usage("-q --quiet... 'Suppress increasing amounts of output'"))
+            .arg(Arg::from_usage("--no-colour 'Don't colourise the log output'"))
             .arg(Arg::from_usage("-d --webdav 'Handle WebDAV requests. Default: false'"))
             .arg(Arg::from_usage("--ssl [TLS_IDENTITY] 'Data for HTTPS, identity file. Password in HTTP_SSL_PASS env var, otherwise empty'")
                 .validator(Options::identity_validator))
@@ -208,6 +211,7 @@ impl Options {
             allow_writes: matches.is_present("allow-write"),
             encode_fs: !matches.is_present("no-encode"),
             loglevel: matches.occurrences_of("quiet").into(),
+            log_colour: !matches.is_present("no-colour"),
             webdav: matches.is_present("webdav"),
             tls_data: matches.value_of("ssl").map(|id| ((id.to_string(), fs::canonicalize(id).unwrap()), env::var("HTTP_SSL_PASS").unwrap_or_default())),
             generate_tls: matches.is_present("gen-ssl"),

@@ -34,41 +34,70 @@ use self::super::util::{WwwAuthenticate, DisplayThree, CommaList, Spaces, Dav, u
 
 
 macro_rules! log {
-    ($do_log:expr, $fmt:expr) => {
+    ($logcfg:expr, $fmt:expr) => {
         use time::now;
         use trivial_colours::{Reset as CReset, Colour as C};
 
-        if $do_log {
-            print!("{}[{}]{} ", C::Cyan, now().strftime("%F %T").unwrap(), CReset);
-            println!(concat!($fmt, "{black:.0}{red:.0}{green:.0}{yellow:.0}{blue:.0}{magenta:.0}{cyan:.0}{white:.0}{reset:.0}"),
-                     black = C::Black,
-                     red = C::Red,
-                     green = C::Green,
-                     yellow = C::Yellow,
-                     blue = C::Blue,
-                     magenta = C::Magenta,
-                     cyan = C::Cyan,
-                     white = C::White,
-                     reset = CReset);
+        if $logcfg.0 {
+            if $logcfg.1 {
+                print!("{}[{}]{} ", C::Cyan, now().strftime("%F %T").unwrap(), CReset);
+                println!(concat!($fmt, "{black:.0}{red:.0}{green:.0}{yellow:.0}{blue:.0}{magenta:.0}{cyan:.0}{white:.0}{reset:.0}"),
+                         black = C::Black,
+                         red = C::Red,
+                         green = C::Green,
+                         yellow = C::Yellow,
+                         blue = C::Blue,
+                         magenta = C::Magenta,
+                         cyan = C::Cyan,
+                         white = C::White,
+                         reset = CReset);
+            } else {
+                print!("[{}] ", now().strftime("%F %T").unwrap());
+                println!(concat!($fmt, "{black:.0}{red:.0}{green:.0}{yellow:.0}{blue:.0}{magenta:.0}{cyan:.0}{white:.0}{reset:.0}"),
+                         black = "",
+                         red = "",
+                         green = "",
+                         yellow = "",
+                         blue = "",
+                         magenta = "",
+                         cyan = "",
+                         white = "",
+                         reset = "");
+            }
         }
     };
-    ($do_log:expr, $fmt:expr, $($arg:tt)*) => {
+    ($logcfg:expr, $fmt:expr, $($arg:tt)*) => {
         use time::now;
         use trivial_colours::{Reset as CReset, Colour as C};
 
-        if $do_log {
-            print!("{}[{}]{} ", C::Cyan, now().strftime("%F %T").unwrap(), CReset);
-            println!(concat!($fmt, "{black:.0}{red:.0}{green:.0}{yellow:.0}{blue:.0}{magenta:.0}{cyan:.0}{white:.0}{reset:.0}"),
-                     $($arg)*,
-                     black = C::Black,
-                     red = C::Red,
-                     green = C::Green,
-                     yellow = C::Yellow,
-                     blue = C::Blue,
-                     magenta = C::Magenta,
-                     cyan = C::Cyan,
-                     white = C::White,
-                     reset = CReset);
+        if $logcfg.0 {
+            if $logcfg.1 {
+                print!("{}[{}]{} ", C::Cyan, now().strftime("%F %T").unwrap(), CReset);
+                println!(concat!($fmt, "{black:.0}{red:.0}{green:.0}{yellow:.0}{blue:.0}{magenta:.0}{cyan:.0}{white:.0}{reset:.0}"),
+                         $($arg)*,
+                         black = C::Black,
+                         red = C::Red,
+                         green = C::Green,
+                         yellow = C::Yellow,
+                         blue = C::Blue,
+                         magenta = C::Magenta,
+                         cyan = C::Cyan,
+                         white = C::White,
+                         reset = CReset);
+            } else {
+                print!("[{}] ", now().strftime("%F %T").unwrap());
+                println!(concat!($fmt, "{black:.0}{red:.0}{green:.0}{yellow:.0}{blue:.0}{magenta:.0}{cyan:.0}{white:.0}{reset:.0}"),
+                         $($arg)*,
+                         black = "",
+                         red = "",
+                         green = "",
+                         yellow = "",
+                         blue = "",
+                         magenta = "",
+                         cyan = "",
+                         white = "",
+                         reset = "");
+            }
         }
     };
 }
@@ -87,7 +116,8 @@ pub struct HttpHandler {
     pub follow_symlinks: bool,
     pub sandbox_symlinks: bool,
     pub check_indices: bool,
-    pub log: bool,
+    /// (at all, log_colour)
+    pub log: (bool, bool),
     pub webdav: bool,
     pub global_auth_data: Option<(String, Option<String>)>,
     pub path_auth_data: BTreeMap<String, Option<(String, Option<String>)>>,
@@ -123,7 +153,7 @@ impl HttpHandler {
             follow_symlinks: opts.follow_symlinks,
             sandbox_symlinks: opts.sandbox_symlinks,
             check_indices: opts.check_indices,
-            log: opts.loglevel < LogLevel::NoServeStatus,
+            log: (opts.loglevel < LogLevel::NoServeStatus, opts.log_colour),
             webdav: opts.webdav,
             global_auth_data: global_auth_data,
             path_auth_data: path_auth_data,
@@ -136,10 +166,10 @@ impl HttpHandler {
         }
     }
 
-    pub fn clean_temp_dirs(temp_dir: &(String, PathBuf), loglevel: LogLevel) {
+    pub fn clean_temp_dirs(temp_dir: &(String, PathBuf), loglevel: LogLevel, log_colour: bool) {
         for (temp_name, temp_dir) in ["writes", "encoded", "tls"].iter().flat_map(|tn| HttpHandler::temp_subdir(temp_dir, true, tn)) {
             if temp_dir.exists() && fs::remove_dir_all(&temp_dir).is_ok() {
-                log!(loglevel < LogLevel::NoServeStatus, "Deleted temp dir {magenta}{}{reset}", temp_name);
+                log!((loglevel < LogLevel::NoServeStatus, log_colour), "Deleted temp dir {magenta}{}{reset}", temp_name);
             }
         }
     }
