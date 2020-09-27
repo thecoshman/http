@@ -105,8 +105,10 @@ fn result_main() -> Result<(), Error> {
     }?;
 
     if opts.loglevel < options::LogLevel::NoStartup {
-        print!("{}Hosting \"{}\" on port {}",
-               trivial_colours::Reset,
+        if opts.log_colour {
+            print!("{}", trivial_colours::Reset);
+        }
+        print!("Hosting \"{}\" on port {}",
                opts.hosted_directory.0,
                responder.socket.port());
         if responder.socket.ip() != IpAddr::from([0, 0, 0, 0]) {

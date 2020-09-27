@@ -199,7 +199,7 @@ pass parameters like what port to use.
       N >= 2 – suppress startup except for auth data, if present
       N >= 3 – suppress all startup messages
 
-  --no-colour
+  -c --no-colour
 
     Don't colourise log output.
 
