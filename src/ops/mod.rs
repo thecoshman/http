@@ -116,6 +116,7 @@ pub struct HttpHandler {
     pub follow_symlinks: bool,
     pub sandbox_symlinks: bool,
     pub check_indices: bool,
+    pub strip_extensions: bool,
     /// (at all, log_colour)
     pub log: (bool, bool),
     pub webdav: bool,
@@ -153,6 +154,7 @@ impl HttpHandler {
             follow_symlinks: opts.follow_symlinks,
             sandbox_symlinks: opts.sandbox_symlinks,
             check_indices: opts.check_indices,
+            strip_extensions: opts.strip_extensions,
             log: (opts.loglevel < LogLevel::NoServeStatus, opts.log_colour),
             webdav: opts.webdav,
             global_auth_data: global_auth_data,
@@ -325,10 +327,16 @@ impl HttpHandler {
     }
 
     fn handle_get(&self, req: &mut Request) -> IronResult<Response> {
-        let (req_p, symlink, url_err) = self.parse_requested_path(req);
+        let (mut req_p, symlink, url_err) = self.parse_requested_path(req);
 
         if url_err {
             return self.handle_invalid_url(req, "<p>Percent-encoding decoded to invalid UTF-8.</p>");
+        }
+
+        if !req_p.exists() && req_p.extension().is_none() && self.strip_extensions {
+            if let Some(rp) = INDEX_EXTENSIONS.iter().map(|ext| req_p.with_extension(ext)).find(|rp| rp.exists()) {
+                req_p = rp;
+            }
         }
 
         if !req_p.exists() || (symlink && !self.follow_symlinks) ||
@@ -1319,6 +1327,7 @@ impl Clone for HttpHandler {
             follow_symlinks: self.follow_symlinks,
             sandbox_symlinks: self.sandbox_symlinks,
             check_indices: self.check_indices,
+            strip_extensions: self.strip_extensions,
             log: self.log,
             webdav: self.webdav,
             global_auth_data: self.global_auth_data.clone(),

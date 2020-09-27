@@ -182,6 +182,13 @@ pass parameters like what port to use.
 
     This is false by default because it's useful for reducing bandwidth usage.
 
+  -x --strip-extensions
+
+    Allow stripping index extentions from served paths:
+    a request to /file might get served by /file.[s]htm[l].
+
+    This is false by defailt
+
   -q --quiet...
 
     Suppress increasing amounts of output.

@@ -106,7 +106,7 @@ pub static PORT_SCAN_HIGHEST: u16 = 9999;
 /// The app name and version to use with User-Agent or Server response header.
 pub static USER_AGENT: &str = concat!("http/", env!("CARGO_PKG_VERSION"));
 
-/// Index file extensions to look for if `-i` was not specified.
+/// Index file extensions to look for if `-i` was not specified and strippable extensions to look for if `-x` was specified.
 pub static INDEX_EXTENSIONS: &[&str] = &["html", "htm", "shtml"];
 
 
