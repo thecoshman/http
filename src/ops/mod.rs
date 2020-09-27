@@ -169,7 +169,9 @@ impl HttpHandler {
     pub fn clean_temp_dirs(temp_dir: &(String, PathBuf), loglevel: LogLevel, log_colour: bool) {
         for (temp_name, temp_dir) in ["writes", "encoded", "tls"].iter().flat_map(|tn| HttpHandler::temp_subdir(temp_dir, true, tn)) {
             if temp_dir.exists() && fs::remove_dir_all(&temp_dir).is_ok() {
-                log!((loglevel < LogLevel::NoServeStatus, log_colour), "Deleted temp dir {magenta}{}{reset}", temp_name);
+                log!((loglevel < LogLevel::NoServeStatus, log_colour),
+                     "Deleted temp dir {magenta}{}{reset}",
+                     temp_name);
             }
         }
     }
@@ -1292,6 +1294,7 @@ impl HttpHandler {
         AddressWriter {
             request: req,
             proxies: &self.proxies,
+            log: self.log,
         }
     }
 
@@ -1334,19 +1337,29 @@ impl Clone for HttpHandler {
 pub struct AddressWriter<'r, 'p, 'ra, 'rb: 'ra> {
     pub request: &'r Request<'ra, 'rb>,
     pub proxies: &'p BTreeMap<IpCidr, String>,
+    /// (at all, log_colour)
+    pub log: (bool, bool),
 }
 
 impl<'r, 'p, 'ra, 'rb: 'ra> fmt::Display for AddressWriter<'r, 'p, 'ra, 'rb> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         use trivial_colours::{Reset as CReset, Colour as C};
 
-        write!(f, "{green}{}{reset}", self.request.remote_addr, green = C::Green, reset = CReset)?;
+        if self.log.1 {
+            write!(f, "{green}{}{reset}", self.request.remote_addr, green = C::Green, reset = CReset)?;
+        } else {
+            write!(f, "{}", self.request.remote_addr)?;
+        }
 
         for (network, header) in self.proxies {
             if network.contains(&self.request.remote_addr.ip()) {
                 if let Some(saddrs) = self.request.headers.get_raw(header) {
                     for saddr in saddrs {
-                        write!(f, " for {green}{}{reset}", String::from_utf8_lossy(saddr), green = C::Green, reset = CReset)?;
+                        if self.log.1 {
+                            write!(f, " for {green}{}{reset}", String::from_utf8_lossy(saddr), green = C::Green, reset = CReset)?;
+                        } else {
+                            write!(f, " for {}", String::from_utf8_lossy(saddr))?;
+                        }
                     }
                 }
             }
