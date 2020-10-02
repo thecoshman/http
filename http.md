@@ -187,7 +187,7 @@ pass parameters like what port to use.
     Allow stripping index extentions from served paths:
     a request to /file might get served by /file.[s]htm[l].
 
-    This is false by defailt
+    This is false by default
 
   -q --quiet...
 
