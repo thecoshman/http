@@ -437,7 +437,7 @@ pass parameters like what port to use.
 ## AUTHOR
 
 Written by thecoshman &lt;<rust@thecoshman.com>&gt;,
-           nabijaczleweli &lt;<nabijaczleweli@gmail.com>&gt;,
+           nabijaczleweli &lt;<nabijaczleweli@nabijaczleweli.xyz>&gt;,
            pheki,
        and Adrian Herath &lt;<adrianisuru@gmail.com>&gt;.
 
