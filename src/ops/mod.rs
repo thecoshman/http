@@ -763,7 +763,7 @@ impl HttpHandler {
                     file_time_modified_p(req_p.parent().expect("Failed to get requested directory's parent directory"))
                         .strftime("%F %T")
                         .unwrap(),
-                    up_path = slash_idx.map(|i| &rel_noslash[0..i]).unwrap_or(""),
+                    up_path = slash_idx.map(|i| &rel_noslash[0..i]).unwrap_or("").replace('%', "%25").replace('#', "%23").replace('[', "%5B").replace(']', "%5D"),
                     up_path_slash = if slash_idx.is_some() { "/" } else { "" })
         };
         let list_s = req_p.read_dir()
@@ -815,8 +815,8 @@ impl HttpHandler {
                         } else {
                             DisplayThree("", String::new(), "")
                         },
-                        path = format!("/{}", relpath).replace("//", "/").replace('%', "%25").replace('#', "%23"),
-                        fname = fname.replace('%', "%25").replace('#', "%23"))
+                        path = format!("/{}", relpath).replace("//", "/").replace('%', "%25").replace('#', "%23").replace('[', "%5B").replace(']', "%5D"),
+                        fname = fname.replace('%', "%25").replace('#', "%23").replace('[', "%5B").replace(']', "%5D"))
             });
 
         self.handle_generated_response_encoding(req,
@@ -866,7 +866,7 @@ impl HttpHandler {
                          <td><a href=\"/{up_path}{up_path_slash}\">&nbsp;</a></td> \
                          <td><a href=\"/{up_path}{up_path_slash}\">&nbsp;</a></td></tr>",
                     file_time_modified_p(req_p.parent().expect("Failed to get requested directory's parent directory")).strftime("%F %T").unwrap(),
-                    up_path = slash_idx.map(|i| &rel_noslash[0..i]).unwrap_or(""),
+                    up_path = slash_idx.map(|i| &rel_noslash[0..i]).unwrap_or("").replace('%', "%25").replace('#', "%23").replace('[', "%5B").replace(']', "%5D"),
                     up_path_slash = if slash_idx.is_some() { "/" } else { "" })
         };
 
@@ -930,8 +930,8 @@ impl HttpHandler {
                         } else {
                             DisplayThree("", "", "")
                         },
-                        path = format!("/{}", relpath).replace("//", "/").replace('%', "%25").replace('#', "%23"),
-                        fname = fname.replace('%', "%25").replace('#', "%23"))
+                        path = format!("/{}", relpath).replace("//", "/").replace('%', "%25").replace('#', "%23").replace('[', "%5B").replace(']', "%5D"),
+                        fname = fname.replace('%', "%25").replace('#', "%23").replace('[', "%5B").replace(']', "%5D"))
             });
 
         self.handle_generated_response_encoding(req,
