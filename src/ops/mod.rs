@@ -740,7 +740,7 @@ impl HttpHandler {
         //     https://cloud.githubusercontent.com/assets/6709544/21442017/9eb20d64-c89b-11e6-8c7b-888b5f70a403.png
         //   - With following slash:
         //     https://cloud.githubusercontent.com/assets/6709544/21442028/a50918c4-c89b-11e6-8936-c29896947f6a.png
-        Ok(Response::with((status::MovedPermanently, Header(headers::Server(USER_AGENT.to_string())), Header(headers::Location(new_url)))))
+        Ok(Response::with((status::SeeOther, Header(headers::Server(USER_AGENT.to_string())), Header(headers::Location(new_url)))))
     }
 
     fn handle_get_mobile_dir_listing(&self, req: &mut Request, req_p: PathBuf) -> IronResult<Response> {
