@@ -27,12 +27,6 @@ static IOCTL_INCLUDE_SKELETON: &str = r#"
 static BLKGETSIZE: {type} = {expr} as {type};
 "#;
 
-#[cfg(all(not(any(target_os = "windows", target_os = "macos")), not(target_env = "musl")))]
-static IOCTL_REQUEST_TYPE: &str = "libc::c_ulong";
-
-#[cfg(all(not(any(target_os = "windows", target_os = "macos")), target_env = "musl"))]
-static IOCTL_REQUEST_TYPE: &str = "libc::c_int";
-
 
 fn main() {
     embed_resources();
@@ -57,9 +51,14 @@ fn get_ioctl_data() {
     let ioctl_preprocessed = String::from_utf8(cc::Build::new().file(ioctl_source).expand()).unwrap();
     let blkgetsize_expr = ioctl_preprocessed.lines().next_back().unwrap().replace("U", "");
 
+    let ioctl_request_type = match &env::var("CARGO_CFG_TARGET_ENV").expect("CARGO_CFG_TARGET_ENV")[..] {
+        "musl" => "libc::c_int",
+        _ => "libc::c_ulong",
+    };
+
     let ioctl_include = ioctl_dir.join("ioctl.rs");
     File::create(&ioctl_include)
         .unwrap()
-        .write_all(IOCTL_INCLUDE_SKELETON.replace("{type}", IOCTL_REQUEST_TYPE).replace("{expr}", &blkgetsize_expr).as_bytes())
+        .write_all(IOCTL_INCLUDE_SKELETON.replace("{type}", ioctl_request_type).replace("{expr}", &blkgetsize_expr).as_bytes())
         .unwrap();
 }
