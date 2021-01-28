@@ -34,7 +34,7 @@ If you have `cargo` installed (you're a Rust developer) all you need to do is:
 cargo install https
 ```
 
-Which will install `http` in the folder where all other binaries go.
+Which will install `http` and `httplz` (identical, disable one or another if they clash) in the folder where all other binaries go.
 
 If, however, you're not a Rust developer, but you have `sh`-like shell, you can use an installer (works on Windows and Linux):
 
