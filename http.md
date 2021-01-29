@@ -166,10 +166,31 @@ pass parameters like what port to use.
     This is false by default because it's most likely not something you
     want to do.
 
+  -l --no-listings
+
+    Do not generate directory listings.
+
+    Behaviour table of `--no-listing`(-l) with `--no-indices`(-i)
+    +------------+---------+---------+---------+---------+
+    |    Path    | Neither |   -i    |   -l    |  -l -i  |
+    +============+=========+=========+=========+=========+
+    | /has-index |  index  | listing |  index  |   404   |
+    | /no-index  | listing | listing |   404   |   404   |
+    +------------+---------+---------+---------+---------+
+
+    This is false by default because it's most likely for debugging purposes.
+
   -i --no-indices
 
-    Always generate directory listings, even for directories containing an
-    index file.
+    Do not automatically serve the index file for directories containing one.
+
+    Behaviour table of `--no-listing`(-l) with `--no-indices`(-i)
+    +------------+---------+---------+---------+---------+
+    |    Path    | Neither |   -i    |   -l    |  -l -i  |
+    +============+=========+=========+=========+=========+
+    | /has-index |  index  | listing |  index  |   404   |
+    | /no-index  | listing | listing |   404   |   404   |
+    +------------+---------+---------+---------+---------+
 
     This is false by default because it's most likely for debugging purposes.
 
