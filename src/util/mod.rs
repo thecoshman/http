@@ -216,6 +216,30 @@ pub fn uppercase_first(s: &str) -> String {
     }
 }
 
+/// Percent-encode the last character if it's white space
+///
+/// Firefox treats, e.g. `href="http://henlo/menlo   "` as `href="http://henlo/menlo"`,
+/// but that final whitespace is significant, so this turns it into `href="http://henlo/menlo  %20"`
+pub fn encode_tail_if_trimmed(mut s: String) -> String {
+    let c = s.chars().rev().next();
+    if c.map(|c| c.is_whitespace()).unwrap_or(false) {
+        let c = c.unwrap();
+
+        s.pop();
+        s.push('%');
+
+        let mut cb = [0u8; 4];
+        c.encode_utf8(&mut cb);
+        for b in cb.iter().take(c.len_utf8()) {
+            write!(s, "{:02X}", b).expect("Couldn't allocate two more characters?");
+        }
+
+        s
+    } else {
+        s
+    }
+}
+
 /// Check if the specified file is to be considered "binary".
 ///
 /// Basically checks is a file is UTF-8.

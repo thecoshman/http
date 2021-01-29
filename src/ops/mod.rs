@@ -29,8 +29,9 @@ use iron::{headers, status, method, mime, IronResult, Listening, Response, TypeM
 use self::super::util::{WwwAuthenticate, DisplayThree, CommaList, Spaces, Dav, url_path, file_hash, is_symlink, encode_str, encode_file, file_length,
                         hash_string, html_response, file_binary, client_mobile, percent_decode, file_icon_suffix, is_actually_file, is_descendant_of,
                         response_encoding, detect_file_as_dir, encoding_extension, file_time_modified, file_time_modified_p, get_raw_fs_metadata,
-                        human_readable_size, is_nonexistent_descendant_of, USER_AGENT, ERROR_HTML, INDEX_EXTENSIONS, MIN_ENCODING_GAIN, MAX_ENCODING_SIZE,
-                        MIN_ENCODING_SIZE, DAV_LEVEL_1_METHODS, DIRECTORY_LISTING_HTML, MOBILE_DIRECTORY_LISTING_HTML, BLACKLISTED_ENCODING_EXTENSIONS};
+                        human_readable_size, encode_tail_if_trimmed, is_nonexistent_descendant_of, USER_AGENT, ERROR_HTML, INDEX_EXTENSIONS, MIN_ENCODING_GAIN,
+                        MAX_ENCODING_SIZE, MIN_ENCODING_SIZE, DAV_LEVEL_1_METHODS, DIRECTORY_LISTING_HTML, MOBILE_DIRECTORY_LISTING_HTML,
+                        BLACKLISTED_ENCODING_EXTENSIONS};
 
 
 macro_rules! log {
@@ -769,7 +770,8 @@ impl HttpHandler {
                     file_time_modified_p(req_p.parent().expect("Failed to get requested directory's parent directory"))
                         .strftime("%F %T")
                         .unwrap(),
-                    up_path = slash_idx.map(|i| &rel_noslash[0..i]).unwrap_or("").replace('%', "%25").replace('#', "%23").replace('[', "%5B").replace(']', "%5D"),
+                    up_path =
+                        slash_idx.map(|i| &rel_noslash[0..i]).unwrap_or("").replace('%', "%25").replace('#', "%23").replace('[', "%5B").replace(']', "%5D"),
                     up_path_slash = if slash_idx.is_some() { "/" } else { "" })
         };
         let list_s = req_p.read_dir()
@@ -822,7 +824,7 @@ impl HttpHandler {
                             DisplayThree("", String::new(), "")
                         },
                         path = format!("/{}", relpath).replace("//", "/").replace('%', "%25").replace('#', "%23").replace('[', "%5B").replace(']', "%5D"),
-                        fname = fname.replace('%', "%25").replace('#', "%23").replace('[', "%5B").replace(']', "%5D"))
+                        fname = encode_tail_if_trimmed(fname.replace('%', "%25").replace('#', "%23").replace('[', "%5B").replace(']', "%5D")))
             });
 
         self.handle_generated_response_encoding(req,
@@ -872,7 +874,8 @@ impl HttpHandler {
                          <td><a href=\"/{up_path}{up_path_slash}\">&nbsp;</a></td> \
                          <td><a href=\"/{up_path}{up_path_slash}\">&nbsp;</a></td></tr>",
                     file_time_modified_p(req_p.parent().expect("Failed to get requested directory's parent directory")).strftime("%F %T").unwrap(),
-                    up_path = slash_idx.map(|i| &rel_noslash[0..i]).unwrap_or("").replace('%', "%25").replace('#', "%23").replace('[', "%5B").replace(']', "%5D"),
+                    up_path =
+                        slash_idx.map(|i| &rel_noslash[0..i]).unwrap_or("").replace('%', "%25").replace('#', "%23").replace('[', "%5B").replace(']', "%5D"),
                     up_path_slash = if slash_idx.is_some() { "/" } else { "" })
         };
 
@@ -937,7 +940,7 @@ impl HttpHandler {
                             DisplayThree("", "", "")
                         },
                         path = format!("/{}", relpath).replace("//", "/").replace('%', "%25").replace('#', "%23").replace('[', "%5B").replace(']', "%5D"),
-                        fname = fname.replace('%', "%25").replace('#', "%23").replace('[', "%5B").replace(']', "%5D"))
+                        fname = encode_tail_if_trimmed(fname.replace('%', "%25").replace('#', "%23").replace('[', "%5B").replace(']', "%5D")))
             });
 
         self.handle_generated_response_encoding(req,
