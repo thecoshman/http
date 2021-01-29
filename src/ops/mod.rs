@@ -721,6 +721,10 @@ impl HttpHandler {
             }
         }
 
+        if !self.generate_listings {
+            return self.handle_nonexistent(req, req_p);
+        }
+
         if client_mobile(&req.headers) {
             self.handle_get_mobile_dir_listing(req, req_p)
         } else {
