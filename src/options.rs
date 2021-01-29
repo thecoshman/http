@@ -76,6 +76,8 @@ pub struct Options {
     /// The temp directory to write to before copying to hosted directory and to store encoded FS responses.
     /// Default: `"$TEMP/http-[FULL_PATH_TO_HOSTED_DIR]"`
     pub temp_directory: (String, PathBuf),
+    /// Whether to generate directory listings at all. Default: true
+    pub generate_listings: bool,
     /// Whether to check for index files in served directories before serving a listing. Default: true
     pub check_indices: bool,
     /// Whether to allow requests to `/file` to return `/file.{INDEX_EXTENSIONS`. Default: false
@@ -128,7 +130,8 @@ impl Options {
             .arg(Arg::from_usage("-r --sandbox-symlinks 'Restrict/sandbox where symlinks lead to only the direct descendants of the hosted directory. \
                                   Default: false'"))
             .arg(Arg::from_usage("-w --allow-write 'Allow for write operations. Default: false'"))
-            .arg(Arg::from_usage("-i --no-indices 'Always generate dir listings even if index files are available. Default: false'"))
+            .arg(Arg::from_usage("-l --no-listings 'Never generate dir listings. Default: false'"))
+            .arg(Arg::from_usage("-i --no-indices 'Do not automatically use index files. Default: false'"))
             .arg(Arg::from_usage("-e --no-encode 'Do not encode filesystem files. Default: false'"))
             .arg(Arg::from_usage("-x --strip-extensions 'Allow stripping index extentions from served paths. Default: false'"))
             .arg(Arg::from_usage("-q --quiet... 'Suppress increasing amounts of output'"))
@@ -210,6 +213,7 @@ impl Options {
                          suffix),
                  temp_pb.join(suffix))
             },
+            generate_listings: !matches.is_present("no-listings"),
             check_indices: !matches.is_present("no-indices"),
             strip_extensions: matches.is_present("strip-extensions"),
             allow_writes: matches.is_present("allow-write"),
