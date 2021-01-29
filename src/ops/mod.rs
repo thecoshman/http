@@ -115,6 +115,7 @@ pub struct HttpHandler {
     pub hosted_directory: (String, PathBuf),
     pub follow_symlinks: bool,
     pub sandbox_symlinks: bool,
+    pub serve_listings: bool,
     pub check_indices: bool,
     pub strip_extensions: bool,
     /// (at all, log_colour)
@@ -153,6 +154,7 @@ impl HttpHandler {
             hosted_directory: opts.hosted_directory.clone(),
             follow_symlinks: opts.follow_symlinks,
             sandbox_symlinks: opts.sandbox_symlinks,
+            serve_listings: opts.serve_listings,
             check_indices: opts.check_indices,
             strip_extensions: opts.strip_extensions,
             log: (opts.loglevel < LogLevel::NoServeStatus, opts.log_colour),
@@ -1326,6 +1328,7 @@ impl Clone for HttpHandler {
             hosted_directory: self.hosted_directory.clone(),
             follow_symlinks: self.follow_symlinks,
             sandbox_symlinks: self.sandbox_symlinks,
+            serve_listings: self.serve_listings,
             check_indices: self.check_indices,
             strip_extensions: self.strip_extensions,
             log: self.log,
