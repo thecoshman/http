@@ -3,12 +3,10 @@
 window.addEventListener("load", function() {
   const SUPPORTED_TYPES = ["Files", "application/x-moz-file"];
 
-  let body = document.getElementsByTagName("body")[0];
-  let file_upload = document.getElementById("file_upload");
+  let body = document.querySelector("body");
+  let file_upload = document.querySelector("#file_upload");
   let remaining_files = 0;
-  let url = document.URL;
-  if(url[url.length - 1] == "/")
-    url = url.substr(0, url.length - 1);
+  let page_path = document.location.pathname.replace(/\/+$/, "") + "/"; // trim all trailing '/'s then put one back
 
   body.addEventListener("dragover", function(ev) {
     if(SUPPORTED_TYPES.find(function(el) {
@@ -33,9 +31,9 @@ window.addEventListener("load", function() {
       for(let i = ev.dataTransfer.files.length - 1; i >= 0; --i) {
         if(!ev.dataTransfer.items[i].webkitGetAsEntry) {
           let file = ev.dataTransfer.files[i];
-          upload_file(url + "/" + file.name, file);
+          upload_file(page_path + encodeURIComponent(file.name), file);
         } else
-          recurse_upload(ev.dataTransfer.items[i].webkitGetAsEntry(), url);
+          recurse_upload(ev.dataTransfer.items[i].webkitGetAsEntry(), page_path);
       }
     }
   });
@@ -45,7 +43,7 @@ window.addEventListener("load", function() {
 
     for(let i = file_upload.files.length - 1; i >= 0; --i) {
       let file = file_upload.files[i];
-      upload_file(url + "/" + file.name, file);
+      upload_file(page_path + encodeURIComponent(file.name), file);
     }
   });
 
@@ -59,18 +57,20 @@ window.addEventListener("load", function() {
     request.send(file);
   }
 
-  function recurse_upload(entry, base_url) {
+  function recurse_upload(entry, base_path) {
     if(entry.isFile) {
-      if(entry.file)
-        entry.file(function(f) {
-          upload_file(base_url + entry.fullPath, f);
-        });
-      else
-        upload_file(base_url + entry.fullPath, entry.getFile());
+      entry.file(function(f) {
+        let file_path = entry.fullPath.replace(/^\/+/, ""); // we don't want the leading '/'s
+        // each path segment needs to be individually encoded
+        // e.g. encodeURIComponent("some#/$path") == "some%23%2F%24path" which is wrong
+        //      we want "some%23/%24path" instead
+        file_path = file_path.split("/").map((seg) => encodeURIComponent(seg)).join("/");
+        upload_file(base_path + file_path, f);
+      });
     } else
-      entry.createReader().readEntries(function(e) {
-        e.forEach(function(f) {
-          recurse_upload(f, base_url)
+      entry.createReader().readEntries(function(e_arr) {
+        e_arr.forEach(function(f) {
+          recurse_upload(f, base_path)
         });
       });
   }
