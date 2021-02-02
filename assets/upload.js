@@ -7,6 +7,8 @@ window.addEventListener("load", function() {
   let file_upload = document.getElementById("file_upload");
   let remaining_files = 0;
   let url = document.location.pathname;
+  if(!url.endsWith("/"))
+    url += "/";
 
   body.addEventListener("dragover", function(ev) {
     if(SUPPORTED_TYPES.find(function(el) {
@@ -31,7 +33,7 @@ window.addEventListener("load", function() {
       for(let i = ev.dataTransfer.files.length - 1; i >= 0; --i) {
         if(!ev.dataTransfer.items[i].webkitGetAsEntry) {
           let file = ev.dataTransfer.files[i];
-          upload_file(url + "/" + encodeURIComponent(file.name), file);
+          upload_file(url + encodeURIComponent(file.name), file);
         } else
           recurse_upload(ev.dataTransfer.items[i].webkitGetAsEntry(), url);
       }
@@ -43,7 +45,7 @@ window.addEventListener("load", function() {
 
     for(let i = file_upload.files.length - 1; i >= 0; --i) {
       let file = file_upload.files[i];
-      upload_file(url + "/" + encodeURIComponent(file.name), file);
+      upload_file(url + encodeURIComponent(file.name), file);
     }
   });
 
@@ -61,10 +63,10 @@ window.addEventListener("load", function() {
     if(entry.isFile) {
       if(entry.file)
         entry.file(function(f) {
-          upload_file(base_url + "/" + entry.fullPath.split("/").map(encodeURIComponent).join("/"), f);
+          upload_file(base_url + entry.fullPath.split("/").filter(function(seg) { return seg; }).map(encodeURIComponent).join("/"), f);
         });
       else
-        upload_file(base_url + "/" + entry.fullPath.split("/").map(encodeURIComponent).join("/"), entry.getFile());
+        upload_file(base_url + entry.fullPath.split("/").filter(function(seg) { return seg; }).map(encodeURIComponent).join("/"), entry.getFile());
     } else
       entry.createReader().readEntries(function(e) {
         e.forEach(function(f) {
