@@ -60,6 +60,10 @@ pass parameters like what port to use.
     Generate a passwordless, single-use TLS self-signed certificate
     and use it for this session.
 
+    On MacOS the certificate does actually have a password, password,
+    because the platform libssl implementation refuses to import
+    PKCS12 certificates without one.
+
     Exclusive with --ssl. Default: false.
 
   --auth [USERNAME[:PASSWORD]]

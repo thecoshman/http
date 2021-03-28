@@ -1513,20 +1513,40 @@ pub fn generate_tls_data(temp_dir: &(String, PathBuf)) -> Result<((String, PathB
         return Err(exit_err(true, &mut child, &es));
     }
 
-    let mut child =
-        Command::new("openssl").args(&["pkcs12", "-export", "-out", "tls.p12", "-inkey", "tls.key", "-in", "tls.crt", "-passin", "pass:", "-passout", "pass:"])
-            .current_dir(&tls_dir)
-            .stdin(Stdio::null())
-            .stdout(Stdio::null())
-            .stderr(Stdio::null())
-            .spawn()
-            .map_err(|error| err(false, "spawn", error.to_string()))?;
+    let mut child = Command::new("openssl").args(&["pkcs12",
+                "-export",
+                "-out",
+                "tls.p12",
+                "-inkey",
+                "tls.key",
+                "-in",
+                "tls.crt",
+                "-passin",
+                "pass:",
+                "-passout",
+                if cfg!(target_os = "macos") {
+                    "pass:password"
+                } else {
+                    "pass:"
+                }])
+        .current_dir(&tls_dir)
+        .stdin(Stdio::null())
+        .stdout(Stdio::null())
+        .stderr(Stdio::null())
+        .spawn()
+        .map_err(|error| err(false, "spawn", error.to_string()))?;
     let es = child.wait().map_err(|error| err(false, "wait", error.to_string()))?;
     if !es.success() {
         return Err(exit_err(false, &mut child, &es));
     }
 
-    Ok(((format!("{}/tls/tls.p12", temp_dir.0), tls_dir.join("tls.p12")), String::new()))
+    Ok(((format!("{}/tls/tls.p12", temp_dir.0), tls_dir.join("tls.p12")),
+        if cfg!(target_os = "macos") {
+                "password"
+            } else {
+                ""
+            }
+            .to_string()))
 }
 
 /// Generate random username:password auth credentials.
