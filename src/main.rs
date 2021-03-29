@@ -81,7 +81,7 @@ fn result_main() -> Result<(), Error> {
         after: opts.request_bandwidth.map(ops::LimitBandwidthMiddleware::new),
     };
     let mut responder = if let Some(p) = opts.port {
-        if let Some(&((ref id, _), ref pw)) = opts.tls_data.as_ref() {
+        if let Some(&((_, ref id), ref pw)) = opts.tls_data.as_ref() {
                 Iron::new(handler).https((opts.bind_address, p),
                                          NativeTlsServer::new(id, pw).map_err(|err| {
                         Error {
