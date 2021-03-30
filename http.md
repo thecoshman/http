@@ -57,12 +57,12 @@ pass parameters like what port to use.
 
   --gen-ssl
 
-    Generate a passwordless, single-use TLS self-signed certificate
+    Generate a single-use self-signed TLS certificate
     and use it for this session.
 
-    On MacOS the certificate does actually have a password, password,
-    because the platform libssl implementation refuses to import
-    PKCS12 certificates without one.
+    The password for the certificate is the empty string,
+    except on MacOS, where it's "password", since the platform libssl
+    refuses to import passwordless certificates.
 
     Exclusive with --ssl. Default: false.
 
