@@ -128,6 +128,7 @@ pub struct HttpHandler {
     pub encoded_temp_dir: Option<(String, PathBuf)>,
     pub proxies: BTreeMap<IpCidr, String>,
     pub mime_type_overrides: BTreeMap<String, Mime>,
+    pub additional_headers: Vec<(String, Vec<u8>)>,
     cache_gen: RwLock<CacheT<Vec<u8>>>,
     cache_fs: RwLock<CacheT<(PathBuf, bool)>>,
 }
@@ -168,6 +169,7 @@ impl HttpHandler {
             cache_fs: Default::default(),
             proxies: opts.proxies.clone(),
             mime_type_overrides: opts.mime_type_overrides.clone(),
+            additional_headers: opts.additional_headers.clone(),
         }
     }
 
@@ -237,6 +239,9 @@ impl Handler for HttpHandler {
         }?;
         if self.webdav {
             resp.headers.set(Dav::LEVEL_1);
+        }
+        for (h, v) in &self.additional_headers {
+            resp.headers.append_raw(h.clone(), v.clone());
         }
         Ok(resp)
     }
@@ -1346,6 +1351,7 @@ impl Clone for HttpHandler {
             encoded_temp_dir: self.encoded_temp_dir.clone(),
             proxies: self.proxies.clone(),
             mime_type_overrides: self.mime_type_overrides.clone(),
+            additional_headers: self.additional_headers.clone(),
             cache_gen: Default::default(),
             cache_fs: Default::default(),
         }

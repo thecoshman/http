@@ -146,6 +146,12 @@ pass parameters like what port to use.
 
     Default: 0.
 
+  -H --header [NAME: VALUE]...
+
+    Add the specified headers to all resposes.
+
+    VALUE is left-trimmed.
+
   -s --no-follow-symlinks
 
     Don't follow symlinks when requesting file access.

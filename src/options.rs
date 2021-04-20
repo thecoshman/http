@@ -29,6 +29,7 @@ use std::fs;
 lazy_static! {
     static ref CREDENTIALS_REGEX: Regex = Regex::new("[^:]+(?::[^:]+)?").unwrap();
     static ref PATH_CREDENTIALS_REGEX: Regex = Regex::new("(.+)=([^:]+(?::[^:]+)?)?").unwrap();
+    static ref HEADER_REGEX: Regex = Regex::new("^([^:]+):[[:space:]]*(.+)$").unwrap();
 }
 
 
@@ -110,6 +111,8 @@ pub struct Options {
     pub mime_type_overrides: BTreeMap<String, Mime>,
     /// Max amount of data per second each request is allowed to return. Default: `None`
     pub request_bandwidth: Option<NonZeroU64>,
+    /// Additional headers to add to every response
+    pub additional_headers: Vec<(String, Vec<u8>)>,
 }
 
 impl Options {
@@ -151,6 +154,7 @@ impl Options {
                 .validator(|s| Options::mime_type_override_parse(s.into()).map(|_| ())))
             .arg(Arg::from_usage("--request-bandwidth [BYTES] 'Limit each request to returning BYTES per second, or 0 for unlimited. Default: 0'")
                 .validator(|s| Options::bandwidth_parse(s.into()).map(|_| ())))
+            .arg(Arg::from_usage("-H --header [NAME: VALUE]... 'Headers to add to every response'").validator(|s| Options::header_parse(&s).map(|_| ())))
             .get_matches();
 
         let dir = matches.value_of("DIR").unwrap_or(".");
@@ -233,6 +237,11 @@ impl Options {
                 .map(Result::unwrap)
                 .collect(),
             request_bandwidth: matches.value_of("request-bandwidth").map(Cow::from).map(Options::bandwidth_parse).map(Result::unwrap).unwrap_or_default(),
+            additional_headers: matches.values_of("header")
+                .unwrap_or_default()
+                .map(Options::header_parse)
+                .map(Result::unwrap)
+                .collect(),
         }
     }
 
@@ -374,5 +383,9 @@ impl Options {
                 Ok((s, mt))
             }
         }
+    }
+
+    fn header_parse(s: &str) -> Result<(String, Vec<u8>), String> {
+        HEADER_REGEX.captures(s).map(|hdr| (hdr[1].to_string(), hdr[2].as_bytes().to_vec())).ok_or_else(|| format!("\"{}\" invalid format", s))
     }
 }
