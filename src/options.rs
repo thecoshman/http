@@ -27,8 +27,8 @@ use std::fs;
 
 
 lazy_static! {
-    static ref CREDENTIALS_REGEX: Regex = Regex::new("[^:]+(?::[^:]+)?").unwrap();
-    static ref PATH_CREDENTIALS_REGEX: Regex = Regex::new("(.+)=([^:]+(?::[^:]+)?)?").unwrap();
+    static ref CREDENTIALS_REGEX: Regex = Regex::new("^[^:]+(?::[^:]+)?$").unwrap();
+    static ref PATH_CREDENTIALS_REGEX: Regex = Regex::new("^(.+)=([^:]+(?::[^:]+)?)?$").unwrap();
     static ref HEADER_REGEX: Regex = Regex::new("^([^:]+):[[:space:]]*(.+)$").unwrap();
 }
 
