@@ -809,7 +809,7 @@ impl HttpHandler {
                         if is_file { "file" } else { "dir" },
                         file_icon_suffix(&path, is_file),
                         path.file_name().map(|p| p.to_str().expect("Filename not UTF-8").replace('.', "_")).as_ref().unwrap_or(&fname),
-                        fname,
+                        fname.replace('<', "&lt;"),
                         if is_file { "" } else { "/" },
                         if show_file_management_controls {
                             DisplayThree("<span class=\"manage\"><span class=\"delete_file_icon\">Delete</span>",
@@ -919,7 +919,7 @@ impl HttpHandler {
                         path.file_name().map(|p| p.to_str().expect("Filename not UTF-8").replace('.', "_")).as_ref().unwrap_or(&fname),
                         if is_file { "file" } else { "dir" },
                         file_icon_suffix(&path, is_file),
-                        fname,
+                        fname.replace('<', "&lt;"),
                         if is_file { "" } else { "/" },
                         file_time_modified(&fmeta).strftime("%F %T").unwrap(),
                         if is_file {
