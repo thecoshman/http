@@ -1,4 +1,4 @@
-# http [![Travis build status](https://travis-ci.org/thecoshman/http.svg)](https://travis-ci.org/thecoshman/http) [![AppVeyor build status](https://ci.appveyor.com/api/projects/status/7knk9lnptn1njro5?svg=true)](https://ci.appveyor.com/project/thecoshman/http) [![Licence](https://img.shields.io/badge/license-MIT-blue.svg?style=flat)](LICENSE) [![Crates.io version](https://meritbadge.herokuapp.com/https)](https://crates.io/crates/https)
+# http [![Travis build status](https://travis-ci.org/thecoshman/http.svg)](https://travis-ci.org/thecoshman/http) [![AppVeyor build status](https://ci.appveyor.com/api/projects/status/7knk9lnptn1njro5?svg=true)](https://ci.appveyor.com/project/thecoshman/http) [![Licence](https://img.shields.io/badge/license-MIT-blue.svg?style=flat)](LICENSE) [![Crates.io version](https://img.shields.io/crates/v/https.svg)](https://crates.io/crates/https)
 Host These Things Please - a basic HTTP server for hosting a folder fast and simply
 
 ## Selected features
