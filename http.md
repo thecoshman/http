@@ -463,7 +463,8 @@ Written by thecoshman &lt;<rust@thecoshman.com>&gt;,
            nabijaczleweli &lt;<nabijaczleweli@nabijaczleweli.xyz>&gt;,
            pheki,
            Adrian Herath &lt;<adrianisuru@gmail.com>&gt;,
-       and cyqsimon.
+           cyqsimon,
+       and jim4067.
 
 ## REPORTING BUGS
 

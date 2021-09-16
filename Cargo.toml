@@ -15,7 +15,8 @@ authors = ["thecoshman <rust@thecoshman.com>",
            "nabijaczleweli <nabijaczleweli@nabijaczleweli.xyz>",
            "pheki",
            "Adrian Herath <adrianisuru@gmail.com>",
-           "cyqsimon"]
+           "cyqsimon",
+           "jim4067"]
 
 [dependencies]
 hyper-native-tls = "0.3"
