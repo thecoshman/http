@@ -329,7 +329,7 @@ impl HttpHandler {
                 return Ok(Response::with(status::PreconditionFailed));
             }
 
-            if !is_actually_file(&dest_p.metadata().expect("Failed to get destination file metadata").file_type()) {
+            if !is_actually_file(&dest_p.metadata().expect("Failed to get destination file metadata").file_type(), &dest_p) {
                 // NB: this disallows overwriting non-empty directories
                 if fs::remove_dir(&dest_p).is_err() {
                     return Ok(Response::with(status::Locked));
@@ -339,7 +339,7 @@ impl HttpHandler {
             overwritten = true;
         }
 
-        let source_file = is_actually_file(&req_p.metadata().expect("Failed to get requested file metadata").file_type());
+        let source_file = is_actually_file(&req_p.metadata().expect("Failed to get requested file metadata").file_type(), &dest_p);
         if let Some(sp) = source_path {
             *sp = (req_p.clone(), source_file);
         }
@@ -463,7 +463,7 @@ impl HttpHandler {
 
                 "resourcetype" => {
                     out.write(XmlWEvent::start_element((WEBDAV_XML_NAMESPACE_DAV.0, "resourcetype")))?;
-                    if !is_actually_file(&meta.file_type()) {
+                    if !is_actually_file(&meta.file_type(), path) {
                         out.write(XmlWEvent::start_element((WEBDAV_XML_NAMESPACE_DAV.0, "collection")))?;
                         out.write(XmlWEvent::end_element())?;
                     }

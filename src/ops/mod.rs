@@ -352,7 +352,7 @@ impl HttpHandler {
             return self.handle_nonexistent(req, req_p);
         }
 
-        let is_file = is_actually_file(&req_p.metadata().expect("Failed to get file metadata").file_type());
+        let is_file = is_actually_file(&req_p.metadata().expect("Failed to get file metadata").file_type(), &req_p);
         let range = req.headers.get().map(|r: &headers::Range| (*r).clone());
         let raw_fs = req.headers.get().map(|r: &RawFsApiHeader| r.0).unwrap_or(false);
         if is_file {
@@ -687,7 +687,7 @@ impl HttpHandler {
                     }) || (self.follow_symlinks && self.sandbox_symlinks && symlink && !is_descendant_of(fp, &self.hosted_directory.1)))
                 })
                                                 .map(|f| {
-                    let is_file = is_actually_file(&f.file_type().expect("Failed to get file type"));
+                    let is_file = is_actually_file(&f.file_type().expect("Failed to get file type"), &f.path());
                     if is_file {
                         get_raw_fs_metadata(f.path())
                     } else {
@@ -792,13 +792,13 @@ impl HttpHandler {
                 }) || (self.follow_symlinks && self.sandbox_symlinks && symlink && !is_descendant_of(fp, &self.hosted_directory.1)))
             })
             .sorted_by(|lhs, rhs| {
-                (is_actually_file(&lhs.file_type().expect("Failed to get file type")),
+                (is_actually_file(&lhs.file_type().expect("Failed to get file type"), &lhs.path()),
                  lhs.file_name().to_str().expect("Failed to get file name").to_lowercase())
-                    .cmp(&(is_actually_file(&rhs.file_type().expect("Failed to get file type")),
+                    .cmp(&(is_actually_file(&rhs.file_type().expect("Failed to get file type"), &rhs.path()),
                            rhs.file_name().to_str().expect("Failed to get file name").to_lowercase()))
             })
             .fold("".to_string(), |cur, f| {
-                let is_file = is_actually_file(&f.file_type().expect("Failed to get file type"));
+                let is_file = is_actually_file(&f.file_type().expect("Failed to get file type"), &f.path());
                 let fmeta = f.metadata().expect("Failed to get requested file metadata");
                 let fname = f.file_name().into_string().expect("Failed to get file name");
                 let path = f.path();
@@ -900,13 +900,13 @@ impl HttpHandler {
                 }) || (self.follow_symlinks && self.sandbox_symlinks && symlink && !is_descendant_of(fp, &self.hosted_directory.1)))
             })
             .sorted_by(|lhs, rhs| {
-                (is_actually_file(&lhs.file_type().expect("Failed to get file type")),
+                (is_actually_file(&lhs.file_type().expect("Failed to get file type"), &lhs.path()),
                  lhs.file_name().to_str().expect("Failed to get file name").to_lowercase())
-                    .cmp(&(is_actually_file(&rhs.file_type().expect("Failed to get file type")),
+                    .cmp(&(is_actually_file(&rhs.file_type().expect("Failed to get file type"), &rhs.path()),
                            rhs.file_name().to_str().expect("Failed to get file name").to_lowercase()))
             })
             .fold("".to_string(), |cur, f| {
-                let is_file = is_actually_file(&f.file_type().expect("Failed to get file type"));
+                let is_file = is_actually_file(&f.file_type().expect("Failed to get file type"), &f.path());
                 let fmeta = f.metadata().expect("Failed to get requested file metadata");
                 let fname = f.file_name().into_string().expect("Failed to get file name");
                 let path = f.path();
@@ -1116,10 +1116,11 @@ impl HttpHandler {
 
     fn handle_delete_path(&self, req: &mut Request, req_p: PathBuf, symlink: bool) -> IronResult<Response> {
         let ft = req_p.metadata().expect("failed to get file metadata").file_type();
+        let is_file = is_actually_file(&ft, &req_p);
         log!(self.log,
              "{} deleted {blue}{} {magenta}{}{reset}",
              self.remote_addresses(&req),
-             if is_actually_file(&ft) {
+             if is_file {
                  "file"
              } else if symlink {
                  "symlink"
@@ -1128,7 +1129,7 @@ impl HttpHandler {
              },
              req_p.display());
 
-        if is_actually_file(&ft) {
+        if is_file {
             fs::remove_file(req_p).expect("Failed to remove requested file");
         } else {
             fs::remove_dir_all(req_p).expect(if symlink {

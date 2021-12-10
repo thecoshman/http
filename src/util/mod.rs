@@ -385,8 +385,8 @@ pub fn is_symlink<P: AsRef<Path>>(p: P) -> bool {
 }
 
 /// Check if a path refers to a file in a way that includes Unix devices and Windows symlinks.
-pub fn is_actually_file(tp: &FileType) -> bool {
-    tp.is_file() || is_device(tp)
+pub fn is_actually_file<P: AsRef<Path>>(tp: &FileType, p: P) -> bool {
+    tp.is_file() || (tp.is_symlink() && fs::metadata(p).map(|m| is_actually_file(&m.file_type(), "")).unwrap_or(false)) || is_device(tp)
 }
 
 /// Check if the specified path is a direct descendant (or an equal) of the specified path.
@@ -560,7 +560,7 @@ pub fn copy_dir(from: &Path, to: &Path) -> IoResult<Vec<(IoError, String)>> {
 
         let target_path = to.join(relative_path);
 
-        if !is_actually_file(&source_metadata.file_type()) {
+        if !is_actually_file(&source_metadata.file_type(), entry.path()) {
             push_error!(errors, relative_path, fs::create_dir(&target_path));
             push_error!(errors, relative_path, fs::set_permissions(&target_path, source_metadata.permissions()));
         } else {

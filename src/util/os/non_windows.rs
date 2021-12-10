@@ -24,7 +24,7 @@ pub fn win32_file_attributes(meta: &Metadata, path: &Path) -> u32 {
         attr |= FILE_ATTRIBUTE_HIDDEN;
     }
 
-    if !is_actually_file(&meta.file_type()) {
+    if !is_actually_file(&meta.file_type(), &path) {
         attr |= FILE_ATTRIBUTE_DIRECTORY;
     } else {
         // this is the 'Archive' bit, which is set by
