@@ -240,6 +240,23 @@ pub fn encode_tail_if_trimmed(mut s: String) -> String {
     }
 }
 
+/// %-escape special characters in an URL
+pub fn escape_specials<S: AsRef<str>>(s: S) -> String {
+    let s = s.as_ref();
+    let mut ret = Vec::with_capacity(s.len());
+    for &b in s.as_bytes() {
+        match b {
+            b'%' => ret.extend(b"%25"),
+            b'#' => ret.extend(b"%23"),
+            b'?' => ret.extend(b"%3F"),
+            b'[' => ret.extend(b"%5B"),
+            b']' => ret.extend(b"%5D"),
+            _ => ret.push(b),
+        }
+    }
+    unsafe { String::from_utf8_unchecked(ret) }
+}
+
 /// Check if the specified file is to be considered "binary".
 ///
 /// Basically checks is a file is UTF-8.
