@@ -10,10 +10,10 @@ extern crate mime_guess;
 extern crate itertools;
 extern crate tabwriter;
 extern crate lazysort;
-extern crate brotli2;
 extern crate unicase;
 extern crate walkdir;
 extern crate base64;
+extern crate brotli;
 extern crate flate2;
 extern crate rfsapi;
 #[cfg(target_os = "windows")]
