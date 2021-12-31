@@ -24,45 +24,45 @@ lazy_static! {
 }
 
 /// Prefix and namespace URI for generic WebDAV elements
-pub static WEBDAV_XML_NAMESPACE_DAV: (&str, &str) = ("D", "DAV:");
+pub const WEBDAV_XML_NAMESPACE_DAV: (&str, &str) = ("D", "DAV:");
 
 /// Prefix and namespace URI for elements specific to Windows clients
-pub static WEBDAV_XML_NAMESPACE_MICROSOFT: (&str, &str) = ("Z", "urn:schemas-microsoft-com:");
+pub const WEBDAV_XML_NAMESPACE_MICROSOFT: (&str, &str) = ("Z", "urn:schemas-microsoft-com:");
 
 /// Prefix and namespace URI for elements for Apache emulation
-pub static WEBDAV_XML_NAMESPACE_APACHE: (&str, &str) = ("A", "http://apache.org/dav/props/");
+pub const WEBDAV_XML_NAMESPACE_APACHE: (&str, &str) = ("A", "http://apache.org/dav/props/");
 
 /// All first-class-recognised prefix/namespace pairs
 ///
 /// `WEBDAV_XML_NAMESPACE_DAV` needs to be the first here
-pub static WEBDAV_XML_NAMESPACES: &[&(&str, &str)] = &[&WEBDAV_XML_NAMESPACE_DAV, &WEBDAV_XML_NAMESPACE_MICROSOFT, &WEBDAV_XML_NAMESPACE_APACHE];
+pub const WEBDAV_XML_NAMESPACES: &[&(&str, &str)] = &[&WEBDAV_XML_NAMESPACE_DAV, &WEBDAV_XML_NAMESPACE_MICROSOFT, &WEBDAV_XML_NAMESPACE_APACHE];
 
 /// Properties to return on empty body or [`<allprop />`](https://tools.ietf.org/html/rfc2518#section-12.14.1)
 /// for non-Windows clients
 ///
 /// Based on https://github.com/miquels/webdav-handler-rs/blob/02433c1acfccd848a7de26889f6857cbad559076/src/handle_props.rs#L52
-pub static WEBDAV_ALLPROP_PROPERTIES_NON_WINDOWS: &[&[XmlName]] = &[&[xml_name!(WEBDAV_XML_NAMESPACE_DAV, "creationdate"),
-                                                                      xml_name!(WEBDAV_XML_NAMESPACE_DAV, "getcontentlength"),
-                                                                      xml_name!(WEBDAV_XML_NAMESPACE_DAV, "getcontenttype"),
-                                                                      xml_name!(WEBDAV_XML_NAMESPACE_DAV, "getlastmodified"),
-                                                                      xml_name!(WEBDAV_XML_NAMESPACE_DAV, "resourcetype")]];
+pub const WEBDAV_ALLPROP_PROPERTIES_NON_WINDOWS: &[&[XmlName]] = &[&[xml_name!(WEBDAV_XML_NAMESPACE_DAV, "creationdate"),
+                                                                     xml_name!(WEBDAV_XML_NAMESPACE_DAV, "getcontentlength"),
+                                                                     xml_name!(WEBDAV_XML_NAMESPACE_DAV, "getcontenttype"),
+                                                                     xml_name!(WEBDAV_XML_NAMESPACE_DAV, "getlastmodified"),
+                                                                     xml_name!(WEBDAV_XML_NAMESPACE_DAV, "resourcetype")]];
 
 /// Properties to return on empty body or [`<allprop />`](https://tools.ietf.org/html/rfc2518#section-12.14.1)
 /// for Windows clients
 ///
 /// Based on https://github.com/miquels/webdav-handler-rs/blob/02433c1acfccd848a7de26889f6857cbad559076/src/handle_props.rs#L66
-pub static WEBDAV_ALLPROP_PROPERTIES_WINDOWS: &[&[XmlName]] = &[&WEBDAV_ALLPROP_PROPERTIES_NON_WINDOWS[0],
-                                                                &[xml_name!(WEBDAV_XML_NAMESPACE_MICROSOFT, "Win32CreationTime"),
-                                                                  xml_name!(WEBDAV_XML_NAMESPACE_MICROSOFT, "Win32FileAttributes"),
-                                                                  xml_name!(WEBDAV_XML_NAMESPACE_MICROSOFT, "Win32LastAccessTime"),
-                                                                  xml_name!(WEBDAV_XML_NAMESPACE_MICROSOFT, "Win32LastModifiedTime")]];
+pub const WEBDAV_ALLPROP_PROPERTIES_WINDOWS: &[&[XmlName]] = &[&WEBDAV_ALLPROP_PROPERTIES_NON_WINDOWS[0],
+                                                               &[xml_name!(WEBDAV_XML_NAMESPACE_MICROSOFT, "Win32CreationTime"),
+                                                                 xml_name!(WEBDAV_XML_NAMESPACE_MICROSOFT, "Win32FileAttributes"),
+                                                                 xml_name!(WEBDAV_XML_NAMESPACE_MICROSOFT, "Win32LastAccessTime"),
+                                                                 xml_name!(WEBDAV_XML_NAMESPACE_MICROSOFT, "Win32LastModifiedTime")]];
 
 /// Properties listed for a [`<propname />`](https://tools.ietf.org/html/rfc2518#section-12.14.2) request
 ///
 /// Based on https://github.com/miquels/webdav-handler-rs/blob/02433c1acfccd848a7de26889f6857cbad559076/src/handle_props.rs#L34
-pub static WEBDAV_PROPNAME_PROPERTIES: &[&[XmlName]] = &[&WEBDAV_ALLPROP_PROPERTIES_NON_WINDOWS[0],
-                                                         &[xml_name!(WEBDAV_XML_NAMESPACE_APACHE, "executable"),
-                                                           xml_name!(WEBDAV_XML_NAMESPACE_MICROSOFT, "Win32LastAccessTime")]];
+pub const WEBDAV_PROPNAME_PROPERTIES: &[&[XmlName]] = &[&WEBDAV_ALLPROP_PROPERTIES_NON_WINDOWS[0],
+                                                        &[xml_name!(WEBDAV_XML_NAMESPACE_APACHE, "executable"),
+                                                          xml_name!(WEBDAV_XML_NAMESPACE_MICROSOFT, "Win32LastAccessTime")]];
 
 
 

@@ -31,13 +31,13 @@ pub use self::content_encoding::*;
 
 
 /// The generic HTML page to use as response to errors.
-pub static ERROR_HTML: &str = include_str!("../../assets/error.html");
+pub const ERROR_HTML: &str = include_str!("../../assets/error.html");
 
 /// The HTML page to use as template for a requested directory's listing.
-pub static DIRECTORY_LISTING_HTML: &str = include_str!("../../assets/directory_listing.html");
+pub const DIRECTORY_LISTING_HTML: &str = include_str!("../../assets/directory_listing.html");
 
 /// The HTML page to use as template for a requested directory's listing for mobile devices.
-pub static MOBILE_DIRECTORY_LISTING_HTML: &str = include_str!("../../assets/directory_listing_mobile.html");
+pub const MOBILE_DIRECTORY_LISTING_HTML: &str = include_str!("../../assets/directory_listing_mobile.html");
 
 lazy_static! {
     /// Collection of data to be injected into generated responses.
@@ -98,16 +98,16 @@ lazy_static! {
 }
 
 /// The port to start scanning from if no ports were given.
-pub static PORT_SCAN_LOWEST: u16 = 8000;
+pub const PORT_SCAN_LOWEST: u16 = 8000;
 
 /// The port to end scanning at if no ports were given.
-pub static PORT_SCAN_HIGHEST: u16 = 9999;
+pub const PORT_SCAN_HIGHEST: u16 = 9999;
 
 /// The app name and version to use with User-Agent or Server response header.
-pub static USER_AGENT: &str = concat!("http/", env!("CARGO_PKG_VERSION"));
+pub const USER_AGENT: &str = concat!("http/", env!("CARGO_PKG_VERSION"));
 
 /// Index file extensions to look for if `-i` was not specified and strippable extensions to look for if `-x` was specified.
-pub static INDEX_EXTENSIONS: &[&str] = &["html", "htm", "shtml"];
+pub const INDEX_EXTENSIONS: &[&str] = &["html", "htm", "shtml"];
 
 
 /// The [WWW-Authenticate header](https://tools.ietf.org/html/rfc7235#section-4.1), without parsing.

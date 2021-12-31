@@ -33,13 +33,13 @@ lazy_static! {
 }
 
 /// The minimal size at which to encode filesystem files.
-pub static MIN_ENCODING_SIZE: u64 = 1024;
+pub const MIN_ENCODING_SIZE: u64 = 1024;
 
 /// The maximal size at which to encode filesystem files.
-pub static MAX_ENCODING_SIZE: u64 = 100 * 1024 * 1024;
+pub const MAX_ENCODING_SIZE: u64 = 100 * 1024 * 1024;
 
 /// The minimal size gain at which to preserve encoded filesystem files.
-pub static MIN_ENCODING_GAIN: f64 = 1.1;
+pub const MIN_ENCODING_GAIN: f64 = 1.1;
 
 
 /// Find best supported encoding to use, or `None` for identity.
@@ -51,7 +51,7 @@ pub fn response_encoding(requested: &mut [QualityItem<Encoding>]) -> Option<Enco
 /// Encode a string slice using a specified encoding or `None` if encoding failed or is not recognised.
 pub fn encode_str(dt: &str, enc: &Encoding) -> Option<Vec<u8>> {
     type EncodeT = fn(&str) -> Option<Vec<u8>>;
-    static STR_ENCODING_FNS: &[EncodeT] = &[encode_str_gzip, encode_str_deflate, encode_str_brotli, encode_str_bzip2];
+    const STR_ENCODING_FNS: &[EncodeT] = &[encode_str_gzip, encode_str_deflate, encode_str_brotli, encode_str_bzip2];
 
     encoding_idx(enc).and_then(|fi| STR_ENCODING_FNS[fi](dt))
 }
@@ -60,7 +60,7 @@ pub fn encode_str(dt: &str, enc: &Encoding) -> Option<Vec<u8>> {
 /// `false` if encoding failed, is not recognised or an I/O error occurred.
 pub fn encode_file(p: &Path, op: &Path, enc: &Encoding) -> bool {
     type EncodeT = fn(File, File) -> bool;
-    static FILE_ENCODING_FNS: &[EncodeT] = &[encode_file_gzip, encode_file_deflate, encode_file_brotli, encode_file_bzip2];
+    const FILE_ENCODING_FNS: &[EncodeT] = &[encode_file_gzip, encode_file_deflate, encode_file_brotli, encode_file_bzip2];
 
     encoding_idx(enc)
         .map(|fi| {
@@ -74,7 +74,7 @@ pub fn encode_file(p: &Path, op: &Path, enc: &Encoding) -> bool {
 
 /// Encoding extension to use for encoded files, for example "gz" for gzip, or `None` if the encoding is not recognised.
 pub fn encoding_extension(enc: &Encoding) -> Option<&'static str> {
-    static ENCODING_EXTS: &[&str] = &["gz", "dflt", "br", "bz2"];
+    const ENCODING_EXTS: &[&str] = &["gz", "dflt", "br", "bz2"];
 
     encoding_idx(enc).map(|ei| ENCODING_EXTS[ei])
 }
