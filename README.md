@@ -28,6 +28,8 @@ See [the manpage](http.md) for full list.
 
 ## Installation
 
+### From Cargo
+
 If you have `cargo` installed (you're a Rust developer) all you need to do is:
 
 ```sh
@@ -35,6 +37,12 @@ cargo install https
 ```
 
 Which will install `http` and `httplz` (identical, disable one or another if they clash) in the folder where all other binaries go.
+
+### From AUR
+
+As [provided](//github.com/thecoshman/http/issues/142) by [@cyqsimon](//github.com/cyqsimon): https://aur.archlinux.org/packages/httplz
+
+### From an installer
 
 If, however, you're not a Rust developer, but you have `sh`-like shell, you can use an installer (works on Windows and Linux):
 
