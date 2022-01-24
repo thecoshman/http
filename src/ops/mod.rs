@@ -1,4 +1,4 @@
-use md6;
+use blake3;
 use std::fmt;
 use serde_json;
 use std::ffi::OsStr;
@@ -27,7 +27,7 @@ use iron::mime::{Mime, SubLevel as MimeSubLevel, TopLevel as MimeTopLevel};
 use std::io::{self, ErrorKind as IoErrorKind, SeekFrom, Write, Error as IoError, Read, Seek};
 use iron::{headers, status, method, mime, IronResult, Listening, Response, TypeMap, Request, Handler, Iron};
 use self::super::util::{WwwAuthenticate, DisplayThree, CommaList, Spaces, Dav, url_path, file_hash, is_symlink, encode_str, encode_file, file_length,
-                        hash_string, html_response, file_binary, client_mobile, percent_decode, escape_specials, file_icon_suffix, is_actually_file, is_descendant_of,
+                        html_response, file_binary, client_mobile, percent_decode, escape_specials, file_icon_suffix, is_actually_file, is_descendant_of,
                         response_encoding, detect_file_as_dir, encoding_extension, file_time_modified, file_time_modified_p, get_raw_fs_metadata,
                         human_readable_size, encode_tail_if_trimmed, is_nonexistent_descendant_of, USER_AGENT, ERROR_HTML, INDEX_EXTENSIONS, MIN_ENCODING_GAIN,
                         MAX_ENCODING_SIZE, MIN_ENCODING_SIZE, DAV_LEVEL_1_METHODS, DIRECTORY_LISTING_HTML, MOBILE_DIRECTORY_LISTING_HTML,
@@ -110,7 +110,7 @@ pub use self::bandwidth::{LimitBandwidthMiddleware, SimpleChain};
 
 
 // TODO: ideally this String here would be Encoding instead but hyper is bad
-type CacheT<Cnt> = HashMap<([u8; 32], String), Cnt>;
+type CacheT<Cnt> = HashMap<(blake3::Hash, String), Cnt>;
 
 pub struct HttpHandler {
     pub hosted_directory: (String, PathBuf),
@@ -614,7 +614,7 @@ impl HttpHandler {
                 }
             }
 
-            let mut resp_p = self.encoded_temp_dir.as_ref().unwrap().1.join(hash_string(&cache_key.0));
+            let mut resp_p = self.encoded_temp_dir.as_ref().unwrap().1.join(cache_key.0.to_hex().as_str());
             match (req_p.extension(), encoding_extension(&encoding)) {
                 (Some(ext), Some(enc)) => resp_p.set_extension(format!("{}.{}", ext.to_str().unwrap_or("ext"), enc)),
                 (Some(ext), None) => resp_p.set_extension(format!("{}.{}", ext.to_str().unwrap_or("ext"), encoding)),
@@ -1197,8 +1197,7 @@ impl HttpHandler {
 
     fn handle_generated_response_encoding(&self, req: &mut Request, st: status::Status, resp: String) -> IronResult<Response> {
         if let Some(encoding) = req.headers.get_mut::<headers::AcceptEncoding>().and_then(|es| response_encoding(&mut **es)) {
-            let mut cache_key = ([0u8; 32], encoding.to_string());
-            md6::hash(256, resp.as_bytes(), &mut cache_key.0).expect("Failed to hash generated response");
+            let cache_key = (blake3::hash(resp.as_bytes()), encoding.to_string());
 
             {
                 if let Some(enc_resp) = self.cache_gen.read().expect("Generated file cache read lock poisoned").get(&cache_key) {

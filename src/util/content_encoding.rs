@@ -10,7 +10,7 @@ use std::io::{self, Write};
 use unicase::UniCase;
 use std::path::Path;
 use std::fs::File;
-use md6::Md6;
+use blake3;
 
 
 lazy_static! {
@@ -79,34 +79,11 @@ pub fn encoding_extension(enc: &Encoding) -> Option<&'static str> {
     encoding_idx(enc).map(|ei| ENCODING_EXTS[ei])
 }
 
-/// Return the 256-bit MD6 hash of the file denoted by the specified path.
-pub fn file_hash(p: &Path) -> [u8; 32] {
-    let mut ctx = Md6::new(256).unwrap();
-    let mut res = [0; 32];
-
+/// Return the 256-bit BLAKE3 hash of the file denoted by the specified path.
+pub fn file_hash(p: &Path) -> blake3::Hash {
+    let mut ctx = blake3::Hasher::new();
     io::copy(&mut File::open(p).unwrap(), &mut ctx).unwrap();
-    ctx.finalise(&mut res);
-
-    res
-}
-
-/// Create a hash string out of its raw bytes.
-///
-/// # Examples
-///
-/// ```
-/// use https::util::hash_string;
-/// assert_eq!(hash_string(&[0x99, 0xAA, 0xBB, 0xCC]), "99AABBCC".to_string());
-/// assert_eq!(hash_string(&[0x09, 0x0A]), "090A".to_string());
-/// ```
-pub fn hash_string(bytes: &[u8]) -> String {
-    use std::fmt::Write;
-
-    let mut result = String::with_capacity(bytes.len() * 2);
-    for b in bytes {
-        write!(result, "{:02X}", b).unwrap();
-    }
-    result
+    ctx.finalize()
 }
 
 

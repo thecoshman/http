@@ -13,6 +13,7 @@ extern crate lazysort;
 extern crate unicase;
 extern crate walkdir;
 extern crate base64;
+extern crate blake3;
 extern crate brotli;
 extern crate flate2;
 extern crate rfsapi;
@@ -30,7 +31,6 @@ extern crate iron;
 extern crate libc;
 extern crate rand;
 extern crate time;
-extern crate md6;
 extern crate xml;
 
 mod error;
