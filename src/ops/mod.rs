@@ -772,7 +772,7 @@ impl HttpHandler {
             format!("<a href=\"/{up_path}{up_path_slash}\" class=\"list entry top\"><span class=\"back_arrow_icon\">Parent directory</span></a> \
                      <a href=\"/{up_path}{up_path_slash}\" class=\"list entry bottom\"><span class=\"marker\">@</span>\
                        <span class=\"datetime\">{} UTC</span></a>",
-                    file_time_modified_p(req_p.parent().expect("Failed to get requested directory's parent directory"))
+                    file_time_modified_p(req_p.parent().unwrap_or(&req_p))
                         .strftime("%F %T")
                         .unwrap(),
                     up_path = escape_specials(slash_idx.map(|i| &rel_noslash[0..i]).unwrap_or("")),
@@ -877,7 +877,7 @@ impl HttpHandler {
                          <td><a href=\"/{up_path}{up_path_slash}\" class=\"datetime\">{}</a></td> \
                          <td><a href=\"/{up_path}{up_path_slash}\">&nbsp;</a></td> \
                          <td><a href=\"/{up_path}{up_path_slash}\">&nbsp;</a></td></tr>",
-                    file_time_modified_p(req_p.parent().expect("Failed to get requested directory's parent directory")).strftime("%F %T").unwrap(),
+                    file_time_modified_p(req_p.parent().unwrap_or(&req_p)).strftime("%F %T").unwrap(),
                     up_path = escape_specials(slash_idx.map(|i| &rel_noslash[0..i]).unwrap_or("")),
                     up_path_slash = if slash_idx.is_some() { "/" } else { "" })
         };
