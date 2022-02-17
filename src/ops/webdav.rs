@@ -9,7 +9,8 @@
 use self::super::super::util::{BorrowXmlName, Destination, CommaList, Overwrite, Depth, win32_file_attributes, file_time_accessed, file_time_modified,
                                file_time_created, client_microsoft, is_actually_file, is_descendant_of, file_executable, html_response, file_length, copy_dir,
                                WEBDAV_ALLPROP_PROPERTIES_NON_WINDOWS, WEBDAV_ALLPROP_PROPERTIES_WINDOWS, WEBDAV_XML_NAMESPACE_MICROSOFT,
-                               WEBDAV_XML_NAMESPACE_APACHE, WEBDAV_PROPNAME_PROPERTIES, WEBDAV_XML_NAMESPACE_DAV, WEBDAV_XML_NAMESPACES, ERROR_HTML};
+                               WEBDAV_XML_NAMESPACE_APACHE, WEBDAV_PROPNAME_PROPERTIES, WEBDAV_XML_NAMESPACE_DAV, WEBDAV_XML_NAMESPACES, MAX_SYMLINKS,
+                               ERROR_HTML};
 use std::io::{ErrorKind as IoErrorKind, Result as IoResult, Error as IoError, Write, Read};
 use xml::reader::{EventReader as XmlReader, XmlEvent as XmlREvent, Error as XmlRError};
 use xml::writer::{EventWriter as XmlWriter, XmlEvent as XmlWEvent, Error as XmlWError};
@@ -133,6 +134,7 @@ impl HttpHandler {
     fn handle_webdav_propfind_path_recursive<'n, W: Write, N: BorrowXmlName<'n>>(&self, req: &mut Request, out: &mut XmlWriter<W>, root_url: String,
                                                                                  root_path: &Path, props: &[&'n [N]], just_names: bool, depth: Depth)
                                                                                  -> Result<Option<IronResult<Response>>, XmlWError> {
+        let mut links_left = MAX_SYMLINKS;
         if let Some(next_depth) = depth.lower() {
             for f in root_path.read_dir().expect("Failed to read requested directory").map(|p| p.expect("Failed to iterate over requested directory")) {
                 let mut url = root_url.clone();
@@ -145,11 +147,16 @@ impl HttpHandler {
                 let mut symlink = false;
                 while let Ok(newlink) = path.read_link() {
                     symlink = true;
-                    if newlink.is_absolute() {
-                        path = newlink;
+                    if links_left != 0 {
+                        if newlink.is_absolute() {
+                            path = newlink;
+                        } else {
+                            path.pop();
+                            path.push(newlink);
+                        }
+                        links_left -= 1;
                     } else {
-                        path.pop();
-                        path.push(newlink);
+                        break;
                     }
                 }
 

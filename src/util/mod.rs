@@ -109,6 +109,11 @@ pub const USER_AGENT: &str = concat!("http/", env!("CARGO_PKG_VERSION"));
 /// Index file extensions to look for if `-i` was not specified and strippable extensions to look for if `-x` was specified.
 pub const INDEX_EXTENSIONS: &[&str] = &["html", "htm", "shtml"];
 
+/// Maximum amount of symlinks to follow in any given path lookup.
+///
+/// `40` matches the linux `MAXSYMLINKS` macro in `include/linux/namei.h`.
+pub const MAX_SYMLINKS: usize = 40;
+
 
 /// The [WWW-Authenticate header](https://tools.ietf.org/html/rfc7235#section-4.1), without parsing.
 ///

@@ -29,8 +29,8 @@ use iron::{headers, status, method, mime, IronResult, Listening, Response, TypeM
 use self::super::util::{WwwAuthenticate, DisplayThree, CommaList, Spaces, Dav, url_path, file_hash, is_symlink, encode_str, encode_file, file_length,
                         html_response, file_binary, client_mobile, percent_decode, escape_specials, file_icon_suffix, is_actually_file, is_descendant_of,
                         response_encoding, detect_file_as_dir, encoding_extension, file_time_modified, file_time_modified_p, get_raw_fs_metadata,
-                        human_readable_size, encode_tail_if_trimmed, is_nonexistent_descendant_of, USER_AGENT, ERROR_HTML, INDEX_EXTENSIONS, MIN_ENCODING_GAIN,
-                        MAX_ENCODING_SIZE, MIN_ENCODING_SIZE, DAV_LEVEL_1_METHODS, DIRECTORY_LISTING_HTML, MOBILE_DIRECTORY_LISTING_HTML,
+                        human_readable_size, encode_tail_if_trimmed, is_nonexistent_descendant_of, USER_AGENT, ERROR_HTML, MAX_SYMLINKS, INDEX_EXTENSIONS,
+                        MIN_ENCODING_GAIN, MAX_ENCODING_SIZE, MIN_ENCODING_SIZE, DAV_LEVEL_1_METHODS, DIRECTORY_LISTING_HTML, MOBILE_DIRECTORY_LISTING_HTML,
                         BLACKLISTED_ENCODING_EXTENSIONS};
 
 
@@ -1266,6 +1266,7 @@ impl HttpHandler {
     }
 
     fn parse_requested_path_custom_symlink(&self, req_url: &GenericUrl, follow_symlinks: bool) -> (PathBuf, bool, bool) {
+        let mut depth_left = MAX_SYMLINKS;
         let (mut cur, sk, err, abs) = req_url.path_segments()
             .unwrap()
             .filter(|p| !p.is_empty())
@@ -1278,7 +1279,7 @@ impl HttpHandler {
                 }
                 while let Ok(newlink) = cur.read_link() {
                     sk = true;
-                    if follow_symlinks {
+                    if follow_symlinks && depth_left != 0 {
                         if newlink.is_absolute() {
                             cur = newlink;
                         } else {
@@ -1286,6 +1287,7 @@ impl HttpHandler {
                             cur.pop();
                             cur.push(newlink);
                         }
+                        depth_left -= 1;
                     } else {
                         break;
                     }
