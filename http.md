@@ -58,7 +58,7 @@ pass parameters like what port to use.
   --gen-ssl
 
     Generate a single-use self-signed TLS certificate
-    and use it for this session.
+    with openssl and use it for this session.
 
     The password for the certificate is the empty string,
     except on MacOS, where it's "password", since the platform libssl
