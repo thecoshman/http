@@ -2,11 +2,11 @@ use brotli::enc::backward_references::{BrotliEncoderParams, BrotliEncoderMode};
 use brotli::enc::BrotliCompress as brotli_compress;
 use flate2::write::{DeflateEncoder, GzEncoder};
 use flate2::Compression as Flate2Compression;
+use std::io::{self, Error as IoError, Write};
 use iron::headers::{QualityItem, Encoding};
 use bzip2::Compression as BzCompression;
 use std::collections::BTreeSet;
 use bzip2::write::BzEncoder;
-use std::io::{self, Write};
 use unicase::UniCase;
 use std::path::Path;
 use std::fs::File;
@@ -80,10 +80,10 @@ pub fn encoding_extension(enc: &Encoding) -> Option<&'static str> {
 }
 
 /// Return the 256-bit BLAKE3 hash of the file denoted by the specified path.
-pub fn file_hash(p: &Path) -> blake3::Hash {
+pub fn file_hash(p: &Path) -> Result<blake3::Hash, IoError> {
     let mut ctx = blake3::Hasher::new();
-    io::copy(&mut File::open(p).unwrap(), &mut ctx).unwrap();
-    ctx.finalize()
+    io::copy(&mut File::open(p)?, &mut ctx)?;
+    Ok(ctx.finalize())
 }
 
 

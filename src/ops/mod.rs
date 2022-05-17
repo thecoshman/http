@@ -582,7 +582,11 @@ impl HttpHandler {
     fn handle_get_file_encoded(&self, req: &mut Request, req_p: PathBuf, mt: Mime) -> IronResult<Response> {
         if let Some(encoding) = req.headers.get_mut::<headers::AcceptEncoding>().and_then(|es| response_encoding(&mut **es)) {
             self.create_temp_dir(&self.encoded_temp_dir);
-            let cache_key = (file_hash(&req_p), encoding.to_string());
+
+            let cache_key = match file_hash(&req_p) {
+                Ok(h) => (h, encoding.to_string()),
+                Err(err) => return self.handle_requested_entity_unopenable(req, err, "file"),
+            };
 
             {
                 match self.cache_fs.read().expect("Filesystem cache read lock poisoned").get(&cache_key) {
