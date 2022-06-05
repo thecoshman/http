@@ -38,9 +38,13 @@ cargo install https
 
 Which will install `http` and `httplz` (identical, disable one or another if they clash) in the folder where all other binaries go.
 
-### From AUR
+### On Arch Linux
 
-As [provided](//github.com/thecoshman/http/issues/142) by [@cyqsimon](//github.com/cyqsimon): https://aur.archlinux.org/packages/httplz
+Available from the [community repository](https://archlinux.org/packages/community/x86_64/httplz/) as `httplz`:
+
+```sh
+pacman -S httplz
+```
 
 ### From an installer
 
