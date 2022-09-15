@@ -148,7 +148,7 @@ pass parameters like what port to use.
 
   -H --header [NAME: VALUE]...
 
-    Add the specified headers to all resposes.
+    Add the specified headers to all responses.
 
     VALUE is left-trimmed.
 
@@ -207,7 +207,7 @@ pass parameters like what port to use.
 
   -x --strip-extensions
 
-    Allow stripping index extentions from served paths:
+    Allow stripping index extensions from served paths:
     a request to /file might get served by /file.[s]htm[l].
 
     This is false by default

@@ -136,7 +136,7 @@ impl Options {
             .arg(Arg::from_usage("-l --no-listings 'Never generate dir listings. Default: false'"))
             .arg(Arg::from_usage("-i --no-indices 'Do not automatically use index files. Default: false'"))
             .arg(Arg::from_usage("-e --no-encode 'Do not encode filesystem files. Default: false'"))
-            .arg(Arg::from_usage("-x --strip-extensions 'Allow stripping index extentions from served paths. Default: false'"))
+            .arg(Arg::from_usage("-x --strip-extensions 'Allow stripping index extensions from served paths. Default: false'"))
             .arg(Arg::from_usage("-q --quiet... 'Suppress increasing amounts of output'"))
             .arg(Arg::from_usage("-c --no-colour 'Don't colourise the log output'"))
             .arg(Arg::from_usage("-d --webdav 'Handle WebDAV requests. Default: false'"))

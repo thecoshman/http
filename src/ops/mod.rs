@@ -1067,13 +1067,13 @@ impl HttpHandler {
     }
 
     fn handle_put_file(&self, req: &mut Request, req_p: PathBuf, legal: bool) -> IronResult<Response> {
-        let existant = !legal || req_p.exists();
+        let existent = !legal || req_p.exists();
         log!(self.log,
              "{} {} {magenta}{}{reset}, size: {}B",
              self.remote_addresses(&req),
              if !legal {
                  "tried to illegally create"
-             } else if existant {
+             } else if existent {
                  "replaced"
              } else {
                  "created"
@@ -1091,7 +1091,7 @@ impl HttpHandler {
             fs::copy(&temp_file_p, req_p).expect("Failed to copy temp file to requested file");
         }
 
-        Ok(Response::with((if !legal || !existant {
+        Ok(Response::with((if !legal || !existent {
                                status::Created
                            } else {
                                status::NoContent
