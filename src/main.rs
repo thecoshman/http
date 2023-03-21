@@ -181,8 +181,7 @@ fn result_main() -> Result<(), Error> {
             move || r.notify_one()
         })
         .unwrap();
-    let mx = Mutex::new(());
-    drop(end_handler.wait(mx.lock().unwrap()).unwrap());
+    drop(end_handler.wait(Mutex::new(()).lock().unwrap()).unwrap());
     responder.close().unwrap();
 
     // This is necessary because the server isn't Drop::drop()ped when the responder is
