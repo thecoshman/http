@@ -4,7 +4,6 @@ use flate2::write::{DeflateEncoder, GzEncoder};
 use flate2::Compression as Flate2Compression;
 use std::io::{self, Error as IoError, Write};
 use iron::headers::{QualityItem, Encoding};
-use bzip2::Compression as BzCompression;
 use std::collections::BTreeSet;
 use bzip2::write::BzEncoder;
 use unicase::UniCase;
@@ -124,7 +123,7 @@ macro_rules! encode_fn {
 
 encode_fn!(encode_str_gzip, encode_file_gzip, GzEncoder, Flate2Compression::default());
 encode_fn!(encode_str_deflate, encode_file_deflate, DeflateEncoder, Flate2Compression::default());
-encode_fn!(encode_str_bzip2, encode_file_bzip2, BzEncoder, BzCompression::Default);
+encode_fn!(encode_str_bzip2, encode_file_bzip2, BzEncoder, Default::default());
 
 fn encode_str_brotli(dt: &str) -> Option<Vec<u8>> {
     let mut ret = Vec::new();
