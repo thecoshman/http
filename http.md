@@ -464,7 +464,10 @@ Written by thecoshman &lt;<rust@thecoshman.com>&gt;,
            pheki,
            Adrian Herath &lt;<adrianisuru@gmail.com>&gt;,
            cyqsimon,
-       and jim4067.
+           jim4067,
+           Orhun Parmaksız &lt;<orhunparmaksiz@gmail.com>&gt;,
+           Kian-Meng Ang &lt;<kianmeng@cpan.org>&gt;,
+       and Theodore Ni.
 
 ## REPORTING BUGS
 
