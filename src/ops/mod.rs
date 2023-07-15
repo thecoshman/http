@@ -1,6 +1,6 @@
 use blake3;
-use std::fmt;
 use serde_json;
+use std::{fmt, str};
 use std::ffi::OsStr;
 use std::borrow::Cow;
 use std::net::IpAddr;
@@ -127,6 +127,7 @@ pub struct HttpHandler {
     pub writes_temp_dir: Option<(String, PathBuf)>,
     pub encoded_temp_dir: Option<(String, PathBuf)>,
     pub proxies: BTreeMap<IpCidr, String>,
+    pub proxy_redirs: BTreeMap<IpCidr, String>,
     pub mime_type_overrides: BTreeMap<String, Mime>,
     pub additional_headers: Vec<(String, Vec<u8>)>,
     cache_gen: RwLock<CacheT<Vec<u8>>>,
@@ -168,6 +169,7 @@ impl HttpHandler {
             cache_gen: Default::default(),
             cache_fs: Default::default(),
             proxies: opts.proxies.clone(),
+            proxy_redirs: opts.proxy_redirs.clone(),
             mime_type_overrides: opts.mime_type_overrides.clone(),
             additional_headers: opts.additional_headers.clone(),
         }
@@ -742,8 +744,27 @@ impl HttpHandler {
         }
     }
 
+    fn slashise(u: String) -> String {
+        let mut b = u.into_bytes();
+        b.insert(b.iter().position(|&c| c == b'?').unwrap_or(b.len()), b'/');
+        unsafe { String::from_utf8_unchecked(b) }
+    }
+
     fn handle_get_dir_index_no_slash(&self, req: &mut Request, idx_ext: &str) -> IronResult<Response> {
-        let new_url = req.url.to_string() + "/";
+        let mut new_url = None;
+        for (network, header) in &self.proxy_redirs {
+            if network.contains(&req.remote_addr.ip()) {
+                if let Some(saddrs) = req.headers.get_raw(header) {
+                    if saddrs.len() > 0 {
+                        if let Ok(s) = str::from_utf8(&saddrs[0]) {
+                            new_url = Some(HttpHandler::slashise(s.to_string()));
+                            break;
+                        }
+                    }
+                }
+            }
+        }
+        let new_url = new_url.unwrap_or_else(|| HttpHandler::slashise(req.url.to_string()));
         log!(self.log,
              "Redirecting {} to {yellow}{}{reset} - found index file {magenta}index.{}{reset}",
              self.remote_addresses(&req),
@@ -1354,6 +1375,7 @@ impl Clone for HttpHandler {
             writes_temp_dir: self.writes_temp_dir.clone(),
             encoded_temp_dir: self.encoded_temp_dir.clone(),
             proxies: self.proxies.clone(),
+            proxy_redirs: self.proxy_redirs.clone(),
             mime_type_overrides: self.mime_type_overrides.clone(),
             additional_headers: self.additional_headers.clone(),
             cache_gen: Default::default(),

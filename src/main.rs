@@ -146,6 +146,10 @@ fn result_main() -> Result<(), Error> {
             for (network, header) in &opts.proxies {
                 writeln!(out, "{}\t{}", header, network).unwrap();
             }
+            writeln!(out, "URL Header\tNetwork").unwrap();
+            for (network, header) in &opts.proxy_redirs {
+                writeln!(out, "{}\t{}", header, network).unwrap();
+            }
             out.flush().unwrap();
         }
     }
