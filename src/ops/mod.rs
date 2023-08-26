@@ -750,21 +750,25 @@ impl HttpHandler {
         unsafe { String::from_utf8_unchecked(b) }
     }
 
-    fn handle_get_dir_index_no_slash(&self, req: &mut Request, idx_ext: &str) -> IronResult<Response> {
-        let mut new_url = None;
+    /// Try to resolve any X-Original-URL headers for a redirect, else raw `/loca/tion` from request
+    fn user_facing_request_url(&self, req: &Request) -> String {
         for (network, header) in &self.proxy_redirs {
             if network.contains(&req.remote_addr.ip()) {
                 if let Some(saddrs) = req.headers.get_raw(header) {
                     if saddrs.len() > 0 {
                         if let Ok(s) = str::from_utf8(&saddrs[0]) {
-                            new_url = Some(HttpHandler::slashise(s.to_string()));
-                            break;
+                            return s.to_string();
                         }
                     }
                 }
             }
         }
-        let new_url = new_url.unwrap_or_else(|| HttpHandler::slashise(req.url.to_string()));
+
+        req.url.to_string()
+    }
+
+    fn handle_get_dir_index_no_slash(&self, req: &mut Request, idx_ext: &str) -> IronResult<Response> {
+        let new_url = HttpHandler::slashise(self.user_facing_request_url(req));
         log!(self.log,
              "Redirecting {} to {yellow}{}{reset} - found index file {magenta}index.{}{reset}",
              self.remote_addresses(&req),
