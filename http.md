@@ -130,7 +130,7 @@ pass parameters like what port to use.
 
     Treat HEADER-NAME as a proxy X-Original-URL header when the request
     originates from an address inside the network specified by the CIDR:
-    this used only for 302 See Other Location: headers when redirecting
+    this used only for 303 See Other Location: headers when redirecting
     due to an index file.
 
     Can be specified any amount of times. Default: none.
