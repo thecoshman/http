@@ -26,7 +26,7 @@ use rand::distributions::Alphanumeric as AlphanumericDistribution;
 use iron::mime::{Mime, SubLevel as MimeSubLevel, TopLevel as MimeTopLevel};
 use std::io::{self, ErrorKind as IoErrorKind, SeekFrom, Write, Error as IoError, Read, Seek};
 use iron::{headers, status, method, mime, IronResult, Listening, Response, TypeMap, Request, Handler, Iron};
-use self::super::util::{WwwAuthenticate, DisplayThree, CommaList, Spaces, Dav, url_path, file_hash, is_symlink, encode_str, encode_file, file_length,
+use self::super::util::{WwwAuthenticate, DisplayThree, CommaList, Spaces, Dav, url_path, file_etag, file_hash, is_symlink, encode_str, encode_file, file_length,
                         html_response, file_binary, client_mobile, percent_decode, escape_specials, file_icon_suffix, is_actually_file, is_descendant_of,
                         response_encoding, detect_file_as_dir, encoding_extension, file_time_modified, file_time_modified_p, get_raw_fs_metadata,
                         human_readable_size, encode_tail_if_trimmed, is_nonexistent_descendant_of, USER_AGENT, ERROR_HTML, MAX_SYMLINKS, INDEX_EXTENSIONS,
@@ -420,26 +420,59 @@ impl HttpHandler {
                                         })
     }
 
+    fn etag_match(req_tags: &[headers::EntityTag], etag: &str) -> bool {
+        req_tags.iter().any(|retag| retag.tag() == etag)
+    }
+
+    fn should_304_path(req: &mut Request, req_p: &Path, etag: &str) -> bool {
+        if let Some(headers::IfNoneMatch::Items(inm)) = req.headers.get::<headers::IfNoneMatch>() {
+            if HttpHandler::etag_match(inm, &etag) {
+                return true;
+            }
+        } else if let Some(headers::IfModifiedSince(since)) = req.headers.get::<headers::IfModifiedSince>() {
+            // unavoidable truncation, the timestamp format is second-resolution; to_timespec() is what <Tm as Ord> does
+            if file_time_modified_p(req_p).to_timespec().sec <= since.0.to_timespec().sec {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
     fn handle_get_file_range(&self, req: &mut Request, req_p: PathBuf, range: headers::Range) -> IronResult<Response> {
         match range {
             headers::Range::Bytes(ref brs) => {
                 if brs.len() == 1 {
-                    let flen = file_length(&req_p.metadata().expect("Failed to get requested file metadata"), &req_p);
+                    let metadata = req_p.metadata().expect("Failed to get requested file metadata");
+                    let flen = file_length(&metadata, &req_p);
+
+                    let mut etag = file_etag(&metadata).into_bytes(); // normaletag+123-41231
+                    let _ = write!(&mut etag, "+{}", brs[0]);
+                    let etag = unsafe { String::from_utf8_unchecked(etag) };
+                    if HttpHandler::should_304_path(req, &req_p, &etag) {
+                        log!(self.log, "{} Not Modified", Spaces(self.remote_addresses(req).width()));
+                        return Ok(Response::with((status::NotModified,
+                                                  (Header(headers::Server(USER_AGENT.to_string())),
+                                                   Header(headers::LastModified(headers::HttpDate(file_time_modified_p(&req_p)))),
+                                                   Header(headers::AcceptRanges(vec![headers::RangeUnit::Bytes]))),
+                                                  Header(headers::ETag(headers::EntityTag::strong(etag))))));
+                    }
+
                     match brs[0] {
                         // Cases where from is bigger than to are filtered out by iron so can never happen
-                        headers::ByteRangeSpec::FromTo(from, to) => self.handle_get_file_closed_range(req, req_p, from, to),
+                        headers::ByteRangeSpec::FromTo(from, to) => self.handle_get_file_closed_range(req, req_p, from, to, etag),
                         headers::ByteRangeSpec::AllFrom(from) => {
                             if flen < from {
-                                self.handle_get_file_empty_range(req, req_p, from, flen)
+                                self.handle_get_file_empty_range(req, req_p, from, flen, etag)
                             } else {
-                                self.handle_get_file_right_opened_range(req, req_p, from)
+                                self.handle_get_file_right_opened_range(req, req_p, from, etag)
                             }
                         }
                         headers::ByteRangeSpec::Last(from) => {
                             if flen < from {
-                                self.handle_get_file_empty_range(req, req_p, from, flen)
+                                self.handle_get_file_empty_range(req, req_p, from, flen, etag)
                             } else {
-                                self.handle_get_file_left_opened_range(req, req_p, from)
+                                self.handle_get_file_left_opened_range(req, req_p, from, etag)
                             }
                         }
                     }
@@ -451,7 +484,7 @@ impl HttpHandler {
         }
     }
 
-    fn handle_get_file_closed_range(&self, req: &mut Request, req_p: PathBuf, from: u64, to: u64) -> IronResult<Response> {
+    fn handle_get_file_closed_range(&self, req: &mut Request, req_p: PathBuf, from: u64, to: u64, etag: String) -> IronResult<Response> {
         let mime_type = self.guess_mime_type(&req_p);
         log!(self.log,
              "{} was served byte range {}-{} of file {magenta}{}{reset} as {blue}{}{reset}",
@@ -473,12 +506,13 @@ impl HttpHandler {
                                 range: Some((from, to)),
                                 instance_length: Some(file_length(&f.metadata().expect("Failed to get requested file metadata"), &req_p)),
                             })),
+                            Header(headers::ETag(headers::EntityTag::strong(etag))),
                             Header(headers::AcceptRanges(vec![headers::RangeUnit::Bytes]))),
                            buf,
                            mime_type)))
     }
 
-    fn handle_get_file_right_opened_range(&self, req: &mut Request, req_p: PathBuf, from: u64) -> IronResult<Response> {
+    fn handle_get_file_right_opened_range(&self, req: &mut Request, req_p: PathBuf, from: u64, etag: String) -> IronResult<Response> {
         let mime_type = self.guess_mime_type(&req_p);
         log!(self.log,
              "{} was served file {magenta}{}{reset} from byte {} as {blue}{}{reset}",
@@ -488,10 +522,10 @@ impl HttpHandler {
              mime_type);
 
         let flen = file_length(&req_p.metadata().expect("Failed to get requested file metadata"), &req_p);
-        self.handle_get_file_opened_range(req_p, SeekFrom::Start(from), from, flen - from, mime_type)
+        self.handle_get_file_opened_range(req_p, SeekFrom::Start(from), from, flen - from, mime_type, etag)
     }
 
-    fn handle_get_file_left_opened_range(&self, req: &mut Request, req_p: PathBuf, from: u64) -> IronResult<Response> {
+    fn handle_get_file_left_opened_range(&self, req: &mut Request, req_p: PathBuf, from: u64, etag: String) -> IronResult<Response> {
         let mime_type = self.guess_mime_type(&req_p);
         log!(self.log,
              "{} was served last {} bytes of file {magenta}{}{reset} as {blue}{}{reset}",
@@ -501,10 +535,10 @@ impl HttpHandler {
              mime_type);
 
         let flen = file_length(&req_p.metadata().expect("Failed to get requested file metadata"), &req_p);
-        self.handle_get_file_opened_range(req_p, SeekFrom::End(-(from as i64)), flen - from, from, mime_type)
+        self.handle_get_file_opened_range(req_p, SeekFrom::End(-(from as i64)), flen - from, from, mime_type, etag)
     }
 
-    fn handle_get_file_opened_range(&self, req_p: PathBuf, s: SeekFrom, b_from: u64, clen: u64, mt: Mime) -> IronResult<Response> {
+    fn handle_get_file_opened_range(&self, req_p: PathBuf, s: SeekFrom, b_from: u64, clen: u64, mt: Mime, etag: String) -> IronResult<Response> {
         let mut f = File::open(&req_p).expect("Failed to open requested file");
         let fmeta = f.metadata().expect("Failed to get requested file metadata");
         let flen = file_length(&fmeta, &req_p);
@@ -518,6 +552,7 @@ impl HttpHandler {
                                 range: Some((b_from, flen - 1)),
                                 instance_length: Some(flen),
                             })),
+                            Header(headers::ETag(headers::EntityTag::strong(etag))),
                             Header(headers::ContentLength(clen)),
                             Header(headers::AcceptRanges(vec![headers::RangeUnit::Bytes]))),
                            mt)))
@@ -534,7 +569,7 @@ impl HttpHandler {
                                                                 reason]))
     }
 
-    fn handle_get_file_empty_range(&self, req: &mut Request, req_p: PathBuf, from: u64, to: u64) -> IronResult<Response> {
+    fn handle_get_file_empty_range(&self, req: &mut Request, req_p: PathBuf, from: u64, to: u64, etag: String) -> IronResult<Response> {
         let mime_type = self.guess_mime_type(&req_p);
         log!(self.log,
              "{} was served an empty range from file {magenta}{}{reset} as {blue}{}{reset}",
@@ -543,12 +578,13 @@ impl HttpHandler {
              mime_type);
 
         Ok(Response::with((status::NoContent,
-                           Header(headers::Server(USER_AGENT.to_string())),
-                           Header(headers::LastModified(headers::HttpDate(file_time_modified_p(&req_p)))),
-                           Header(headers::ContentRange(headers::ContentRangeSpec::Bytes {
-                               range: Some((from, to)),
-                               instance_length: Some(file_length(&req_p.metadata().expect("Failed to get requested file metadata"), &req_p)),
-                           })),
+                           (Header(headers::Server(USER_AGENT.to_string())),
+                            Header(headers::LastModified(headers::HttpDate(file_time_modified_p(&req_p)))),
+                            Header(headers::ContentRange(headers::ContentRangeSpec::Bytes {
+                                range: Some((from, to)),
+                                instance_length: Some(file_length(&req_p.metadata().expect("Failed to get requested file metadata"), &req_p)),
+                            }))),
+                           Header(headers::ETag(headers::EntityTag::strong(etag))),
                            Header(headers::AcceptRanges(vec![headers::RangeUnit::Bytes])),
                            mime_type)))
     }
@@ -562,26 +598,36 @@ impl HttpHandler {
              mime_type);
 
         let metadata = req_p.metadata().expect("Failed to get requested file metadata");
+        let etag = file_etag(&metadata);
+        let headers = (Header(headers::Server(USER_AGENT.to_string())),
+                       Header(headers::LastModified(headers::HttpDate(file_time_modified(&metadata)))),
+                       Header(headers::AcceptRanges(vec![headers::RangeUnit::Bytes])));
+        if HttpHandler::should_304_path(req, &req_p, &etag) {
+            log!(self.log, "{} Not Modified", Spaces(self.remote_addresses(req).width()));
+            return Ok(Response::with((status::NotModified, headers, Header(headers::ETag(headers::EntityTag::strong(etag))))));
+        }
+
         let flen = file_length(&metadata, &req_p);
         if self.encoded_temp_dir.is_some() && flen > MIN_ENCODING_SIZE && flen < MAX_ENCODING_SIZE &&
            req_p.extension().and_then(|s| s.to_str()).map(|s| !BLACKLISTED_ENCODING_EXTENSIONS.contains(&UniCase::new(s))).unwrap_or(true) {
-            self.handle_get_file_encoded(req, req_p, mime_type)
+            self.handle_get_file_encoded(req, req_p, mime_type, headers, etag)
         } else {
             let file = match File::open(&req_p) {
                 Ok(file) => file,
                 Err(err) => return self.handle_requested_entity_unopenable(req, err, "file"),
             };
             Ok(Response::with((status::Ok,
-                               (Header(headers::Server(USER_AGENT.to_string())),
-                                Header(headers::LastModified(headers::HttpDate(file_time_modified(&metadata)))),
-                                Header(headers::AcceptRanges(vec![headers::RangeUnit::Bytes]))),
+                               headers,
+                               Header(headers::ETag(headers::EntityTag::strong(etag))),
                                file,
-                               Header(headers::ContentLength(file_length(&metadata, &req_p))),
-                               mime_type)))
+                               mime_type,
+                               Header(headers::ContentLength(file_length(&metadata, &req_p))))))
         }
     }
 
-    fn handle_get_file_encoded(&self, req: &mut Request, req_p: PathBuf, mt: Mime) -> IronResult<Response> {
+    fn handle_get_file_encoded(&self, req: &mut Request, req_p: PathBuf, mt: Mime,
+                               headers: (Header<headers::Server>, Header<headers::LastModified>, Header<headers::AcceptRanges>), etag: String)
+                               -> IronResult<Response> {
         if let Some(encoding) = req.headers.get_mut::<headers::AcceptEncoding>().and_then(|es| response_encoding(&mut **es)) {
             self.create_temp_dir(&self.encoded_temp_dir);
 
@@ -595,26 +641,21 @@ impl HttpHandler {
                     Some(&(ref resp_p, true)) => {
                         log!(self.log,
                              "{} encoded as {} for {:.1}% ratio (cached)",
-                             Spaces(self.remote_addresses(req).to_string().len()),
+                             Spaces(self.remote_addresses(req).width()),
                              encoding,
                              ((file_length(&req_p.metadata().expect("Failed to get requested file metadata"), &req_p) as f64) /
                               (file_length(&resp_p.metadata().expect("Failed to get encoded file metadata"), &resp_p) as f64)) *
                              100f64);
 
                         return Ok(Response::with((status::Ok,
-                                                  Header(headers::Server(USER_AGENT.to_string())),
+                                                  headers,
+                                                  Header(headers::ETag(headers::EntityTag::strong(etag))),
                                                   Header(headers::ContentEncoding(vec![encoding])),
-                                                  Header(headers::AcceptRanges(vec![headers::RangeUnit::Bytes])),
                                                   resp_p.as_path(),
                                                   mt)));
                     }
                     Some(&(ref resp_p, false)) => {
-                        return Ok(Response::with((status::Ok,
-                                                  Header(headers::Server(USER_AGENT.to_string())),
-                                                  Header(headers::LastModified(headers::HttpDate(file_time_modified_p(resp_p)))),
-                                                  Header(headers::AcceptRanges(vec![headers::RangeUnit::Bytes])),
-                                                  resp_p.as_path(),
-                                                  mt)));
+                        return Ok(Response::with((status::Ok, headers, Header(headers::ETag(headers::EntityTag::strong(etag))), resp_p.as_path(), mt)));
                     }
                     None => (),
                 }
@@ -638,7 +679,7 @@ impl HttpHandler {
                 } else {
                     log!(self.log,
                          "{} encoded as {} for {:.1}% ratio",
-                         Spaces(self.remote_addresses(req).to_string().len()),
+                         Spaces(self.remote_addresses(req).width()),
                          encoding,
                          gain * 100f64);
 
@@ -646,24 +687,23 @@ impl HttpHandler {
                     cache.insert(cache_key, (resp_p.clone(), true));
 
                     return Ok(Response::with((status::Ok,
-                                              Header(headers::Server(USER_AGENT.to_string())),
+                                              headers,
+                                              Header(headers::ETag(headers::EntityTag::strong(etag))),
                                               Header(headers::ContentEncoding(vec![encoding])),
-                                              Header(headers::AcceptRanges(vec![headers::RangeUnit::Bytes])),
                                               resp_p.as_path(),
                                               mt)));
                 }
             } else {
                 log!(self.log,
                      "{} failed to encode as {}, sending identity",
-                     Spaces(self.remote_addresses(req).to_string().len()),
+                     Spaces(self.remote_addresses(req).width()),
                      encoding);
             }
         }
 
         Ok(Response::with((status::Ok,
-                           (Header(headers::Server(USER_AGENT.to_string())),
-                            Header(headers::LastModified(headers::HttpDate(file_time_modified_p(&req_p)))),
-                            Header(headers::AcceptRanges(vec![headers::RangeUnit::Bytes]))),
+                           headers,
+                           Header(headers::ETag(headers::EntityTag::strong(etag))),
                            req_p.as_path(),
                            Header(headers::ContentLength(file_length(&req_p.metadata().expect("Failed to get requested file metadata"), &req_p))),
                            mt)))
@@ -724,7 +764,7 @@ impl HttpHandler {
                     let r = self.handle_get_file(req, idx);
                     log!(self.log,
                          "{} found index file for directory {magenta}{}{reset}",
-                         Spaces(self.remote_addresses(req).to_string().len()),
+                         Spaces(self.remote_addresses(req).width()),
                          req_p.display());
                     return r;
                 } else {
@@ -1225,20 +1265,36 @@ impl HttpHandler {
     }
 
     fn handle_generated_response_encoding(&self, req: &mut Request, st: status::Status, resp: String) -> IronResult<Response> {
+        let hash = blake3::hash(resp.as_bytes());
+        let etag = hash.to_string();
+
+        if st == status::Ok && (req.method == method::Get || req.method == method::Head) {
+            if let Some(headers::IfNoneMatch::Items(inm)) = req.headers.get::<headers::IfNoneMatch>() {
+                if HttpHandler::etag_match(inm, &etag) {
+                    log!(self.log, "{} Not Modified", Spaces(self.remote_addresses(req).width()));
+                    return Ok(Response::with((status::NotModified,
+                                              Header(headers::Server(USER_AGENT.to_string())),
+                                              Header(headers::ETag(headers::EntityTag::strong(etag))),
+                                              "text/html;charset=utf-8".parse::<mime::Mime>().unwrap())));
+                }
+            }
+        }
+
         if let Some(encoding) = req.headers.get_mut::<headers::AcceptEncoding>().and_then(|es| response_encoding(&mut **es)) {
-            let cache_key = (blake3::hash(resp.as_bytes()), encoding.to_string());
+            let cache_key = (hash, encoding.to_string());
 
             {
                 if let Some(enc_resp) = self.cache_gen.read().expect("Generated file cache read lock poisoned").get(&cache_key) {
                     log!(self.log,
                          "{} encoded as {} for {:.1}% ratio (cached)",
-                         Spaces(self.remote_addresses(req).to_string().len()),
+                         Spaces(self.remote_addresses(req).width()),
                          encoding,
                          ((resp.len() as f64) / (enc_resp.len() as f64)) * 100f64);
 
                     return Ok(Response::with((st,
                                               Header(headers::Server(USER_AGENT.to_string())),
                                               Header(headers::ContentEncoding(vec![encoding])),
+                                              Header(headers::ETag(headers::EntityTag::strong(etag))),
                                               "text/html;charset=utf-8".parse::<mime::Mime>().unwrap(),
                                               &enc_resp[..])));
                 }
@@ -1247,27 +1303,32 @@ impl HttpHandler {
             if let Some(enc_resp) = encode_str(&resp, &encoding) {
                 log!(self.log,
                      "{} encoded as {} for {:.1}% ratio",
-                     Spaces(self.remote_addresses(req).to_string().len()),
+                     Spaces(self.remote_addresses(req).width()),
                      encoding,
                      ((resp.len() as f64) / (enc_resp.len() as f64)) * 100f64);
 
-                let mut cache = self.cache_gen.write().expect("Generated file cache read lock poisoned");
+                let mut cache = self.cache_gen.write().expect("Generated file cache write lock poisoned");
                 cache.insert(cache_key.clone(), enc_resp);
 
                 return Ok(Response::with((st,
                                           Header(headers::Server(USER_AGENT.to_string())),
                                           Header(headers::ContentEncoding(vec![encoding])),
+                                          Header(headers::ETag(headers::EntityTag::strong(etag))),
                                           "text/html;charset=utf-8".parse::<mime::Mime>().unwrap(),
                                           &cache[&cache_key][..])));
             } else {
                 log!(self.log,
                      "{} failed to encode as {}, sending identity",
-                     Spaces(self.remote_addresses(req).to_string().len()),
+                     Spaces(self.remote_addresses(req).width()),
                      encoding);
             }
         }
 
-        Ok(Response::with((st, Header(headers::Server(USER_AGENT.to_string())), "text/html;charset=utf-8".parse::<mime::Mime>().unwrap(), resp)))
+        Ok(Response::with((st,
+                           Header(headers::Server(USER_AGENT.to_string())),
+                           Header(headers::ETag(headers::EntityTag::strong(etag))),
+                           "text/html;charset=utf-8".parse::<mime::Mime>().unwrap(),
+                           resp)))
     }
 
     fn handle_requested_entity_unopenable(&self, req: &mut Request, e: IoError, entity_type: &str) -> IronResult<Response> {
@@ -1421,6 +1482,23 @@ impl<'r, 'p, 'ra, 'rb: 'ra> fmt::Display for AddressWriter<'r, 'p, 'ra, 'rb> {
         }
 
         Ok(())
+    }
+}
+
+impl<'r, 'p, 'ra, 'rb: 'ra> AddressWriter<'r, 'p, 'ra, 'rb> {
+    fn width(&self) -> usize {
+        let mut len = self.request.remote_addr.to_string().len();
+        for (network, header) in self.proxies {
+            if network.contains(&self.request.remote_addr.ip()) {
+                if let Some(saddrs) = self.request.headers.get_raw(header) {
+                    for saddr in saddrs {
+                        len += " for ".len();
+                        len += saddr.len();
+                    }
+                }
+            }
+        }
+        return len;
     }
 }
 

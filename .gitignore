@@ -9,6 +9,8 @@
 !http-manifest.rc
 !install.*
 !*.md
+!.cargo
+!.cargo/**
 !src
 !src/**
 !assets

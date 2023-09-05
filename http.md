@@ -241,6 +241,24 @@ pass parameters like what port to use.
 
     False by default.
 
+## NOTES
+
+When returning files from the filesystem, the `ETag` returned
+is based on the filesystem, i-node, and precise modification time.
+
+Naturally, this means that when serving files from filesystems with coarse
+timestamps (like FAT with its 1s-resolution), changes may be hidden from
+`ETag`-using user agents (if a file was modified at
+2023-02-12T01:00:00.100000000, a UA requested and cached a response for
+2023-02-12T01:00:00.000000000, then the file was modified again at
+2023-02-12T01:00:00.900000000, subsequent requests with
+`If-None-Match: 2023-02-12T01:00:00.000000000` will all return
+304 Not Modified).
+
+This isn't really much of an issue,
+don't use FAT as a High-Performance File System (or reload w/o cache),
+and `If-Modified-Since` is affected with this by design, on all back-ends.
+
 ## EXAMPLES
 
   `http`

@@ -1,3 +1,5 @@
+#![cfg_attr(target_os = "windows", feature(windows_by_handle))]
+
 extern crate hyper_native_tls;
 extern crate percent_encoding;
 extern crate trivial_colours;

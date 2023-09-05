@@ -1,5 +1,6 @@
 use self::super::super::is_actually_file;
 use os_str_generic::OsStrGenericExt;
+use std::os::unix::fs::MetadataExt;
 use std::fs::Metadata;
 use std::path::Path;
 
@@ -34,4 +35,10 @@ pub fn win32_file_attributes(meta: &Metadata, path: &Path) -> u32 {
     }
 
     attr
+}
+
+
+/// `st_dev`-`st_ino`-`st_mtime`
+pub fn file_etag(m: &Metadata) -> String {
+    format!("{:x}-{}-{}.{}", m.dev(), m.ino(), m.mtime(), m.mtime_nsec())
 }

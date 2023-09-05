@@ -1,0 +1,4 @@
+# Needed for st_dev/st_ino on windows ("windows_by_handle")
+# available since 2019 in 1.38: https://github.com/rust-lang/rust/commit/c69f367bafb3a2f90d44fe54fc20d57996fa294a
+[env]
+RUSTC_BOOTSTRAP = "1"

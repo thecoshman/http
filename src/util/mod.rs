@@ -344,7 +344,7 @@ pub fn file_time_modified_p(f: &Path) -> Tm {
     file_time_modified(&f.metadata().expect("Failed to get file metadata"))
 }
 
-/// Get the timestamp of the file's last modification as a `time::Tm` in UTC.
+/// Get the timestamp of the file's creation as a `time::Tm` in UTC.
 pub fn file_time_created_p(f: &Path) -> Tm {
     file_time_created(&f.metadata().expect("Failed to get file metadata"))
 }
@@ -359,7 +359,7 @@ pub fn file_time_modified(m: &Metadata) -> Tm {
     file_time_impl(m.modified().expect("Failed to get file last modified date"))
 }
 
-/// Get the timestamp of the file's last modification as a `time::Tm` in UTC.
+/// Get the timestamp of the file's creation as a `time::Tm` in UTC.
 pub fn file_time_created(m: &Metadata) -> Tm {
     file_time_impl(m.created().or_else(|_| m.modified()).expect("Failed to get file created date"))
 }
