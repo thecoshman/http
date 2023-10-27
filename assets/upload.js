@@ -5,6 +5,7 @@ window.addEventListener("load", function() {
 
   let body = document.getElementsByTagName("body")[0];
   let file_upload = document.getElementById("file_upload");
+  let file_upload_text = null;
   let remaining_files = 0;
   let url = document.location.pathname;
   if(!url.endsWith("/"))
@@ -42,10 +43,17 @@ window.addEventListener("load", function() {
 
   function upload_file(req_url, file) {
     ++remaining_files;
+    if(!file_upload_text) {
+      file_upload_text = document.createTextNode(1);
+      file_upload.parentNode.insertBefore(file_upload_text, file_upload.nextSibling); // insertafter
+    } else
+      file_upload_text.data = remaining_files;
+
     let request = new XMLHttpRequest();
     request.addEventListener("loadend", function(e) {
-      if(--remaining_files === 0)
+      if(!--remaining_files)
         window.location.reload();
+      file_upload_text.data = remaining_files;
     });
     request.open("PUT", req_url);
     request.send(file);
