@@ -1,6 +1,6 @@
+use std::os::unix::fs::{PermissionsExt, MetadataExt};
 use self::super::super::is_actually_file;
 use os_str_generic::OsStrGenericExt;
-use std::os::unix::fs::MetadataExt;
 use std::fs::Metadata;
 use std::path::Path;
 
@@ -41,4 +41,10 @@ pub fn win32_file_attributes(meta: &Metadata, path: &Path) -> u32 {
 /// `st_dev`-`st_ino`-`st_mtime`
 pub fn file_etag(m: &Metadata) -> String {
     format!("{:x}-{}-{}.{}", m.dev(), m.ino(), m.mtime(), m.mtime_nsec())
+}
+
+
+/// Check if file is marked executable
+pub fn file_executable(meta: &Metadata) -> bool {
+    (meta.permissions().mode() & 0o111) != 0
 }

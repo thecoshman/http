@@ -23,3 +23,10 @@ pub fn file_etag(m: &Metadata) -> String {
             m.file_index().unwrap_or(0),
             m.last_write_time())
 }
+
+
+/// Check if file is marked executable
+#[inline(always)]
+pub fn file_executable(_: &Metadata) -> bool {
+    true
+}

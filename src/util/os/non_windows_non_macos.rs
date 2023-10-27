@@ -1,6 +1,6 @@
-use std::os::unix::fs::{PermissionsExt, FileTypeExt};
 use libc::{O_CLOEXEC, O_RDONLY, close, ioctl, open};
 use std::os::unix::ffi::OsStrExt;
+use std::os::unix::fs::FileTypeExt;
 use std::fs::{FileType, Metadata};
 use std::ffi::CString;
 use std::path::Path;
@@ -36,9 +36,4 @@ fn file_length_impl(meta: &Metadata, path: &Path) -> u64 {
     }
 
     meta.len()
-}
-
-/// Check if file is marked executable
-pub fn file_executable(meta: &Metadata) -> bool {
-    (meta.permissions().mode() & 0o111) != 0
 }
