@@ -24,13 +24,6 @@ window.addEventListener("load", function() {
       ev.preventDefault();
 
       for(let i = ev.dataTransfer.files.length - 1; i >= 0; --i) {
-        if(!ev.dataTransfer.items[i].webkitGetAsEntry)
-          ++remaining_files;
-        else
-          recurse_count(ev.dataTransfer.items[i].webkitGetAsEntry());
-      }
-
-      for(let i = ev.dataTransfer.files.length - 1; i >= 0; --i) {
         if(!ev.dataTransfer.items[i].webkitGetAsEntry) {
           let file = ev.dataTransfer.files[i];
           upload_file(url + encodeURIComponent(file.name), file);
@@ -41,8 +34,6 @@ window.addEventListener("load", function() {
   });
 
   file_upload.addEventListener("change", function() {
-    remaining_files += file_upload.files.length;
-
     for(let i = file_upload.files.length - 1; i >= 0; --i) {
       let file = file_upload.files[i];
       upload_file(url + encodeURIComponent(file.name), file);
@@ -50,6 +41,7 @@ window.addEventListener("load", function() {
   });
 
   function upload_file(req_url, file) {
+    ++remaining_files;
     let request = new XMLHttpRequest();
     request.addEventListener("loadend", function(e) {
       if(--remaining_files === 0)
@@ -67,22 +59,15 @@ window.addEventListener("load", function() {
         });
       else
         upload_file(base_url + entry.fullPath.split("/").filter(function(seg) { return seg; }).map(encodeURIComponent).join("/"), entry.getFile());
-    } else
-      all_in_reader(entry.createReader(), function(f) {
-        recurse_upload(f, base_url)
-      });
-  }
-
-  function recurse_count(entry) {
-    if(entry.isFile) {
-      ++remaining_files;
     } else // https://developer.mozilla.org/en-US/docs/Web/API/DataTransferItem/webkitGetAsEntry#javascript:
            //   Note: To read all files in a directory, readEntries needs to be
            //   called repeatedly until it returns an empty array. In
            //   Chromium-based browsers, the following example will only return a
            //   max of 100 entries.
            // This is actually true.
-      all_in_reader(entry.createReader(), recurse_count);
+      all_in_reader(entry.createReader(), function(f) {
+        recurse_upload(f, base_url)
+      });
   }
 
   function all_in_reader(reader, f) {
