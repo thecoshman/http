@@ -1,8 +1,11 @@
-use winapi::um::fileapi::GetFileAttributesW;
+use winapi::um::fileapi::{GetFileAttributesW, SetFileTime};
+use winapi::shared::minwindef::FILETIME;
+use std::os::windows::io::AsRawHandle;
 use std::os::windows::fs::MetadataExt;
 use std::os::windows::ffi::OsStrExt;
-use std::fs::Metadata;
+use std::fs::{Metadata, File};
 use std::path::Path;
+use std::ptr;
 
 
 /// Get windows-style attributes for the specified file
@@ -29,4 +32,21 @@ pub fn file_etag(m: &Metadata) -> String {
 #[inline(always)]
 pub fn file_executable(_: &Metadata) -> bool {
     true
+}
+
+
+pub fn set_mtime(f: &Path, ms: u64) {
+    if let Ok(f) = File::options().write(true).open(f) {
+        // FILETIME is in increments of 100ns, and in the Win32 epoch
+        let ft = (ms * 1000_0) + 116444736000000000;
+        unsafe {
+            SetFileTime(f.as_raw_handle(),
+                        ptr::null(),
+                        ptr::null(),
+                        &FILETIME {
+                            dwLowDateTime: (ft & 0xFFFFFFFF) as u32,
+                            dwHighDateTime: (ft >> 32) as u32,
+                        });
+        }
+    }
 }

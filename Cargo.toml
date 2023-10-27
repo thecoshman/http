@@ -69,7 +69,7 @@ features = ["fileapi"]
 [target.'cfg(not(target_os = "windows"))'.dependencies.os-str-generic]
 version = "0.2"
 
-[target.'cfg(not(any(target_os = "windows", target_os = "macos")))'.dependencies.libc]
+[target.'cfg(not(target_os = "windows"))'.dependencies.libc]
 version = "0.2"
 
 [build-dependencies]

@@ -1,7 +1,7 @@
 use libc::{O_CLOEXEC, O_RDONLY, close, ioctl, open};
-use std::os::unix::ffi::OsStrExt;
 use std::os::unix::fs::FileTypeExt;
 use std::fs::{FileType, Metadata};
+use std::os::unix::ffi::OsStrExt;
 use std::ffi::CString;
 use std::path::Path;
 

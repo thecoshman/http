@@ -1,6 +1,8 @@
+use libc::{AT_SYMLINK_NOFOLLOW, UTIME_OMIT, AT_FDCWD, utimensat, timespec};
 use std::os::unix::fs::{PermissionsExt, MetadataExt};
 use self::super::super::is_actually_file;
 use os_str_generic::OsStrGenericExt;
+use std::os::unix::ffi::OsStrExt;
 use std::fs::Metadata;
 use std::path::Path;
 
@@ -47,4 +49,22 @@ pub fn file_etag(m: &Metadata) -> String {
 /// Check if file is marked executable
 pub fn file_executable(meta: &Metadata) -> bool {
     (meta.permissions().mode() & 0o111) != 0
+}
+
+
+pub fn set_mtime(f: &Path, ms: u64) {
+    unsafe {
+        utimensat(AT_FDCWD,
+                  f.as_os_str().as_bytes().as_ptr() as *const _,
+                  [timespec {
+                       tv_sec: 0,
+                       tv_nsec: UTIME_OMIT,
+                   },
+                   timespec {
+                       tv_sec: (ms / 1000) as i64,
+                       tv_nsec: ((ms % 1000) * 1000_000) as i64,
+                   }]
+                      .as_ptr(),
+                  AT_SYMLINK_NOFOLLOW);
+    }
 }

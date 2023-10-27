@@ -26,12 +26,12 @@ use rand::distributions::Alphanumeric as AlphanumericDistribution;
 use iron::mime::{Mime, SubLevel as MimeSubLevel, TopLevel as MimeTopLevel};
 use std::io::{self, ErrorKind as IoErrorKind, SeekFrom, Write, Error as IoError, Read, Seek};
 use iron::{headers, status, method, mime, IronResult, Listening, Response, TypeMap, Request, Handler, Iron};
-use self::super::util::{WwwAuthenticate, DisplayThree, CommaList, Spaces, Dav, url_path, file_etag, file_hash, is_symlink, encode_str, encode_file, file_length,
-                        html_response, file_binary, client_mobile, percent_decode, escape_specials, file_icon_suffix, is_actually_file, is_descendant_of,
-                        response_encoding, detect_file_as_dir, encoding_extension, file_time_modified, file_time_modified_p, get_raw_fs_metadata,
-                        human_readable_size, encode_tail_if_trimmed, is_nonexistent_descendant_of, USER_AGENT, ERROR_HTML, MAX_SYMLINKS, INDEX_EXTENSIONS,
-                        MIN_ENCODING_GAIN, MAX_ENCODING_SIZE, MIN_ENCODING_SIZE, DAV_LEVEL_1_METHODS, DIRECTORY_LISTING_HTML, MOBILE_DIRECTORY_LISTING_HTML,
-                        BLACKLISTED_ENCODING_EXTENSIONS};
+use self::super::util::{WwwAuthenticate, XLastModified, DisplayThree, CommaList, Spaces, Dav, url_path, file_etag, file_hash, set_mtime, is_symlink, encode_str,
+                        encode_file, file_length, html_response, file_binary, client_mobile, percent_decode, escape_specials, file_icon_suffix,
+                        is_actually_file, is_descendant_of, response_encoding, detect_file_as_dir, encoding_extension, file_time_modified, file_time_modified_p,
+                        get_raw_fs_metadata, human_readable_size, encode_tail_if_trimmed, is_nonexistent_descendant_of, USER_AGENT, ERROR_HTML, MAX_SYMLINKS,
+                        INDEX_EXTENSIONS, MIN_ENCODING_GAIN, MAX_ENCODING_SIZE, MIN_ENCODING_SIZE, DAV_LEVEL_1_METHODS, DIRECTORY_LISTING_HTML,
+                        MOBILE_DIRECTORY_LISTING_HTML, BLACKLISTED_ENCODING_EXTENSIONS};
 
 
 macro_rules! log {
@@ -1072,13 +1072,11 @@ impl HttpHandler {
             self.handle_invalid_url(req, "<p>Attempted to use file as directory.</p>")
         } else if req.headers.has::<headers::ContentRange>() {
             self.handle_put_partial_content(req)
-        } else if (symlink && !self.follow_symlinks) ||
-                  (symlink && self.follow_symlinks && self.sandbox_symlinks && !is_nonexistent_descendant_of(&req_p, &self.hosted_directory.1)) {
-            self.create_temp_dir(&self.writes_temp_dir);
-            self.handle_put_file(req, req_p, false)
         } else {
+            let legal = (symlink && !self.follow_symlinks) ||
+                        (symlink && self.follow_symlinks && self.sandbox_symlinks && !is_nonexistent_descendant_of(&req_p, &self.hosted_directory.1));
             self.create_temp_dir(&self.writes_temp_dir);
-            self.handle_put_file(req, req_p, true)
+            self.handle_put_file(req, req_p, !legal)
         }
     }
 
@@ -1153,7 +1151,11 @@ impl HttpHandler {
             .expect("Failed to write requested data to requested file");
         if legal {
             let _ = fs::create_dir_all(req_p.parent().expect("Failed to get requested file's parent directory"));
-            fs::copy(&temp_file_p, req_p).expect("Failed to copy temp file to requested file");
+            fs::copy(&temp_file_p, &req_p).expect("Failed to copy temp file to requested file");
+            if let Some(&XLastModified(ms)) = req.headers.get::<XLastModified>() {
+                println!("ms={}", ms);
+                set_mtime(&req_p, ms);
+            }
         }
 
         Ok(Response::with((if !legal || !existent {

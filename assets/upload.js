@@ -56,6 +56,8 @@ window.addEventListener("load", function() {
       file_upload_text.data = remaining_files;
     });
     request.open("PUT", req_url);
+    if(file.lastModified)
+      request.setRequestHeader("X-Last-Modified", file.lastModified);
     request.send(file);
   }
 

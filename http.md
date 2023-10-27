@@ -182,6 +182,9 @@ pass parameters like what port to use.
 
     Currently supported write operations: PUT and DELETE.
 
+    With PUTs, the X-Last-Modified can be specified to milliseconds since epoch,
+    and this will be set on the file's st_mtim.
+
     This is false by default because it's most likely not something you
     want to do.
 

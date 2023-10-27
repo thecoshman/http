@@ -18,11 +18,11 @@ use time::{self, Duration, Tm};
 use iron::{mime, Headers, Url};
 use base64::display::Base64Display;
 use std::fmt::{self, Write as FmtWrite};
-use iron::error::HttpResult as HyperResult;
 use std::fs::{self, FileType, Metadata, File};
 use iron::headers::{HeaderFormat, UserAgent, Header};
 use mime_guess::{guess_mime_type_opt, get_mime_type_str};
 use xml::name::{OwnedName as OwnedXmlName, Name as XmlName};
+use iron::error::{HttpResult as HyperResult, HttpError as HyperError};
 use std::io::{ErrorKind as IoErrorKind, BufReader, BufRead, Result as IoResult, Error as IoError};
 
 pub use self::os::*;
@@ -135,6 +135,34 @@ impl Header for WwwAuthenticate {
 impl HeaderFormat for WwwAuthenticate {
     fn fmt_header(&self, f: &mut fmt::Formatter) -> fmt::Result {
         f.write_str(&self.0)
+    }
+}
+
+/// The `X-Last-Modified` header: milliseconds since epoch for PUTs.
+///
+/// Required since XMLHttpRequests can't set `Date:`.
+///
+/// No formatting, we only receive.
+#[derive(Debug, Clone, Hash, PartialOrd, Ord, PartialEq, Eq)]
+pub struct XLastModified(pub u64);
+
+impl Header for XLastModified {
+    fn header_name() -> &'static str {
+        "X-Last-Modified"
+    }
+
+    /// Dummy impl returning an empty value, since we're only ever sending these
+    fn parse_header(data: &[Vec<u8>]) -> HyperResult<XLastModified> {
+        if data.len() != 1 {
+            return Err(HyperError::Header);
+        }
+        Ok(XLastModified(str::from_utf8(data.last().ok_or(HyperError::Header)?).map_err(|_| HyperError::Header)?.parse().map_err(|_| HyperError::Header)?))
+    }
+}
+
+impl HeaderFormat for XLastModified {
+    fn fmt_header(&self, _: &mut fmt::Formatter) -> fmt::Result {
+        Ok(())
     }
 }
 
