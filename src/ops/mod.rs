@@ -26,8 +26,8 @@ use rand::distributions::Alphanumeric as AlphanumericDistribution;
 use iron::mime::{Mime, SubLevel as MimeSubLevel, TopLevel as MimeTopLevel};
 use std::io::{self, ErrorKind as IoErrorKind, SeekFrom, Write, Error as IoError, Read, Seek};
 use iron::{headers, status, method, mime, IronResult, Listening, Response, TypeMap, Request, Handler, Iron};
-use self::super::util::{WwwAuthenticate, XLastModified, DisplayThree, CommaList, Spaces, Dav, url_path, file_etag, file_hash, set_mtime, is_symlink, encode_str,
-                        encode_file, file_length, html_response, file_binary, client_mobile, percent_decode, escape_specials, file_icon_suffix,
+use self::super::util::{WwwAuthenticate, XLastModified, DisplayThree, CommaList, Spaces, MsAsS, Maybe, Dav, url_path, file_etag, file_hash, set_mtime, is_symlink,
+                        encode_str, encode_file, file_length, html_response, file_binary, client_mobile, percent_decode, escape_specials, file_icon_suffix,
                         is_actually_file, is_descendant_of, response_encoding, detect_file_as_dir, encoding_extension, file_time_modified, file_time_modified_p,
                         get_raw_fs_metadata, human_readable_size, encode_tail_if_trimmed, is_nonexistent_descendant_of, USER_AGENT, ERROR_HTML, MAX_SYMLINKS,
                         INDEX_EXTENSIONS, MIN_ENCODING_GAIN, MAX_ENCODING_SIZE, MIN_ENCODING_SIZE, DAV_LEVEL_1_METHODS, DIRECTORY_LISTING_HTML,
@@ -1131,8 +1131,9 @@ impl HttpHandler {
 
     fn handle_put_file(&self, req: &mut Request, req_p: PathBuf, legal: bool) -> IronResult<Response> {
         let existent = !legal || req_p.exists();
+        let mtime = req.headers.get::<XLastModified>().map(|xlm| xlm.0);
         log!(self.log,
-             "{} {} {magenta}{}{reset}, size: {}B",
+             "{} {} {magenta}{}{reset}, size: {}B{}{}",
              self.remote_addresses(&req),
              if !legal {
                  "tried to illegally create"
@@ -1142,7 +1143,9 @@ impl HttpHandler {
                  "created"
              },
              req_p.display(),
-             *req.headers.get::<headers::ContentLength>().expect("No Content-Length header"));
+             *req.headers.get::<headers::ContentLength>().expect("No Content-Length header"),
+             mtime.map(|_| ". modified: ").unwrap_or(""),
+             Maybe(mtime.map(MsAsS)));
 
         let &(_, ref temp_dir) = self.writes_temp_dir.as_ref().unwrap();
         let temp_file_p = temp_dir.join(req_p.file_name().expect("Failed to get requested file's filename"));
@@ -1152,8 +1155,7 @@ impl HttpHandler {
         if legal {
             let _ = fs::create_dir_all(req_p.parent().expect("Failed to get requested file's parent directory"));
             fs::copy(&temp_file_p, &req_p).expect("Failed to copy temp file to requested file");
-            if let Some(&XLastModified(ms)) = req.headers.get::<XLastModified>() {
-                println!("ms={}", ms);
+            if let Some(ms) = mtime {
                 set_mtime(&req_p, ms);
             }
         }

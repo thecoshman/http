@@ -229,6 +229,27 @@ impl fmt::Display for Spaces {
     }
 }
 
+#[derive(Debug, Copy, Clone, Hash, PartialOrd, Ord, PartialEq, Eq)]
+pub struct Maybe<T: fmt::Display>(pub Option<T>);
+
+impl<T: fmt::Display> fmt::Display for Maybe<T> {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        if let Some(dt) = self.0.as_ref() {
+            dt.fmt(f)?;
+        }
+        Ok(())
+    }
+}
+
+#[derive(Debug, Copy, Clone, Hash, PartialOrd, Ord, PartialEq, Eq)]
+pub struct MsAsS(pub u64);
+
+impl fmt::Display for MsAsS {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{}.{:03}", self.0 / 1000, self.0 % 1000)
+    }
+}
+
 
 
 /// Uppercase the first character of the supplied string.
