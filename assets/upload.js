@@ -68,19 +68,28 @@ window.addEventListener("load", function() {
       else
         upload_file(base_url + entry.fullPath.split("/").filter(function(seg) { return seg; }).map(encodeURIComponent).join("/"), entry.getFile());
     } else
-      entry.createReader().readEntries(function(e) {
-        e.forEach(function(f) {
-          recurse_upload(f, base_url)
-        });
+      all_in_reader(entry.createReader(), function(f) {
+        recurse_upload(f, base_url)
       });
   }
 
   function recurse_count(entry) {
     if(entry.isFile) {
       ++remaining_files;
-    } else
-      entry.createReader().readEntries(function(e) {
-        e.forEach(recurse_count);
-      });
+    } else // https://developer.mozilla.org/en-US/docs/Web/API/DataTransferItem/webkitGetAsEntry#javascript:
+           //   Note: To read all files in a directory, readEntries needs to be
+           //   called repeatedly until it returns an empty array. In
+           //   Chromium-based browsers, the following example will only return a
+           //   max of 100 entries.
+           // This is actually true.
+      all_in_reader(entry.createReader(), recurse_count);
+  }
+
+  function all_in_reader(reader, f) {
+    reader.readEntries(function(e) {
+      e.forEach(f);
+      if(e.length)
+        all_in_reader(reader, f);
+    });
   }
 });
