@@ -24,7 +24,6 @@ use std::path::{PathBuf, Path};
 use std::fs::{self, Metadata};
 use self::super::HttpHandler;
 use itertools::Itertools;
-use std::borrow::Borrow;
 use iron::mime::Mime;
 use std::fmt;
 
@@ -749,7 +748,7 @@ fn intialise_xml_output() -> Result<XmlWriter<Vec<u8>>, XmlWError> {
 fn namespaces_for_props<'n, N: 'n + BorrowXmlName<'n>, Ni: Iterator<Item = &'n N>>(elem_name: &str, props: Ni) -> XmlWEventStartElementBuilder {
     let mut bldr = XmlWEvent::start_element(elem_name).ns(WEBDAV_XML_NAMESPACES[0].0, WEBDAV_XML_NAMESPACES[0].1);
 
-    for prop_namespace in props.map(|p| p.borrow().borrow_xml_name()).flat_map(|p| p.namespace).unique() {
+    for prop_namespace in props.map(|p| p.borrow_xml_name()).flat_map(|p| p.namespace).unique() {
         if let Some((prefix, namespace)) = WEBDAV_XML_NAMESPACES[1..].iter().find(|(_, ns)| *ns == prop_namespace) {
             bldr = bldr.ns(*prefix, *namespace);
         }
