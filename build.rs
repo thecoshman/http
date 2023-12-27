@@ -1,19 +1,19 @@
 extern crate embed_resource;
-#[cfg(not(any(target_os = "windows", target_os = "macos")))]
+#[cfg(any(target_os = "linux", target_os = "android"))]
 extern crate cc;
 
-#[cfg(not(any(target_os = "windows", target_os = "macos")))]
+#[cfg(any(target_os = "linux", target_os = "android"))]
 use std::env;
-#[cfg(not(any(target_os = "windows", target_os = "macos")))]
+#[cfg(any(target_os = "linux", target_os = "android"))]
 use std::io::Write;
-#[cfg(not(any(target_os = "windows", target_os = "macos")))]
+#[cfg(any(target_os = "linux", target_os = "android"))]
 use std::path::Path;
-#[cfg(not(any(target_os = "windows", target_os = "macos")))]
+#[cfg(any(target_os = "linux", target_os = "android"))]
 use std::fs::{self, File};
 
 
 /// The last line of this, after running it through a preprocessor, will expand to the value of `BLKGETSIZE`
-#[cfg(not(any(target_os = "windows", target_os = "macos")))]
+#[cfg(any(target_os = "linux", target_os = "android"))]
 static IOCTL_CHECK_SOURCE: &str = r#"
 #include <sys/mount.h>
 
@@ -21,7 +21,7 @@ BLKGETSIZE
 "#;
 
 /// Replace `{}` with the `BLKGETSIZE` expression from `IOCTL_CHECK_SOURCE`
-#[cfg(not(any(target_os = "windows", target_os = "macos")))]
+#[cfg(any(target_os = "linux", target_os = "android"))]
 static IOCTL_INCLUDE_SKELETON: &str = r#"
 /// Return `device size / 512` (`long *` arg)
 static BLKGETSIZE: {type} = {expr} as {type};
@@ -37,10 +37,10 @@ fn embed_resources() {
     embed_resource::compile("http-manifest.rc");
 }
 
-#[cfg(any(target_os = "windows", target_os = "macos"))]
+#[cfg(not(any(target_os = "linux", target_os = "android")))]
 fn get_ioctl_data() {}
 
-#[cfg(not(any(target_os = "windows", target_os = "macos")))]
+#[cfg(any(target_os = "linux", target_os = "android"))]
 fn get_ioctl_data() {
     let ioctl_dir = Path::new(&env::var("OUT_DIR").unwrap()).join("ioctl-data");
     fs::create_dir_all(&ioctl_dir).unwrap();

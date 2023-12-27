@@ -5,7 +5,7 @@ use std::fs::{FileType, Metadata};
 use std::ffi::CString;
 use std::path::Path;
 
-
+#[cfg(any(target_os = "linux", target_os = "android"))]
 include!(concat!(env!("OUT_DIR"), "/ioctl-data/ioctl.rs"));
 
 
@@ -30,6 +30,7 @@ pub fn file_length<P: AsRef<Path>>(meta: &Metadata, path: &P) -> u64 {
 }
 
 fn file_length_impl(meta: &Metadata, path: &Path) -> u64 {
+    #[cfg(any(target_os = "linux", target_os = "android"))]
     if is_device(&meta.file_type()) {
         let mut block_count: c_ulong = 0;
 
