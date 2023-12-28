@@ -6,6 +6,7 @@
 !Cargo.toml
 !rustfmt.toml
 !build.rs
+!build-ioctl.c
 !http-manifest.rc
 !install.*
 !*.md
