@@ -26,7 +26,7 @@ pub fn file_length<P: AsRef<Path>>(meta: &Metadata, path: &P) -> u64 {
 fn file_length_impl(meta: &Metadata, path: &Path) -> u64 {
     if meta.file_type().is_block_device() || meta.file_type().is_char_device() {
         if let Ok(f) = OpenOptions::new().read(true).custom_flags(O_NONBLOCK).open(path) {
-            let size = unsafe {http_blkgetsize(f.as_raw_fd())};
+            let size = unsafe { http_blkgetsize(f.as_raw_fd()) };
             if size != u64::MAX {
                 return size;
             }

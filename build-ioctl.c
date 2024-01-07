@@ -14,6 +14,7 @@
 #include <sys/disklabel.h>
 #include <sys/types.h>
 #elif __has_include(<sys/vtoc.h>)  // illumos
+#include <stropts.h>
 #include <sys/dkio.h>
 #include <sys/vtoc.h>
 #endif
@@ -40,7 +41,7 @@ uint64_t http_blkgetsize(int fd) {
 	ret         = ioctl(fd, DKIOCGMEDIAINFO, &mi);
 	uint64_t sz = mi.dki_capacity;
 	if(__builtin_mul_overflow(sz, mi.dki_lbsize, &sz))
-		sz = -1;
+		ret = -1;
 #endif
 
 	if(ret == -1)
