@@ -35,7 +35,7 @@ uint64_t http_blkgetsize(int fd) {
 	ret         = ioctl(fd, DIOCGDINFO, &dl);
 	uint64_t sz = DL_GETDSIZE(&dl);
 	if(__builtin_mul_overflow(sz, dl.d_secsize, &sz))
-		sz = -1;
+		ret = -1;
 #elif defined(DKIOCGMEDIAINFO)  // illumos
 	struct dk_minfo mi;
 	ret         = ioctl(fd, DKIOCGMEDIAINFO, &mi);
