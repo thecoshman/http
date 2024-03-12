@@ -24,6 +24,7 @@ use std::net::IpAddr;
 use regex::Regex;
 use cidr::IpCidr;
 use std::fs;
+use blake3;
 
 
 lazy_static! {
@@ -223,7 +224,12 @@ impl Options {
                     ("$TEMP".to_string(), temp_dir())
                 };
                 let suffix = dir_pb.into_os_string().to_str().unwrap().replace(r"\\?\", "").replace(':', "").replace('\\', "/").replace('/', "-");
-                let suffix = format!("http{}{}", if suffix.starts_with('-') { "" } else { "-" }, suffix);
+                let suffix = dbg!(if dbg!(&suffix).len() >= 255 - (4 + 1) {
+                    // avoid NAME_MAX
+                    format!("http-{}", blake3::hash(suffix.as_bytes()).to_hex())
+                } else {
+                    format!("http{}{}", if suffix.starts_with('-') { "" } else { "-" }, suffix)
+                });
 
                 (format!("{}{}{}",
                          temp_s,
