@@ -151,7 +151,6 @@ impl Header for XLastModified {
         "X-Last-Modified"
     }
 
-    /// Dummy impl returning an empty value, since we're only ever sending these
     fn parse_header(data: &[Vec<u8>]) -> HyperResult<XLastModified> {
         if data.len() != 1 {
             return Err(HyperError::Header);
@@ -160,7 +159,36 @@ impl Header for XLastModified {
     }
 }
 
+/// Dummy impl returning an empty value, since we're only ever sending these
 impl HeaderFormat for XLastModified {
+    fn fmt_header(&self, _: &mut fmt::Formatter) -> fmt::Result {
+        Ok(())
+    }
+}
+
+/// The `X-OC-MTIME` header: seconds since epoch for PUTs (Total Commander Android WebDAV).
+///
+/// Required since XMLHttpRequests can't set `Date:`.
+///
+/// No formatting, we only receive.
+#[derive(Debug, Clone, Hash, PartialOrd, Ord, PartialEq, Eq)]
+pub struct XOcMTime(pub u64);
+
+impl Header for XOcMTime {
+    fn header_name() -> &'static str {
+        "X-OC-MTime"
+    }
+
+    fn parse_header(data: &[Vec<u8>]) -> HyperResult<XOcMTime> {
+        if data.len() != 1 {
+            return Err(HyperError::Header);
+        }
+        Ok(XOcMTime(str::from_utf8(data.last().ok_or(HyperError::Header)?).map_err(|_| HyperError::Header)?.parse().map_err(|_| HyperError::Header)?))
+    }
+}
+
+/// Dummy impl returning an empty value, since we're only ever sending these
+impl HeaderFormat for XOcMTime {
     fn fmt_header(&self, _: &mut fmt::Formatter) -> fmt::Result {
         Ok(())
     }

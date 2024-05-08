@@ -26,12 +26,12 @@ use rand::distributions::Alphanumeric as AlphanumericDistribution;
 use iron::mime::{Mime, SubLevel as MimeSubLevel, TopLevel as MimeTopLevel};
 use std::io::{self, ErrorKind as IoErrorKind, SeekFrom, Write, Error as IoError, Read, Seek};
 use iron::{headers, status, method, mime, IronResult, Listening, Response, TypeMap, Request, Handler, Iron};
-use self::super::util::{WwwAuthenticate, XLastModified, DisplayThree, CommaList, Spaces, MsAsS, Maybe, Dav, url_path, file_etag, file_hash, set_mtime, is_symlink,
-                        encode_str, encode_file, file_length, html_response, file_binary, client_mobile, percent_decode, escape_specials, file_icon_suffix,
-                        is_actually_file, is_descendant_of, response_encoding, detect_file_as_dir, encoding_extension, file_time_modified, file_time_modified_p,
-                        get_raw_fs_metadata, human_readable_size, encode_tail_if_trimmed, is_nonexistent_descendant_of, USER_AGENT, ERROR_HTML, MAX_SYMLINKS,
-                        INDEX_EXTENSIONS, MIN_ENCODING_GAIN, MAX_ENCODING_SIZE, MIN_ENCODING_SIZE, DAV_LEVEL_1_METHODS, DIRECTORY_LISTING_HTML,
-                        MOBILE_DIRECTORY_LISTING_HTML, BLACKLISTED_ENCODING_EXTENSIONS};
+use self::super::util::{WwwAuthenticate, XLastModified, DisplayThree, CommaList, XOcMTime, Spaces, MsAsS, Maybe, Dav, url_path, file_etag, file_hash, set_mtime,
+                        is_symlink, encode_str, encode_file, file_length, html_response, file_binary, client_mobile, percent_decode, escape_specials,
+                        file_icon_suffix, is_actually_file, is_descendant_of, response_encoding, detect_file_as_dir, encoding_extension, file_time_modified,
+                        file_time_modified_p, get_raw_fs_metadata, human_readable_size, encode_tail_if_trimmed, is_nonexistent_descendant_of, USER_AGENT,
+                        ERROR_HTML, MAX_SYMLINKS, INDEX_EXTENSIONS, MIN_ENCODING_GAIN, MAX_ENCODING_SIZE, MIN_ENCODING_SIZE, DAV_LEVEL_1_METHODS,
+                        DIRECTORY_LISTING_HTML, MOBILE_DIRECTORY_LISTING_HTML, BLACKLISTED_ENCODING_EXTENSIONS};
 
 
 macro_rules! log {
@@ -1131,7 +1131,7 @@ impl HttpHandler {
 
     fn handle_put_file(&self, req: &mut Request, req_p: PathBuf, legal: bool) -> IronResult<Response> {
         let existent = !legal || req_p.exists();
-        let mtime = req.headers.get::<XLastModified>().map(|xlm| xlm.0);
+        let mtime = req.headers.get::<XLastModified>().map(|xlm| xlm.0).or_else(|| req.headers.get::<XOcMTime>().map(|xocmt| xocmt.0 * 1000));
         log!(self.log,
              "{} {} {magenta}{}{reset}, size: {}B{}{}",
              self.remote_addresses(&req),
