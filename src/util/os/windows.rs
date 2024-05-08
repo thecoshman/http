@@ -5,7 +5,6 @@ use std::os::windows::fs::MetadataExt;
 use std::os::windows::ffi::OsStrExt;
 use std::fs::{Metadata, File};
 use std::path::Path;
-use std::ptr;
 
 
 /// Get windows-style attributes for the specified file
@@ -34,19 +33,39 @@ pub fn file_executable(_: &Metadata) -> bool {
     true
 }
 
+#[inline(always)]
+pub fn set_executable(_: &Path, _: bool) {}
+
 
 pub fn set_mtime(f: &Path, ms: u64) {
-    if let Ok(f) = File::options().write(true).open(f) {
-        // FILETIME is in increments of 100ns, and in the Win32 epoch
-        let ft = (ms * 1000_0) + 116444736000000000;
-        unsafe {
-            SetFileTime(f.as_raw_handle(),
-                        ptr::null(),
-                        ptr::null(),
-                        &FILETIME {
-                            dwLowDateTime: (ft & 0xFFFFFFFF) as u32,
-                            dwHighDateTime: (ft >> 32) as u32,
-                        });
+    set_times(f, Some(ms), None, None)
+}
+
+
+const NO_FILETIME: FILETIME = FILETIME {
+    dwLowDateTime: 0,
+    dwHighDateTime: 0,
+};
+
+pub fn set_times(f: &Path, mtime_ms: Option<u64>, atime_ms: Option<u64>, ctime_ms: Option<u64>) {
+    if mtime_ms.is_some() || atime_ms.is_some() || ctime_ms.is_some() {
+        if let Ok(f) = File::options().write(true).open(f) {
+            unsafe {
+                SetFileTime(f.as_raw_handle(),
+                            &ctime_ms.map(ms_to_FILETIME).unwrap_or(NO_FILETIME),
+                            &atime_ms.map(ms_to_FILETIME).unwrap_or(NO_FILETIME),
+                            &mtime_ms.map(ms_to_FILETIME).unwrap_or(NO_FILETIME));
+            }
         }
+    }
+}
+
+/// FILETIME is in increments of 100ns, and in the Win32 epoch
+#[allow(non_snake_case)]
+fn ms_to_FILETIME(ms: u64) -> FILETIME {
+    let ft = (ms * 1000_0) + 116444736000000000;
+    FILETIME {
+        dwLowDateTime: (ft & 0xFFFFFFFF) as u32,
+        dwHighDateTime: (ft >> 32) as u32,
     }
 }

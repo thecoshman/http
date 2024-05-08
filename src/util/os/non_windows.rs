@@ -1,9 +1,9 @@
-use libc::{AT_SYMLINK_NOFOLLOW, UTIME_OMIT, AT_FDCWD, utimensat, timespec};
+use libc::{AT_SYMLINK_NOFOLLOW, UTIME_OMIT, AT_FDCWD, utimensat, timespec, umask};
 use std::os::unix::fs::{PermissionsExt, MetadataExt};
 use self::super::super::is_actually_file;
 use os_str_generic::OsStrGenericExt;
 use std::os::unix::ffi::OsStrExt;
-use std::fs::Metadata;
+use std::fs::{self, Metadata};
 use std::path::Path;
 
 
@@ -52,19 +52,51 @@ pub fn file_executable(meta: &Metadata) -> bool {
 }
 
 
+lazy_static! {
+    static ref UMASK: u32 = unsafe {
+        let um = umask(0o777);
+        umask(um);
+        um
+    };
+}
+
+pub fn set_executable(f: &Path, ex: bool) {
+    let mut perm = match fs::metadata(f) {
+        Ok(meta) => meta.permissions(),
+        Err(_) => return,
+    };
+    if ex {
+        perm.set_mode(perm.mode() | (0o111 & !*UMASK));
+    } else {
+        perm.set_mode(perm.mode() & !0o111);
+    }
+    let _ = fs::set_permissions(f, perm);
+}
+
+
+const NO_TIMESPEC: timespec = timespec {
+    tv_sec: 0,
+    tv_nsec: UTIME_OMIT,
+};
+
 pub fn set_mtime(f: &Path, ms: u64) {
-    unsafe {
-        utimensat(AT_FDCWD,
-                  f.as_os_str().as_bytes().as_ptr() as *const _,
-                  [timespec {
-                       tv_sec: 0,
-                       tv_nsec: UTIME_OMIT,
-                   },
-                   timespec {
-                       tv_sec: (ms / 1000) as i64,
-                       tv_nsec: ((ms % 1000) * 1000_000) as i64,
-                   }]
-                      .as_ptr(),
-                  AT_SYMLINK_NOFOLLOW);
+    set_times(f, Some(ms), None, None)
+}
+
+pub fn set_times(f: &Path, mtime_ms: Option<u64>, atime_ms: Option<u64>, _: Option<u64>) {
+    if mtime_ms.is_some() || atime_ms.is_some() {
+        unsafe {
+            utimensat(AT_FDCWD,
+                      f.as_os_str().as_bytes().as_ptr() as *const _,
+                      [atime_ms.map(ms_to_timespec).unwrap_or(NO_TIMESPEC), mtime_ms.map(ms_to_timespec).unwrap_or(NO_TIMESPEC)].as_ptr(),
+                      AT_SYMLINK_NOFOLLOW);
+        }
+    }
+}
+
+fn ms_to_timespec(ms: u64) -> timespec {
+    timespec {
+        tv_sec: (ms / 1000) as i64,
+        tv_nsec: ((ms % 1000) * 1000_000) as i64,
     }
 }
