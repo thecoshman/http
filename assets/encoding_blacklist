@@ -1,9 +1,10 @@
 ## Stolen from https://en.wikipedia.org/wiki/List_of_archive_formats
 # Compression-only files
+br
 bz2
-F
 gz
 lz
+lz4
 lzma
 lzo
 rz
@@ -12,21 +13,26 @@ sz
 xz
 z
 Z
+zst
 
 # Compression and archiving
 7z
-s7z
+aar
 ace
 afa
 alz
 apk
 arc
+arc
 arj
+ark
 b1
+b6z
 ba
 bh
 cab
 car
+cdx
 cfs
 cpt
 dar
@@ -35,25 +41,28 @@ dgc
 dmg
 ear
 gca
+genozip
 ha
 hki
 ice
 jar
 kgb
-lzh
 lha
+lzh
 lzx
 pak
-partimg
 paq6
 paq7
 paq8
+partimg
 pea
+phar
 pim
 pit
 qda
 rar
 rk
+s7z
 sda
 sea
 sen
@@ -62,17 +71,18 @@ shk
 sit
 sitx
 sqx
-tgz
 tbz2
+tgz
 tlz
+txz
 uc
 uc0
 uc2
-ucn
-ur2
-ue2
 uca
+ucn
+ue2
 uha
+ur2
 war
 wim
 xar
@@ -87,35 +97,47 @@ zz
 
 ## Stolen from https://en.wikipedia.org/wiki/Video_file_format
 # Compressed videos
-webm
-mkv
-flv
-ogv
-ogg
-drc
-gifv
-wmv
-rm
-rmvb
-asf
-amv
-mp4
-m4p
-m4v
-mpg
-mp2
-mpeg
-mpe
-mpv
-m2v
-3gp
 3g2
-mxf
-flv
-f4v
-f4p
+3gp
+amv
+asf
+avi
+drc
 f4a
 f4b
+f4p
+f4v
+flv
+gif
+gifv
+m2ts
+m2v
+m4p
+m4v
+mkv
+mng
+mov
+mp2
+mp4
+mpe
+mpeg
+mpg
+mpv
+mts
+mxf
+nsv
+ogg
+ogv
+qt
+rm
+rmvb
+roq
+svi
+viv
+vob
+webm
+wmv
+yuv
 
 
 ## Stolen from https://en.wikipedia.org/wiki/Audio_file_format
@@ -135,11 +157,11 @@ ivs
 m4a
 m4b
 mmf
+mogg
 mp3
 mpc
 msv
 oga
-mogg
 opus
 ra
 sln
@@ -151,14 +173,15 @@ wv
 
 ## Stolen from https://en.wikipedia.org/wiki/Image_file_format
 # Compressed images
-jpeg
-jpg
+bpg
+gif
+heic
 jfif
+jpeg
 jpeg2000
+jpg
 pcx
+png
 tif
 tiff
-gif
-png
 webp
-bpg
