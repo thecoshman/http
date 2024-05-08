@@ -654,8 +654,8 @@ impl HttpHandler {
                                                   resp_p.as_path(),
                                                   mt)));
                     }
-                    Some(&(ref resp_p, false)) => {
-                        return Ok(Response::with((status::Ok, headers, Header(headers::ETag(headers::EntityTag::strong(etag))), resp_p.as_path(), mt)));
+                    Some(&((_, false), _)) => {
+                        return Ok(Response::with((status::Ok, headers, Header(headers::ETag(headers::EntityTag::strong(etag))), req_p, mt)));
                     }
                     None => (),
                 }
@@ -674,7 +674,7 @@ impl HttpHandler {
                            (file_length(&resp_p.metadata().expect("Failed to get encoded file metadata"), &resp_p) as f64);
                 if gain < MIN_ENCODING_GAIN {
                     let mut cache = self.cache_fs.write().expect("Filesystem cache write lock poisoned");
-                    cache.insert(cache_key, (req_p.clone(), false));
+                    cache.insert(cache_key, ((PathBuf::new(), false), AtomicU64::new(0)));
                     fs::remove_file(resp_p).expect("Failed to remove too big encoded file");
                 } else {
                     log!(self.log,
