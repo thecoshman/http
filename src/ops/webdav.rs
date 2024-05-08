@@ -208,7 +208,7 @@ impl HttpHandler {
         log!(self.log,
              "{} requested {red}PROPPATCH{reset} of {} on {yellow}{}{reset}",
              self.remote_addresses(&req),
-             CommaList(props.iter().map(|p| &p.0.local_name)),
+             CommaList(props.iter().map(|p| &p.local_name)),
              req_p.display());
 
         match write_proppatch_output(&props, req.url.as_ref()).expect("Couldn't write PROPPATCH XML") {
@@ -612,7 +612,7 @@ fn start_client_prop_element<W: Write>(out: &mut XmlWriter<W>, prop: XmlName) ->
 }
 
 /// https://tools.ietf.org/html/rfc2518#section-12.13
-fn parse_proppatch(req: &mut Request) -> Result<Vec<(OwnedXmlName, bool)>, String> {
+fn parse_proppatch(req: &mut Request) -> Result<Vec<OwnedXmlName>, String> {
     #[derive(Debug, Copy, Clone, Hash, PartialOrd, Ord, PartialEq, Eq)]
     enum State {
         Start,
@@ -627,7 +627,7 @@ fn parse_proppatch(req: &mut Request) -> Result<Vec<(OwnedXmlName, bool)>, Strin
     let mut state = State::Start;
     let mut props = vec![];
     let mut propname = None;
-    let mut is_remove = false;
+    // let mut is_remove = false;
 
     loop {
         let event = xml.next().map_err(|e| e.to_string())?;
@@ -638,11 +638,11 @@ fn parse_proppatch(req: &mut Request) -> Result<Vec<(OwnedXmlName, bool)>, Strin
 
             (State::PropertyUpdate, XmlREvent::StartElement { ref name, .. }) if name.local_name == "set" => {
                 state = State::Action;
-                is_remove = false;
+                // is_remove = false;
             }
             (State::PropertyUpdate, XmlREvent::StartElement { ref name, .. }) if name.local_name == "remove" => {
                 state = State::Action;
-                is_remove = true;
+                // is_remove = true;
             }
             (State::PropertyUpdate, XmlREvent::EndElement { .. }) => return Ok(props),
 
@@ -652,7 +652,7 @@ fn parse_proppatch(req: &mut Request) -> Result<Vec<(OwnedXmlName, bool)>, Strin
             (State::Prop, XmlREvent::StartElement { name, .. }) => {
                 state = State::InProp;
                 propname = Some(name.clone());
-                props.push((name, is_remove));
+                props.push(name);
             }
             (State::Prop, XmlREvent::EndElement { .. }) => state = State::Action,
 
@@ -668,9 +668,9 @@ fn parse_proppatch(req: &mut Request) -> Result<Vec<(OwnedXmlName, bool)>, Strin
     }
 }
 
-fn write_proppatch_output(props: &[(OwnedXmlName, bool)], req_url: &GenericUrl) -> Result<Result<Vec<u8>, IronResult<Response>>, XmlWError> {
+fn write_proppatch_output(props: &[OwnedXmlName], req_url: &GenericUrl) -> Result<Result<Vec<u8>, IronResult<Response>>, XmlWError> {
     let mut out = intialise_xml_output()?;
-    out.write(namespaces_for_props("D:multistatus", props.iter().map(|pp| &pp.0)))?;
+    out.write(namespaces_for_props("D:multistatus", props.iter()))?;
 
     out.write(XmlWEvent::start_element("D:href"))?;
     out.write(XmlWEvent::characters(req_url.as_str()))?;
@@ -678,7 +678,7 @@ fn write_proppatch_output(props: &[(OwnedXmlName, bool)], req_url: &GenericUrl) 
 
     out.write(XmlWEvent::start_element("D:propstat"))?;
 
-    for (name, _) in props {
+    for name in props {
         out.write(XmlWEvent::start_element("D:prop"))?;
 
         start_client_prop_element(&mut out, name.borrow())?;
