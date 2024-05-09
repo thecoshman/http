@@ -1164,16 +1164,23 @@ impl HttpHandler {
 
         let &(_, ref temp_dir) = self.writes_temp_dir.as_ref().unwrap();
         let temp_file_p = temp_dir.join(req_p.file_name().expect("Failed to get requested file's filename"));
+        let finally = || drop(fs::remove_file(&temp_file_p));
+        let catch = |e| {
+            finally();
+            e
+        };
 
         io::copy(&mut req.body, &mut File::create(&temp_file_p).expect("Failed to create temp file"))
+            .map_err(catch)
             .expect("Failed to write requested data to requested file");
         if legal {
-            let _ = fs::create_dir_all(req_p.parent().expect("Failed to get requested file's parent directory"));
-            fs::copy(&temp_file_p, &req_p).expect("Failed to copy temp file to requested file");
+            let _ = fs::create_dir_all(req_p.parent().ok_or_else(finally).ok().expect("Failed to get requested file's parent directory"));
+            fs::copy(&temp_file_p, &req_p).map_err(catch).expect("Failed to copy temp file to requested file");
             if let Some(ms) = mtime {
                 set_mtime(&req_p, ms);
             }
         }
+        finally();
 
         Ok(Response::with((if !legal || !existent {
                                status::Created
