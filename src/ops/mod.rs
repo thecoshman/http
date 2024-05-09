@@ -25,9 +25,9 @@ use rfsapi::{RawFsApiHeader, FilesetData, RawFileData};
 use std::sync::atomic::{AtomicU64, Ordering as AtomicOrdering};
 use rand::distributions::uniform::Uniform as UniformDistribution;
 use rand::distributions::Alphanumeric as AlphanumericDistribution;
-use iron::mime::{Mime, SubLevel as MimeSubLevel, TopLevel as MimeTopLevel};
 use std::io::{self, ErrorKind as IoErrorKind, SeekFrom, Write, Error as IoError, Read, Seek};
 use iron::{headers, status, method, mime, IronResult, Listening, Response, TypeMap, Request, Handler, Iron};
+use iron::mime::{Mime, Attr as MimeAttr, Value as MimeAttrValue, SubLevel as MimeSubLevel, TopLevel as MimeTopLevel};
 use self::super::util::{WwwAuthenticate, XLastModified, DisplayThree, CommaList, XOcMTime, Spaces, MsAsS, Maybe, Dav, url_path, file_etag, file_hash, set_mtime,
                         is_symlink, encode_str, encode_file, file_length, html_response, file_binary, client_mobile, percent_decode, escape_specials,
                         file_icon_suffix, is_actually_file, is_descendant_of, response_encoding, detect_file_as_dir, encoding_extension, file_time_modified,
@@ -1301,7 +1301,7 @@ impl HttpHandler {
                     return Ok(Response::with((status::NotModified,
                                               Header(headers::Server(USER_AGENT.to_string())),
                                               Header(headers::ETag(headers::EntityTag::strong(etag))),
-                                              "text/html;charset=utf-8".parse::<mime::Mime>().unwrap())));
+                                              Mime(MimeTopLevel::Text, MimeSubLevel::Html, vec![(MimeAttr::Charset, MimeAttrValue::Utf8)])))); // text/html; charset=utf-8
                 }
             }
         }
@@ -1322,7 +1322,7 @@ impl HttpHandler {
                                               Header(headers::Server(USER_AGENT.to_string())),
                                               Header(headers::ContentEncoding(vec![encoding])),
                                               Header(headers::ETag(headers::EntityTag::strong(etag))),
-                                              "text/html;charset=utf-8".parse::<mime::Mime>().unwrap(),
+                                              Mime(MimeTopLevel::Text, MimeSubLevel::Html, vec![(MimeAttr::Charset, MimeAttrValue::Utf8)]), // text/html; charset=utf-8
                                               &enc_resp.0[..])));
                 }
             }
@@ -1343,14 +1343,14 @@ impl HttpHandler {
                                               Header(headers::Server(USER_AGENT.to_string())),
                                               Header(headers::ContentEncoding(vec![encoding])),
                                               Header(headers::ETag(headers::EntityTag::strong(etag))),
-                                              "text/html;charset=utf-8".parse::<mime::Mime>().unwrap(),
+                                              Mime(MimeTopLevel::Text, MimeSubLevel::Html, vec![(MimeAttr::Charset, MimeAttrValue::Utf8)]), // text/html; charset=utf-8
                                               &cache[&cache_key].0[..])));
                 } else {
                     return Ok(Response::with((st,
                                               Header(headers::Server(USER_AGENT.to_string())),
                                               Header(headers::ContentEncoding(vec![encoding])),
                                               Header(headers::ETag(headers::EntityTag::strong(etag))),
-                                              "text/html;charset=utf-8".parse::<mime::Mime>().unwrap(),
+                                              Mime(MimeTopLevel::Text, MimeSubLevel::Html, vec![(MimeAttr::Charset, MimeAttrValue::Utf8)]), // text/html; charset=utf-8
                                               enc_resp)));
                 }
             } else {
@@ -1364,7 +1364,7 @@ impl HttpHandler {
         Ok(Response::with((st,
                            Header(headers::Server(USER_AGENT.to_string())),
                            Header(headers::ETag(headers::EntityTag::strong(etag))),
-                           "text/html;charset=utf-8".parse::<mime::Mime>().unwrap(),
+                           Mime(MimeTopLevel::Text, MimeSubLevel::Html, vec![(MimeAttr::Charset, MimeAttrValue::Utf8)]), // text/html; charset=utf-8
                            resp)))
     }
 
