@@ -9,6 +9,7 @@ use unicase::UniCase;
 use std::sync::RwLock;
 use lazysort::SortedBy;
 use cidr::{Cidr, IpCidr};
+use time::precise_time_ns;
 use std::fs::{self, File};
 use std::default::Default;
 use rand::{Rng, thread_rng};
@@ -21,6 +22,7 @@ use std::collections::{BTreeMap, HashMap};
 use self::super::{LogLevel, Options, Error};
 use std::process::{ExitStatus, Command, Child, Stdio};
 use rfsapi::{RawFsApiHeader, FilesetData, RawFileData};
+use std::sync::atomic::{AtomicU64, Ordering as AtomicOrdering};
 use rand::distributions::uniform::Uniform as UniformDistribution;
 use rand::distributions::Alphanumeric as AlphanumericDistribution;
 use iron::mime::{Mime, SubLevel as MimeSubLevel, TopLevel as MimeTopLevel};
@@ -103,14 +105,16 @@ macro_rules! log {
     };
 }
 
+mod prune;
 mod webdav;
 mod bandwidth;
 
+pub use self::prune::PruneChain;
 pub use self::bandwidth::{LimitBandwidthMiddleware, SimpleChain};
 
 
 // TODO: ideally this String here would be Encoding instead but hyper is bad
-type CacheT<Cnt> = HashMap<(blake3::Hash, String), Cnt>;
+type CacheT<Cnt> = HashMap<(blake3::Hash, String), (Cnt, AtomicU64)>;
 
 pub struct HttpHandler {
     pub hosted_directory: (String, PathBuf),
@@ -130,8 +134,13 @@ pub struct HttpHandler {
     pub proxy_redirs: BTreeMap<IpCidr, String>,
     pub mime_type_overrides: BTreeMap<String, Mime>,
     pub additional_headers: Vec<(String, Vec<u8>)>,
-    cache_gen: RwLock<CacheT<Vec<u8>>>,
-    cache_fs: RwLock<CacheT<(PathBuf, bool)>>,
+
+    pub cache_gen: RwLock<CacheT<Vec<u8>>>,
+    pub cache_fs: RwLock<CacheT<(PathBuf, bool, u64)>>,
+    pub cache_gen_size: AtomicU64,
+    pub cache_fs_size: AtomicU64,
+    pub encoded_filesystem_limit: u64,
+    pub encoded_generated_limit: u64,
 }
 
 impl HttpHandler {
@@ -168,6 +177,10 @@ impl HttpHandler {
             encoded_temp_dir: HttpHandler::temp_subdir(&opts.temp_directory, opts.encode_fs, "encoded"),
             cache_gen: Default::default(),
             cache_fs: Default::default(),
+            cache_gen_size: Default::default(),
+            cache_fs_size: Default::default(),
+            encoded_filesystem_limit: opts.encoded_filesystem_limit.unwrap_or(u64::MAX),
+            encoded_generated_limit: opts.encoded_generated_limit.unwrap_or(u64::MAX),
             proxies: opts.proxies.clone(),
             proxy_redirs: opts.proxy_redirs.clone(),
             mime_type_overrides: opts.mime_type_overrides.clone(),
@@ -638,7 +651,8 @@ impl HttpHandler {
 
             {
                 match self.cache_fs.read().expect("Filesystem cache read lock poisoned").get(&cache_key) {
-                    Some(&(ref resp_p, true)) => {
+                    Some(&((ref resp_p, true, _), ref atime)) => {
+                        atime.store(precise_time_ns(), AtomicOrdering::Relaxed);
                         log!(self.log,
                              "{} encoded as {} for {:.1}% ratio (cached)",
                              Spaces(self.remote_addresses(req).width()),
@@ -654,7 +668,7 @@ impl HttpHandler {
                                                   resp_p.as_path(),
                                                   mt)));
                     }
-                    Some(&((_, false), _)) => {
+                    Some(&((_, false, _), _)) => {
                         return Ok(Response::with((status::Ok, headers, Header(headers::ETag(headers::EntityTag::strong(etag))), req_p, mt)));
                     }
                     None => (),
@@ -670,11 +684,11 @@ impl HttpHandler {
             };
 
             if encode_file(&req_p, &resp_p, &encoding) {
-                let gain = (file_length(&req_p.metadata().expect("Failed to get requested file metadata"), &req_p) as f64) /
-                           (file_length(&resp_p.metadata().expect("Failed to get encoded file metadata"), &resp_p) as f64);
-                if gain < MIN_ENCODING_GAIN {
+                let resp_p_len = file_length(&resp_p.metadata().expect("Failed to get encoded file metadata"), &resp_p);
+                let gain = (file_length(&req_p.metadata().expect("Failed to get requested file metadata"), &req_p) as f64) / (resp_p_len as f64);
+                if gain < MIN_ENCODING_GAIN || resp_p_len > self.encoded_filesystem_limit {
                     let mut cache = self.cache_fs.write().expect("Filesystem cache write lock poisoned");
-                    cache.insert(cache_key, ((PathBuf::new(), false), AtomicU64::new(0)));
+                    cache.insert(cache_key, ((PathBuf::new(), false, 0), AtomicU64::new(u64::MAX)));
                     fs::remove_file(resp_p).expect("Failed to remove too big encoded file");
                 } else {
                     log!(self.log,
@@ -684,7 +698,8 @@ impl HttpHandler {
                          gain * 100f64);
 
                     let mut cache = self.cache_fs.write().expect("Filesystem cache write lock poisoned");
-                    cache.insert(cache_key, (resp_p.clone(), true));
+                    self.cache_fs_size.fetch_add(resp_p_len, AtomicOrdering::Relaxed);
+                    cache.insert(cache_key, ((resp_p.clone(), true, resp_p_len), AtomicU64::new(precise_time_ns())));
 
                     return Ok(Response::with((status::Ok,
                                               headers,
@@ -1289,18 +1304,19 @@ impl HttpHandler {
 
             {
                 if let Some(enc_resp) = self.cache_gen.read().expect("Generated file cache read lock poisoned").get(&cache_key) {
+                    enc_resp.1.store(precise_time_ns(), AtomicOrdering::Relaxed);
                     log!(self.log,
                          "{} encoded as {} for {:.1}% ratio (cached)",
                          Spaces(self.remote_addresses(req).width()),
                          encoding,
-                         ((resp.len() as f64) / (enc_resp.len() as f64)) * 100f64);
+                         ((resp.len() as f64) / (enc_resp.0.len() as f64)) * 100f64);
 
                     return Ok(Response::with((st,
                                               Header(headers::Server(USER_AGENT.to_string())),
                                               Header(headers::ContentEncoding(vec![encoding])),
                                               Header(headers::ETag(headers::EntityTag::strong(etag))),
                                               "text/html;charset=utf-8".parse::<mime::Mime>().unwrap(),
-                                              &enc_resp[..])));
+                                              &enc_resp.0[..])));
                 }
             }
 
@@ -1311,15 +1327,25 @@ impl HttpHandler {
                      encoding,
                      ((resp.len() as f64) / (enc_resp.len() as f64)) * 100f64);
 
-                let mut cache = self.cache_gen.write().expect("Generated file cache write lock poisoned");
-                cache.insert(cache_key.clone(), enc_resp);
+                if enc_resp.len() as u64 <= self.encoded_generated_limit {
+                    let mut cache = self.cache_gen.write().expect("Generated file cache write lock poisoned");
+                    self.cache_gen_size.fetch_add(enc_resp.len() as u64, AtomicOrdering::Relaxed);
+                    cache.insert(cache_key.clone(), (enc_resp, AtomicU64::new(precise_time_ns())));
 
-                return Ok(Response::with((st,
-                                          Header(headers::Server(USER_AGENT.to_string())),
-                                          Header(headers::ContentEncoding(vec![encoding])),
-                                          Header(headers::ETag(headers::EntityTag::strong(etag))),
-                                          "text/html;charset=utf-8".parse::<mime::Mime>().unwrap(),
-                                          &cache[&cache_key][..])));
+                    return Ok(Response::with((st,
+                                              Header(headers::Server(USER_AGENT.to_string())),
+                                              Header(headers::ContentEncoding(vec![encoding])),
+                                              Header(headers::ETag(headers::EntityTag::strong(etag))),
+                                              "text/html;charset=utf-8".parse::<mime::Mime>().unwrap(),
+                                              &cache[&cache_key].0[..])));
+                } else {
+                    return Ok(Response::with((st,
+                                              Header(headers::Server(USER_AGENT.to_string())),
+                                              Header(headers::ContentEncoding(vec![encoding])),
+                                              Header(headers::ETag(headers::EntityTag::strong(etag))),
+                                              "text/html;charset=utf-8".parse::<mime::Mime>().unwrap(),
+                                              enc_resp)));
+                }
             } else {
                 log!(self.log,
                      "{} failed to encode as {}, sending identity",
@@ -1447,8 +1473,13 @@ impl Clone for HttpHandler {
             proxy_redirs: self.proxy_redirs.clone(),
             mime_type_overrides: self.mime_type_overrides.clone(),
             additional_headers: self.additional_headers.clone(),
+
             cache_gen: Default::default(),
             cache_fs: Default::default(),
+            cache_gen_size: Default::default(),
+            cache_fs_size: Default::default(),
+            encoded_filesystem_limit: self.encoded_filesystem_limit,
+            encoded_generated_limit: self.encoded_generated_limit,
         }
     }
 }

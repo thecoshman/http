@@ -48,6 +48,7 @@ use std::mem;
 use iron::Iron;
 use std::net::IpAddr;
 use std::process::exit;
+use std::time::Duration;
 use tabwriter::TabWriter;
 use std::io::{Write, stdout};
 use std::collections::BTreeSet;
@@ -79,9 +80,10 @@ fn result_main() -> Result<(), Error> {
     }
 
     let handler = ops::SimpleChain {
-        handler: ops::HttpHandler::new(&opts),
+        handler: ops::PruneChain::new(&opts),
         after: opts.request_bandwidth.map(ops::LimitBandwidthMiddleware::new),
     };
+    let prune_interval = handler.handler.prune_interval;
     let mut responder = if let Some(p) = opts.port {
         if let Some(&((_, ref id), ref pw)) = opts.tls_data.as_ref() {
                 Iron::new(handler).https((opts.bind_address, p),
@@ -110,9 +112,7 @@ fn result_main() -> Result<(), Error> {
         if opts.log_colour {
             print!("{}", trivial_colours::Reset);
         }
-        print!("Hosting \"{}\" on port {}",
-               opts.hosted_directory.0,
-               responder.socket.port());
+        print!("Hosting \"{}\" on port {}", opts.hosted_directory.0, responder.socket.port());
         if responder.socket.ip() != IpAddr::from([0, 0, 0, 0]) {
             print!(" under address {}", responder.socket.ip());
         }
@@ -187,7 +187,17 @@ fn result_main() -> Result<(), Error> {
             move || r.notify_one()
         })
         .unwrap();
-    drop(end_handler.wait(Mutex::new(()).lock().unwrap()).unwrap());
+    if opts.encoded_prune.is_some() {
+        loop {
+            if !end_handler.wait_timeout(Mutex::new(()).lock().unwrap(), Duration::from_secs(prune_interval)).unwrap().1.timed_out() {
+                break;
+            }
+
+            ops::PruneChain::to_trigger().map(|pc| pc.prune());
+        }
+    } else {
+        drop(end_handler.wait(Mutex::new(()).lock().unwrap()).unwrap());
+    }
     responder.close().unwrap();
 
     // This is necessary because the server isn't Drop::drop()ped when the responder is

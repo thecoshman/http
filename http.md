@@ -217,6 +217,25 @@ pass parameters like what port to use.
 
     This is false by default because it's useful for reducing bandwidth usage.
 
+  --encoded-filesystem FS_LIMIT
+  --encoded-generated GEN_LIMIT
+
+    Consume at most  FS_LIMIT space for encoded filesystem files (in TEMP) and
+            at most GEN_LIMIT memory for encoded generated responses.
+
+    The arguments are an integer, optionally followed by case-insensitive
+    k (kilobyte), m (megabyte), g (gigabyte), t (terabyte), or p (petabyte),
+    optionally followed by case-insensitive b.
+
+    This quota may be exceeded temporarily while servicing a request.
+
+  --encoded-prune MAX_AGE
+
+    Prune cached encoded data older than MAX_AGE.
+
+    The argument is given in seconds, optionally followed by case-insensitive
+    s (seconds), m (minutes), h (hours), or d (days).
+
   -x --strip-extensions
 
     Allow stripping index extensions from served paths:

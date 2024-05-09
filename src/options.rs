@@ -88,6 +88,12 @@ pub struct Options {
     pub allow_writes: bool,
     /// Whether to encode filesystem files. Default: true
     pub encode_fs: bool,
+    /// Consume at most this much space for encoded filesystem files.
+    pub encoded_filesystem_limit: Option<u64>,
+    /// Consume at most this much memory for encoded generated responses.
+    pub encoded_generated_limit: Option<u64>,
+    /// Prune cached encoded data older than this many seconds.
+    pub encoded_prune: Option<u64>,
     /// How much to suppress output
     ///
     ///   * >= 1 – suppress serving status lines ("IP was served something")
@@ -139,6 +145,12 @@ impl Options {
             .arg(Arg::from_usage("-l --no-listings 'Never generate dir listings. Default: false'"))
             .arg(Arg::from_usage("-i --no-indices 'Do not automatically use index files. Default: false'"))
             .arg(Arg::from_usage("-e --no-encode 'Do not encode filesystem files. Default: false'"))
+            .arg(Arg::from_usage("--encoded-filesystem [FS_LIMIT] 'Consume at most FS_LIMIT space for encoded filesystem files.'")
+                .validator(|s| Options::size_parse(s.into()).map(|_| ())))
+            .arg(Arg::from_usage("--encoded-generated [GEN_LIMIT] 'Consume at most GEN_LIMIT memory for encoded generated responses.'")
+                .validator(|s| Options::size_parse(s.into()).map(|_| ())))
+            .arg(Arg::from_usage("--encoded-prune [MAX_AGE] 'Prune cached encoded data older than MAX_AGE.'")
+                .validator(|s| Options::age_parse(s.into()).map(|_| ())))
             .arg(Arg::from_usage("-x --strip-extensions 'Allow stripping index extensions from served paths. Default: false'"))
             .arg(Arg::from_usage("-q --quiet... 'Suppress increasing amounts of output'"))
             .arg(Arg::from_usage("-c --no-colour 'Don't colourise the log output'"))
@@ -245,6 +257,9 @@ impl Options {
             strip_extensions: matches.is_present("strip-extensions"),
             allow_writes: matches.is_present("allow-write"),
             encode_fs: !matches.is_present("no-encode"),
+            encoded_filesystem_limit: matches.value_of("encoded-filesystem").and_then(|s| Options::size_parse(s.into()).ok()),
+            encoded_generated_limit: matches.value_of("encoded-generated").and_then(|s| Options::size_parse(s.into()).ok()),
+            encoded_prune: matches.value_of("encoded-prune").and_then(|s| Options::age_parse(s.into()).ok()),
             loglevel: matches.occurrences_of("quiet").into(),
             log_colour: !matches.is_present("no-colour"),
             webdav: matches.is_present("webdav"),
@@ -352,6 +367,40 @@ impl Options {
 
     fn u16_validator(s: String) -> Result<(), String> {
         u16::from_str(&s).map(|_| ()).map_err(|_| format!("{} is not a valid port number", s))
+    }
+
+    fn size_parse<'s>(s: Cow<'s, str>) -> Result<u64, String> {
+        let mut s = &s[..];
+        if matches!(s.as_bytes().last(), Some(b'b' | b'B')) {
+            s = &s[..s.len() - 1];
+        }
+        let mul: u64 = match s.as_bytes().last() {
+            Some(b'k' | b'K') => 1024u64,
+            Some(b'm' | b'M') => 1024u64 * 1024u64,
+            Some(b'g' | b'G') => 1024u64 * 1024u64 * 1024u64,
+            Some(b't' | b'T') => 1024u64 * 1024u64 * 1024u64 * 1024u64,
+            Some(b'p' | b'P') => 1024u64 * 1024u64 * 1024u64 * 1024u64 * 1024u64,
+            _ => 1,
+        };
+        if mul != 1 {
+            s = &s[..s.len() - 1];
+        }
+        s.parse().map(|size: u64| size * mul).map_err(|e| format!("{} not a valid (optionally-K/M/G/T/P[B]-suffixed) number: {}", s, e))
+    }
+
+    fn age_parse<'s>(s: Cow<'s, str>) -> Result<u64, String> {
+        let mut s = &s[..];
+        let mul: u64 = match s.as_bytes().last() {
+            Some(b's') => 1,
+            Some(b'm') => 60,
+            Some(b'h') => 60 * 60,
+            Some(b'd') => 60 * 60 * 24,
+            _ => 1,
+        };
+        if mul != 1 {
+            s = &s[..s.len() - 1];
+        }
+        s.parse().map(|age: u64| age * mul).map_err(|e| format!("{} not a valid (optionally-s/m/h/d-suffixed) number: {}", s, e))
     }
 
     fn proxy_parse<'s>(s: Cow<'s, str>) -> Result<(IpCidr, String), String> {
