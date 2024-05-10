@@ -190,7 +190,7 @@ impl HttpHandler {
 
     pub fn clean_temp_dirs(temp_dir: &(String, PathBuf), loglevel: LogLevel, log_colour: bool) {
         for (temp_name, temp_dir) in ["writes", "encoded", "tls"].iter().flat_map(|tn| HttpHandler::temp_subdir(temp_dir, true, tn)) {
-            if temp_dir.exists() && fs::remove_dir_all(&temp_dir).is_ok() {
+            if fs::remove_dir_all(&temp_dir).is_ok() {
                 log!((loglevel < LogLevel::NoServeStatus, log_colour),
                      "Deleted temp dir {magenta}{}{reset}",
                      temp_name);
