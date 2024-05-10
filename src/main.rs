@@ -29,7 +29,6 @@ extern crate cidr;
 #[macro_use]
 extern crate clap;
 extern crate iron;
-#[cfg(not(any(target_os = "windows", target_os = "macos")))]
 extern crate libc;
 extern crate rand;
 extern crate time;
@@ -45,9 +44,9 @@ pub use error::Error;
 pub use options::{LogLevel, Options};
 
 use std::mem;
+use libc::exit;
 use iron::Iron;
 use std::net::IpAddr;
-use std::process::exit;
 use std::time::Duration;
 use tabwriter::TabWriter;
 use std::io::{Write, stdout};
@@ -58,7 +57,7 @@ use hyper_native_tls::NativeTlsServer;
 
 fn main() {
     let result = actual_main();
-    exit(result);
+    unsafe { exit(result) }
 }
 
 fn actual_main() -> i32 {
