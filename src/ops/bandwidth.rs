@@ -9,7 +9,7 @@ use std::thread;
 pub const DEFAULT_SLEEP: Duration = Duration::from_millis(1);
 
 
-#[derive(Copy, Clone, Hash, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Hash, PartialEq, Eq, PartialOrd, Ord)]
 pub struct SimpleChain<H: Handler, Am: AfterMiddleware> {
     pub handler: H,
     pub after: Option<Am>,

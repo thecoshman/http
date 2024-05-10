@@ -1461,33 +1461,29 @@ impl HttpHandler {
     }
 }
 
-impl Clone for HttpHandler {
-    fn clone(&self) -> HttpHandler {
-        HttpHandler {
-            hosted_directory: self.hosted_directory.clone(),
-            follow_symlinks: self.follow_symlinks,
-            sandbox_symlinks: self.sandbox_symlinks,
-            generate_listings: self.generate_listings,
-            check_indices: self.check_indices,
-            strip_extensions: self.strip_extensions,
-            log: self.log,
-            webdav: self.webdav,
-            global_auth_data: self.global_auth_data.clone(),
-            path_auth_data: self.path_auth_data.clone(),
-            writes_temp_dir: self.writes_temp_dir.clone(),
-            encoded_temp_dir: self.encoded_temp_dir.clone(),
-            proxies: self.proxies.clone(),
-            proxy_redirs: self.proxy_redirs.clone(),
-            mime_type_overrides: self.mime_type_overrides.clone(),
-            additional_headers: self.additional_headers.clone(),
 
-            cache_gen: Default::default(),
-            cache_fs: Default::default(),
-            cache_gen_size: Default::default(),
-            cache_fs_size: Default::default(),
-            encoded_filesystem_limit: self.encoded_filesystem_limit,
-            encoded_generated_limit: self.encoded_generated_limit,
-        }
+#[derive(Hash, PartialEq, Eq, PartialOrd, Ord)]
+pub struct RcHandler<T: ?Sized>(pub std::sync::Arc<T>);
+impl<T> RcHandler<T> {
+    pub fn new(dt: T) -> RcHandler<T> {
+        RcHandler(std::sync::Arc::new(dt))
+    }
+}
+impl<H: Handler> Handler for RcHandler<H> {
+    fn handle(&self, req: &mut Request) -> IronResult<Response> {
+        self.0.handle(req)
+    }
+}
+impl<T: ?Sized> std::ops::Deref for RcHandler<T> {
+    type Target = T;
+    #[inline]
+    fn deref(&self) -> &T {
+        &*self.0
+    }
+}
+impl<T: ?Sized> Clone for RcHandler<T> {
+    fn clone(&self) -> RcHandler<T> {
+        RcHandler(std::sync::Arc::clone(&self.0))
     }
 }
 

@@ -1,13 +1,10 @@
-use std::sync::atomic::{AtomicPtr, AtomicU64, Ordering as AtomicOrdering};
+use std::sync::atomic::{AtomicU64, Ordering as AtomicOrdering};
 use iron::{IronResult, Response, Handler, Request};
 use self::super::super::util::human_readable_size;
 use self::super::super::Options;
 use self::super::HttpHandler;
 use time::precise_time_ns;
-use std::{ptr, fs};
-
-
-static LAST_PRUNED: AtomicPtr<PruneChain> = AtomicPtr::new(ptr::null_mut());
+use std::fs;
 
 
 pub struct PruneChain {
@@ -21,10 +18,6 @@ pub struct PruneChain {
 }
 
 impl PruneChain {
-    pub fn to_trigger() -> Option<&'static PruneChain> {
-        unsafe { LAST_PRUNED.load(AtomicOrdering::Relaxed).as_ref() }
-    }
-
     pub fn new(opts: &Options) -> PruneChain {
         PruneChain {
             handler: HttpHandler::new(opts),
@@ -140,33 +133,8 @@ impl PruneChain {
 
 impl Handler for PruneChain {
     fn handle(&self, req: &mut Request) -> IronResult<Response> {
-        LAST_PRUNED.store(self as *const PruneChain as *mut PruneChain, AtomicOrdering::Relaxed);
-
         let resp = self.handler.handle(req);
         self.prune();
         resp
-    }
-}
-
-impl Drop for PruneChain {
-    fn drop(&mut self) {
-        let _ = LAST_PRUNED.compare_exchange(self as *const PruneChain as *mut PruneChain,
-                                             ptr::null_mut(),
-                                             AtomicOrdering::Relaxed,
-                                             AtomicOrdering::Relaxed);
-    }
-}
-
-impl Clone for PruneChain {
-    fn clone(&self) -> PruneChain {
-        PruneChain {
-            handler: self.handler.clone(),
-            encoded_filesystem_limit: self.encoded_filesystem_limit,
-            encoded_generated_limit: self.encoded_generated_limit,
-            encoded_prune: self.encoded_prune,
-
-            prune_interval: self.prune_interval,
-            last_prune: AtomicU64::new(0),
-        }
     }
 }
