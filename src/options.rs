@@ -21,17 +21,9 @@ use std::str::FromStr;
 use std::borrow::Cow;
 use iron::mime::Mime;
 use std::net::IpAddr;
-use regex::Regex;
 use cidr::IpCidr;
 use std::fs;
 use blake3;
-
-
-lazy_static! {
-    static ref CREDENTIALS_REGEX: Regex = Regex::new("^[^:]+(?::[^:]+)?$").unwrap();
-    static ref PATH_CREDENTIALS_REGEX: Regex = Regex::new("^(.+)=([^:]+(?::[^:]+)?)?$").unwrap();
-    static ref HEADER_REGEX: Regex = Regex::new("^([^:]+):[[:space:]]*(.+)$").unwrap();
-}
 
 
 #[derive(Debug, Copy, Clone, Hash, PartialEq, Eq, PartialOrd, Ord)]
@@ -301,7 +293,10 @@ impl Options {
     }
 
     fn credentials_validator(s: String) -> Result<(), String> {
-        if CREDENTIALS_REGEX.is_match(&s) {
+        if match s.split_once(':') {
+            Some((u, p)) => !u.is_empty() && !p.contains(':'),
+            None => !s.is_empty(),
+        } {
             Ok(())
         } else {
             Err(format!("Global authentication credentials \"{}\" need be in format \"username[:password]\"", s))
@@ -309,7 +304,7 @@ impl Options {
     }
 
     fn path_credentials_validator(s: String) -> Result<(), String> {
-        if PATH_CREDENTIALS_REGEX.is_match(&s) {
+        if Options::parse_path_credentials(&s).is_some() {
             Ok(())
         } else {
             Err(format!("Per-path authentication credentials \"{}\" need be in format \"path=[username[:password]]\"", s))
@@ -317,9 +312,24 @@ impl Options {
     }
 
     fn decode_path_credentials(s: &str) -> (String, Option<&str>) {
-        let creds = PATH_CREDENTIALS_REGEX.captures(s).unwrap();
+        Options::parse_path_credentials(s).unwrap()
+    }
 
-        (Options::normalise_path(&creds[1]), creds.get(2).map(|m| m.as_str()))
+    fn parse_path_credentials(s: &str) -> Option<(String, Option<&str>)> {
+        let (path, creds) = s.split_once('=')?;
+
+        Some((Options::normalise_path(path),
+              if creds.is_empty() {
+                  None
+              } else {
+                  if match creds.split_once(':') {
+                      Some((u, p)) => u.is_empty() || p.contains(':'),
+                      None => false,
+                  } {
+                      return None;
+                  }
+                  Some(creds)
+              }))
     }
 
     fn path_credentials_dupe(path: &str) -> ! {
@@ -459,6 +469,16 @@ impl Options {
     }
 
     fn header_parse(s: &str) -> Result<(String, Vec<u8>), String> {
-        HEADER_REGEX.captures(s).map(|hdr| (hdr[1].to_string(), hdr[2].as_bytes().to_vec())).ok_or_else(|| format!("\"{}\" invalid format", s))
+        s.split_once(':')
+            .and_then(|(hn, mut hd)| {
+                hd = hd.trim_start();
+                if !hn.is_empty() && !hd.is_empty() {
+                    Some((hn, hd))
+                } else {
+                    None
+                }
+            })
+            .map(|(hn, hd)| (hn.to_string(), hd.as_bytes().to_vec()))
+            .ok_or_else(|| format!("\"{}\" invalid format", s))
     }
 }

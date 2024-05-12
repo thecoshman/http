@@ -24,7 +24,6 @@ extern crate winapi;
 extern crate bzip2;
 extern crate ctrlc;
 extern crate serde;
-extern crate regex;
 extern crate cidr;
 #[macro_use]
 extern crate clap;
