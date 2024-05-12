@@ -27,18 +27,14 @@ pub use self::webdav::*;
 pub use self::content_encoding::*;
 
 
-/// The generic HTML page to use as response to errors.
-pub const ERROR_HTML: &str = include_str!("../../assets/error.html");
+// The generic HTML page to use as response to errors.
+pub const ERROR_HTML: &str = include_str!(concat!(env!("OUT_DIR"), "/error.html"));
 
-/// The HTML page to use as template for a requested directory's listing.
-pub const DIRECTORY_LISTING_HTML: &str = include_str!("../../assets/directory_listing.html");
+// The HTML page to use as template for a requested directory's listing.
+pub const DIRECTORY_LISTING_HTML: &str = include_str!(concat!(env!("OUT_DIR"), "/directory_listing.html"));
 
-/// The HTML page to use as template for a requested directory's listing for mobile devices.
-pub const MOBILE_DIRECTORY_LISTING_HTML: &str = include_str!("../../assets/directory_listing_mobile.html");
-
-// Collection of data to be injected into generated responses.
-// static ASSETS: [(&'static str, &'static str); {}] = {:?};
-include!(concat!(env!("OUT_DIR"), "/assets.rs"));
+// The HTML page to use as template for a requested directory's listing for mobile devices.
+pub const MOBILE_DIRECTORY_LISTING_HTML: &str = include_str!(concat!(env!("OUT_DIR"), "/directory_listing_mobile.html"));
 
 
 /// The port to start scanning from if no ports were given.
@@ -318,8 +314,7 @@ fn file_binary_impl(path: &Path) -> bool {
 /// println!(html_response(NOT_IMPLEMENTED_HTML, &["<p>Abolish the burgeoisie!</p>"]));
 /// ```
 pub fn html_response<S: AsRef<str>>(data: &str, format_strings: &[S]) -> String {
-    ASSETS.iter().fold(format_strings.iter().enumerate().fold(data.to_string(), |d, (i, s)| d.replace(&format!("{{{}}}", i), s.as_ref())),
-                       |d, (k, v)| d.replace(&format!("{{{}}}", k), v))
+    format_strings.iter().enumerate().fold(data.to_string(), |d, (i, s)| d.replace(&format!("{{{}}}", i), s.as_ref()))
 }
 
 /// Return the path part of the URL.

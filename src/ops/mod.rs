@@ -923,7 +923,11 @@ impl HttpHandler {
                                                               &[&relpath[..],
                                                                 if is_root { "" } else { "/" },
                                                                 if show_file_management_controls {
-                                                                    r#"<script type="text/javascript">{upload}{manage_mobile}{manage}</script>"#
+                                                                    concat!(r#"<script type="text/javascript">"#,
+                                                                            include_str!("../../assets/upload.js"),
+                                                                            include_str!("../../assets/manage_mobile.js"),
+                                                                            include_str!("../../assets/manage.js"),
+                                                                            r#"</script>"#)
                                                                 } else {
                                                                     ""
                                                                 },
@@ -1039,7 +1043,11 @@ impl HttpHandler {
                                                 html_response(DIRECTORY_LISTING_HTML,
                                                               &[&relpath[..],
                                                                 if show_file_management_controls {
-                                                                    r#"<script type="text/javascript">{upload}{manage_desktop}{manage}</script>"#
+                                                                    concat!(r#"<script type="text/javascript">"#,
+                                                                            include_str!("../../assets/upload.js"),
+                                                                            include_str!("../../assets/manage_desktop.js"),
+                                                                            include_str!("../../assets/manage.js"),
+                                                                            r#"</script>"#)
                                                                 } else {
                                                                     ""
                                                                 },

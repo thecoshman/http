@@ -13,7 +13,7 @@ use std::collections::{BTreeMap, BTreeSet};
 
 
 fn main() {
-    assets();
+    htmls();
     extensions();
 
     embed_resource::compile("http-manifest.rc");
@@ -23,8 +23,8 @@ fn main() {
 }
 
 
-fn assets() {
-    let mut map = Vec::new();
+fn assets() -> Vec<(&'static str, String)> {
+    let mut assets = Vec::new();
     for (key, mime, file) in
         [("favicon", "image/x-icon", "assets/favicon.ico"),
          ("dir_icon", "image/gif", "assets/icons/directory.gif"),
@@ -38,10 +38,10 @@ fn assets() {
          ("rename_icon", "image/png", "assets/icons/rename.png"),
          ("confirm_icon", "image/png", "assets/icons/confirm.png")] {
         println!("cargo::rerun-if-changed={}", file);
-        map.push((key,
-                  format!("data:{};base64,{}",
-                          mime,
-                          Base64Display::with_config(&fs::read(file).unwrap()[..], base64::STANDARD))));
+        assets.push((key,
+                     format!("data:{};base64,{}",
+                             mime,
+                             Base64Display::with_config(&fs::read(file).unwrap()[..], base64::STANDARD))));
     }
     for (key, file) in [("date", "assets/date.js"),
                         ("manage", "assets/manage.js"),
@@ -50,12 +50,19 @@ fn assets() {
                         ("upload", "assets/upload.js"),
                         ("adjust_tz", "assets/adjust_tz.js")] {
         println!("cargo::rerun-if-changed={}", file);
-        map.push((key, fs::read_to_string(file).unwrap()));
+        assets.push((key, fs::read_to_string(file).unwrap()));
     }
+    assets
+}
 
-    fs::write(Path::new(&env::var("OUT_DIR").unwrap()).join("assets.rs"),
-              format!("static ASSETS: [(&'static str, &'static str); {}] = {:?};\n", map.len(), map))
-        .unwrap();
+fn htmls() {
+    let assets = assets();
+    for html in ["error.html", "directory_listing.html", "directory_listing_mobile.html"] {
+        println!("cargo::rerun-if-changed=assets/{}", html);
+        fs::write(Path::new(&env::var("OUT_DIR").unwrap()).join(html),
+                  assets.iter().fold(fs::read_to_string(format!("assets/{}", html)).unwrap(), |d, (k, v)| d.replace(&format!("{{{}}}", k), v)))
+            .unwrap();
+    }
 }
 
 
