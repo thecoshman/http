@@ -14,7 +14,6 @@ extern crate tabwriter;
 extern crate lazysort;
 extern crate unicase;
 extern crate walkdir;
-extern crate base64;
 extern crate blake3;
 extern crate brotli;
 extern crate flate2;

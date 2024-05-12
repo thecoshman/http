@@ -5,7 +5,6 @@ mod os;
 mod webdav;
 mod content_encoding;
 
-use base64;
 use std::path::Path;
 use percent_encoding;
 use walkdir::WalkDir;
@@ -13,14 +12,12 @@ use std::borrow::Cow;
 use rfsapi::RawFileData;
 use std::{cmp, f64, str};
 use std::time::SystemTime;
-use std::collections::HashMap;
 use time::{self, Duration, Tm};
 use iron::{mime, Headers, Url};
-use base64::display::Base64Display;
+use mime_guess::guess_mime_type_opt;
 use std::fmt::{self, Write as FmtWrite};
 use std::fs::{self, FileType, Metadata, File};
 use iron::headers::{HeaderFormat, UserAgent, Header};
-use mime_guess::{guess_mime_type_opt, get_mime_type_str};
 use xml::name::{OwnedName as OwnedXmlName, Name as XmlName};
 use iron::error::{HttpResult as HyperResult, HttpError as HyperError};
 use std::io::{ErrorKind as IoErrorKind, BufReader, BufRead, Result as IoResult, Error as IoError};
@@ -39,63 +36,10 @@ pub const DIRECTORY_LISTING_HTML: &str = include_str!("../../assets/directory_li
 /// The HTML page to use as template for a requested directory's listing for mobile devices.
 pub const MOBILE_DIRECTORY_LISTING_HTML: &str = include_str!("../../assets/directory_listing_mobile.html");
 
-lazy_static! {
-    /// Collection of data to be injected into generated responses.
-    pub static ref ASSETS: HashMap<&'static str, Cow<'static, str>> = {
-        let mut ass = HashMap::with_capacity(10);
-        ass.insert("favicon",
-            Cow::Owned(format!("data:{};base64,{}",
-                               get_mime_type_str("ico").unwrap(),
-                               Base64Display::with_config(&include_bytes!("../../assets/favicon.ico")[..], base64::STANDARD))));
-        ass.insert("dir_icon",
-            Cow::Owned(format!("data:{};base64,{}",
-                               get_mime_type_str("gif").unwrap(),
-                               Base64Display::with_config(&include_bytes!("../../assets/icons/directory.gif")[..], base64::STANDARD))));
-        ass.insert("file_icon",
-            Cow::Owned(format!("data:{};base64,{}",
-                               get_mime_type_str("gif").unwrap(),
-                               Base64Display::with_config(&include_bytes!("../../assets/icons/file.gif")[..], base64::STANDARD))));
-        ass.insert("file_binary_icon",
-            Cow::Owned(format!("data:{};base64,{}",
-                               get_mime_type_str("gif").unwrap(),
-                               Base64Display::with_config(&include_bytes!("../../assets/icons/file_binary.gif")[..], base64::STANDARD))));
-        ass.insert("file_image_icon",
-            Cow::Owned(format!("data:{};base64,{}",
-                               get_mime_type_str("gif").unwrap(),
-                               Base64Display::with_config(&include_bytes!("../../assets/icons/file_image.gif")[..], base64::STANDARD))));
-        ass.insert("file_text_icon",
-            Cow::Owned(format!("data:{};base64,{}",
-                               get_mime_type_str("gif").unwrap(),
-                               Base64Display::with_config(&include_bytes!("../../assets/icons/file_text.gif")[..], base64::STANDARD))));
-        ass.insert("back_arrow_icon",
-            Cow::Owned(format!("data:{};base64,{}",
-                               get_mime_type_str("gif").unwrap(),
-                               Base64Display::with_config(&include_bytes!("../../assets/icons/back_arrow.gif")[..], base64::STANDARD))));
-        ass.insert("new_dir_icon",
-            Cow::Owned(format!("data:{};base64,{}",
-                               get_mime_type_str("gif").unwrap(),
-                               Base64Display::with_config(&include_bytes!("../../assets/icons/new_directory.gif")[..], base64::STANDARD))));
-        ass.insert("delete_file_icon",
-            Cow::Owned(format!("data:{};base64,{}",
-                               get_mime_type_str("png").unwrap(),
-                               Base64Display::with_config(&include_bytes!("../../assets/icons/delete_file.png")[..], base64::STANDARD))));
-        ass.insert("rename_icon",
-            Cow::Owned(format!("data:{};base64,{}",
-                               get_mime_type_str("png").unwrap(),
-                               Base64Display::with_config(&include_bytes!("../../assets/icons/rename.png")[..], base64::STANDARD))));
-        ass.insert("confirm_icon",
-            Cow::Owned(format!("data:{};base64,{}",
-                               get_mime_type_str("png").unwrap(),
-                               Base64Display::with_config(&include_bytes!("../../assets/icons/confirm.png")[..], base64::STANDARD))));
-        ass.insert("date", Cow::Borrowed(include_str!("../../assets/date.js")));
-        ass.insert("manage", Cow::Borrowed(include_str!("../../assets/manage.js")));
-        ass.insert("manage_mobile", Cow::Borrowed(include_str!("../../assets/manage_mobile.js")));
-        ass.insert("manage_desktop", Cow::Borrowed(include_str!("../../assets/manage_desktop.js")));
-        ass.insert("upload", Cow::Borrowed(include_str!("../../assets/upload.js")));
-        ass.insert("adjust_tz", Cow::Borrowed(include_str!("../../assets/adjust_tz.js")));
-        ass
-    };
-}
+// Collection of data to be injected into generated responses.
+// static ASSETS: [(&'static str, &'static str); {}] = {:?};
+include!(concat!(env!("OUT_DIR"), "/assets.rs"));
+
 
 /// The port to start scanning from if no ports were given.
 pub const PORT_SCAN_LOWEST: u16 = 8000;
