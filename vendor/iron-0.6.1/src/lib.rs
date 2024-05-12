@@ -2,6 +2,8 @@
 #![cfg_attr(test, deny(warnings))]
 #![allow(bare_trait_objects)]
 #![deny(missing_docs)]
+#![allow(deprecated)]
+#![allow(anonymous_parameters)]
 
 //! The main crate for Iron.
 //!

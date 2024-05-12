@@ -55,7 +55,7 @@ default-features = false
 features = ["std"]
 
 [dependencies.iron]
-version = "0.6"
+path = "vendor/iron-0.6.1"
 features = ["hyper-native-tls"]
 
 [target.'cfg(target_os = "windows")'.dependencies.winapi]

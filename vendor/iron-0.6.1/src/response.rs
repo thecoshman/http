@@ -50,19 +50,19 @@ impl<'a> WriteBody for &'a [u8] {
 
 impl WriteBody for File {
     fn write_body(&mut self, res: &mut Write) -> io::Result<()> {
-        io::copy(self, res).map(|_| ())
+        io::copy(&mut std::io::BufReader::with_capacity(1024 * 1024, self), res).map(|_| ())
     }
 }
 
 impl WriteBody for Box<io::Read + Send> {
     fn write_body(&mut self, res: &mut Write) -> io::Result<()> {
-        io::copy(self, res).map(|_| ())
+        io::copy(&mut std::io::BufReader::with_capacity(1024 * 1024, self), res).map(|_| ())
     }
 }
 
 impl <R: io::Read + Send> WriteBody for BodyReader<R> {
     fn write_body(&mut self, res: &mut Write) -> io::Result<()> {
-        io::copy(&mut self.0, res).map(|_| ())
+        io::copy(&mut std::io::BufReader::with_capacity(1024 * 1024, &mut self.0), res).map(|_| ())
     }
 }
 
