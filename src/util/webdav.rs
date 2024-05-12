@@ -19,10 +19,12 @@ macro_rules! xml_name {
 /// HTTP methods we support for WebDAV level 1, as specified in https://tools.ietf.org/html/rfc2518, without locks
 pub fn dav_level_1_methods(writes: bool) -> Vec<method::Method> {
     if writes {
-        ["PROPFIND", "COPY", "MKCOL", "MOVE", "PROPPATCH"].iter()
-    } else {
-        ["PROPFIND"].iter()
-    }.map(|m| method::Extension(m.to_string())).collect()
+            ["PROPFIND", "COPY", "MKCOL", "MOVE", "PROPPATCH"].iter()
+        } else {
+            ["PROPFIND"].iter()
+        }
+        .map(|m| method::Extension(m.to_string()))
+        .collect()
 }
 
 /// Prefix and namespace URI for generic WebDAV elements

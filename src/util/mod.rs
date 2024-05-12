@@ -27,14 +27,22 @@ pub use self::webdav::*;
 pub use self::content_encoding::*;
 
 
+pub enum PreparsedHtml {
+    Literal(&'static str),
+    Argument(usize),
+}
+
 // The generic HTML page to use as response to errors.
-pub const ERROR_HTML: &str = include_str!(concat!(env!("OUT_DIR"), "/error.html"));
+// pub const ERROR_HTML: &str = include_str!(concat!(env!("OUT_DIR"), "/error.html"));
+pub const ERROR_HTML: &[PreparsedHtml] = include!(concat!(env!("OUT_DIR"), "/error.html.rs"));
 
 // The HTML page to use as template for a requested directory's listing.
-pub const DIRECTORY_LISTING_HTML: &str = include_str!(concat!(env!("OUT_DIR"), "/directory_listing.html"));
+// pub const DIRECTORY_LISTING_HTML: &str = include_str!(concat!(env!("OUT_DIR"), "/directory_listing.html"));
+pub const DIRECTORY_LISTING_HTML: &[PreparsedHtml] = include!(concat!(env!("OUT_DIR"), "/directory_listing.html.rs"));
 
 // The HTML page to use as template for a requested directory's listing for mobile devices.
-pub const MOBILE_DIRECTORY_LISTING_HTML: &str = include_str!(concat!(env!("OUT_DIR"), "/directory_listing_mobile.html"));
+// pub const MOBILE_DIRECTORY_LISTING_HTML: &str = include_str!(concat!(env!("OUT_DIR"), "/directory_listing_mobile.html"));
+pub const MOBILE_DIRECTORY_LISTING_HTML: &[PreparsedHtml] = include!(concat!(env!("OUT_DIR"), "/directory_listing_mobile.html.rs"));
 
 
 /// The port to start scanning from if no ports were given.
@@ -313,8 +321,13 @@ fn file_binary_impl(path: &Path) -> bool {
 /// # use https::util::{html_response, NOT_IMPLEMENTED_HTML};
 /// println!(html_response(NOT_IMPLEMENTED_HTML, &["<p>Abolish the burgeoisie!</p>"]));
 /// ```
-pub fn html_response<S: AsRef<str>>(data: &str, format_strings: &[S]) -> String {
-    format_strings.iter().enumerate().fold(data.to_string(), |d, (i, s)| d.replace(&format!("{{{}}}", i), s.as_ref()))
+pub fn html_response<S: AsRef<str>>(data: &[PreparsedHtml], format_strings: &[S]) -> String {
+    data.iter()
+        .map(|ph| match ph {
+            PreparsedHtml::Literal(lit) => lit,
+            PreparsedHtml::Argument(arg) => format_strings[*arg].as_ref(),
+        })
+        .collect()
 }
 
 /// Return the path part of the URL.

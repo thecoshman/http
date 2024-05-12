@@ -59,9 +59,29 @@ fn htmls() {
     let assets = assets();
     for html in ["error.html", "directory_listing.html", "directory_listing_mobile.html"] {
         println!("cargo::rerun-if-changed=assets/{}", html);
-        fs::write(Path::new(&env::var("OUT_DIR").unwrap()).join(html),
-                  assets.iter().fold(fs::read_to_string(format!("assets/{}", html)).unwrap(), |d, (k, v)| d.replace(&format!("{{{}}}", k), v)))
-            .unwrap();
+
+        let with_assets = assets.iter().fold(fs::read_to_string(format!("assets/{}", html)).unwrap(),
+                                             |d, (k, v)| d.replace(&format!("{{{}}}", k), v));
+
+        let mut arguments = BTreeMap::new();
+        for i in 0.. {
+            let len_pre = arguments.len();
+            arguments.extend(with_assets.match_indices(&format!("{{{}}}", i)).map(|(start, s)| (start, (s.len(), i))));
+            if arguments.len() == len_pre {
+                break;
+            }
+        }
+
+        let mut out = File::create(Path::new(&env::var("OUT_DIR").unwrap()).join(format!("{}.rs", html))).unwrap();
+        writeln!(out, "&[").unwrap();
+        let mut idx = 0;
+        for (start, (len, argi)) in arguments {
+            writeln!(out, "PreparsedHtml::Literal({:?}),", &with_assets[idx..start]).unwrap();
+            writeln!(out, "PreparsedHtml::Argument({}),", argi).unwrap();
+            idx = start + len;
+        }
+        writeln!(out, "PreparsedHtml::Literal({:?}),", &with_assets[idx..]).unwrap();
+        writeln!(out, "]").unwrap();
     }
 }
 
