@@ -11,14 +11,6 @@ use std::fs::File;
 use blake3;
 
 
-lazy_static! {
-    /// The list of content encodings we handle.
-    pub static ref SUPPORTED_ENCODINGS: Vec<Encoding> = {
-        let es = vec![Encoding::Gzip, Encoding::Deflate, Encoding::EncodingExt("br".to_string()), Encoding::EncodingExt("bzip2".to_string())];
-        [es.clone(), es.into_iter().map(|e| Encoding::EncodingExt(format!("x-{}", e))).collect()].iter().flat_map(|e| e.clone()).collect()
-    };
-}
-
 /// The minimal size at which to encode filesystem files.
 pub const MIN_ENCODING_SIZE: u64 = 1024;
 
@@ -37,7 +29,7 @@ include!(concat!(env!("OUT_DIR"), "/extensions.rs"));
 /// Find best supported encoding to use, or `None` for identity.
 pub fn response_encoding(requested: &mut [QualityItem<Encoding>]) -> Option<Encoding> {
     requested.sort_by_key(|e| e.quality);
-    requested.iter().filter(|e| e.quality.0 != 0).find(|e| SUPPORTED_ENCODINGS.contains(&e.item)).map(|e| e.item.clone())
+    requested.iter().filter(|e| e.quality.0 != 0).map(|e| &e.item).find(|e| encoding_idx(e).is_some()).cloned()
 }
 
 /// Encode a string slice using a specified encoding or `None` if encoding failed or is not recognised.

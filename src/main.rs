@@ -5,8 +5,6 @@ extern crate percent_encoding;
 extern crate trivial_colours;
 #[cfg(not(target_os = "windows"))]
 extern crate os_str_generic;
-#[macro_use]
-extern crate lazy_static;
 extern crate serde_json;
 extern crate mime_guess;
 extern crate itertools;
