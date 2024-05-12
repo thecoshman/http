@@ -4,10 +4,9 @@ use flate2::write::{DeflateEncoder, GzEncoder};
 use flate2::Compression as Flate2Compression;
 use std::io::{self, Error as IoError, Write};
 use iron::headers::{QualityItem, Encoding};
-use std::collections::BTreeSet;
 use bzip2::write::BzEncoder;
-use unicase::UniCase;
 use std::path::Path;
+use std::ffi::OsStr;
 use std::fs::File;
 use blake3;
 
@@ -17,12 +16,6 @@ lazy_static! {
     pub static ref SUPPORTED_ENCODINGS: Vec<Encoding> = {
         let es = vec![Encoding::Gzip, Encoding::Deflate, Encoding::EncodingExt("br".to_string()), Encoding::EncodingExt("bzip2".to_string())];
         [es.clone(), es.into_iter().map(|e| Encoding::EncodingExt(format!("x-{}", e))).collect()].iter().flat_map(|e| e.clone()).collect()
-    };
-
-    /// The list of extensions not to encode.
-    pub static ref BLACKLISTED_ENCODING_EXTENSIONS: BTreeSet<UniCase<&'static str>> = {
-        let raw = include_str!("../../assets/encoding_blacklist");
-        raw.split('\n').map(str::trim).filter(|s| !s.is_empty() && !s.starts_with('#')).map(UniCase::new).collect()
     };
 }
 
@@ -34,6 +27,11 @@ pub const MAX_ENCODING_SIZE: u64 = 100 * 1024 * 1024;
 
 /// The minimal size gain at which to preserve encoded filesystem files.
 pub const MIN_ENCODING_GAIN: f64 = 1.1;
+
+
+// `true` if we know not to encode the given extension
+// pub fn extension_is_blacklisted(ext: &str) -> bool {
+include!(concat!(env!("OUT_DIR"), "/extensions.rs"));
 
 
 /// Find best supported encoding to use, or `None` for identity.

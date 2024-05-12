@@ -5,7 +5,6 @@ use std::ffi::OsStr;
 use std::borrow::Cow;
 use std::net::IpAddr;
 use serde::Serialize;
-use unicase::UniCase;
 use std::sync::RwLock;
 use lazysort::SortedBy;
 use cidr::{Cidr, IpCidr};
@@ -31,9 +30,9 @@ use iron::mime::{Mime, Attr as MimeAttr, Value as MimeAttrValue, SubLevel as Mim
 use self::super::util::{WwwAuthenticate, XLastModified, DisplayThree, CommaList, XOcMTime, Spaces, MsAsS, Maybe, Dav, url_path, file_etag, file_hash, set_mtime,
                         is_symlink, encode_str, encode_file, file_length, html_response, file_binary, client_mobile, percent_decode, escape_specials,
                         file_icon_suffix, is_actually_file, is_descendant_of, response_encoding, detect_file_as_dir, encoding_extension, file_time_modified,
-                        file_time_modified_p, get_raw_fs_metadata, human_readable_size, encode_tail_if_trimmed, is_nonexistent_descendant_of, USER_AGENT,
-                        ERROR_HTML, MAX_SYMLINKS, INDEX_EXTENSIONS, MIN_ENCODING_GAIN, MAX_ENCODING_SIZE, MIN_ENCODING_SIZE, DAV_LEVEL_1_METHODS,
-                        DIRECTORY_LISTING_HTML, MOBILE_DIRECTORY_LISTING_HTML, BLACKLISTED_ENCODING_EXTENSIONS};
+                        file_time_modified_p, get_raw_fs_metadata, human_readable_size, encode_tail_if_trimmed, extension_is_blacklisted,
+                        is_nonexistent_descendant_of, USER_AGENT, ERROR_HTML, MAX_SYMLINKS, INDEX_EXTENSIONS, MIN_ENCODING_GAIN, MAX_ENCODING_SIZE,
+                        MIN_ENCODING_SIZE, DAV_LEVEL_1_METHODS, DIRECTORY_LISTING_HTML, MOBILE_DIRECTORY_LISTING_HTML};
 
 
 macro_rules! log {
@@ -622,7 +621,7 @@ impl HttpHandler {
 
         let flen = file_length(&metadata, &req_p);
         if self.encoded_temp_dir.is_some() && flen > MIN_ENCODING_SIZE && flen < MAX_ENCODING_SIZE &&
-           req_p.extension().and_then(|s| s.to_str()).map(|s| !BLACKLISTED_ENCODING_EXTENSIONS.contains(&UniCase::new(s))).unwrap_or(true) {
+           req_p.extension().map(|s| !extension_is_blacklisted(s)).unwrap_or(true) {
             self.handle_get_file_encoded(req, req_p, mime_type, headers, etag)
         } else {
             let file = match File::open(&req_p) {
@@ -1322,7 +1321,7 @@ impl HttpHandler {
                                               Header(headers::Server(USER_AGENT.to_string())),
                                               Header(headers::ContentEncoding(vec![encoding])),
                                               Header(headers::ETag(headers::EntityTag::strong(etag))),
-                                              Mime(MimeTopLevel::Text, MimeSubLevel::Html, vec![(MimeAttr::Charset, MimeAttrValue::Utf8)]), // text/html; charset=utf-8
+                                              Mime(MimeTopLevel::Text, MimeSubLevel::Html, vec![(MimeAttr::Charset, MimeAttrValue::Utf8)]), /* text/html; charset=utf-8 */
                                               &enc_resp.0[..])));
                 }
             }
@@ -1343,14 +1342,14 @@ impl HttpHandler {
                                               Header(headers::Server(USER_AGENT.to_string())),
                                               Header(headers::ContentEncoding(vec![encoding])),
                                               Header(headers::ETag(headers::EntityTag::strong(etag))),
-                                              Mime(MimeTopLevel::Text, MimeSubLevel::Html, vec![(MimeAttr::Charset, MimeAttrValue::Utf8)]), // text/html; charset=utf-8
+                                              Mime(MimeTopLevel::Text, MimeSubLevel::Html, vec![(MimeAttr::Charset, MimeAttrValue::Utf8)]), /* text/html; charset=utf-8 */
                                               &cache[&cache_key].0[..])));
                 } else {
                     return Ok(Response::with((st,
                                               Header(headers::Server(USER_AGENT.to_string())),
                                               Header(headers::ContentEncoding(vec![encoding])),
                                               Header(headers::ETag(headers::EntityTag::strong(etag))),
-                                              Mime(MimeTopLevel::Text, MimeSubLevel::Html, vec![(MimeAttr::Charset, MimeAttrValue::Utf8)]), // text/html; charset=utf-8
+                                              Mime(MimeTopLevel::Text, MimeSubLevel::Html, vec![(MimeAttr::Charset, MimeAttrValue::Utf8)]), /* text/html; charset=utf-8 */
                                               enc_resp)));
                 }
             } else {
