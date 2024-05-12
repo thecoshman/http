@@ -1,8 +1,8 @@
 use brotli::enc::backward_references::{BrotliEncoderParams, BrotliEncoderMode};
+use std::io::{self, BufReader, BufWriter, Error as IoError, Write};
 use brotli::enc::BrotliCompress as brotli_compress;
 use flate2::write::{DeflateEncoder, GzEncoder};
 use flate2::Compression as Flate2Compression;
-use std::io::{self, Error as IoError, Write};
 use iron::headers::{QualityItem, Encoding};
 use bzip2::write::BzEncoder;
 use std::path::Path;
@@ -66,7 +66,7 @@ pub fn encoding_extension(enc: &Encoding) -> Option<&'static str> {
 /// Return the 256-bit BLAKE3 hash of the file denoted by the specified path.
 pub fn file_hash(p: &Path) -> Result<blake3::Hash, IoError> {
     let mut ctx = blake3::Hasher::new();
-    io::copy(&mut File::open(p)?, &mut ctx)?;
+    io::copy(&mut BufReader::with_capacity(1024 * 1024, File::open(p)?), &mut ctx)?;
     Ok(ctx.finalize())
 }
 
@@ -95,9 +95,9 @@ macro_rules! encode_fn {
             cmp.write_all(dt.as_bytes()).ok().and_then(|_| cmp.finish().ok())
         }
 
-        fn $file_fn_name(mut inf: File, outf: File) -> bool {
-            let mut cmp = $constructor(outf);
-            io::copy(&mut inf, &mut cmp).and_then(|_| cmp.finish()).is_ok()
+        fn $file_fn_name(inf: File, outf: File) -> bool {
+            let mut cmp = $constructor(BufWriter::with_capacity(1024 * 1024, outf));
+            io::copy(&mut BufReader::with_capacity(1024 * 1024, inf), &mut cmp).and_then(|_| cmp.finish()).is_ok()
         }
     };
 
