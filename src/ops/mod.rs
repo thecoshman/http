@@ -30,9 +30,9 @@ use iron::mime::{Mime, Attr as MimeAttr, Value as MimeAttrValue, SubLevel as Mim
 use self::super::util::{WwwAuthenticate, XLastModified, DisplayThree, CommaList, XOcMTime, Spaces, MsAsS, Maybe, Dav, url_path, file_etag, file_hash, set_mtime,
                         is_symlink, encode_str, encode_file, file_length, html_response, file_binary, client_mobile, percent_decode, escape_specials,
                         file_icon_suffix, is_actually_file, is_descendant_of, response_encoding, detect_file_as_dir, encoding_extension, file_time_modified,
-                        file_time_modified_p, get_raw_fs_metadata, human_readable_size, encode_tail_if_trimmed, extension_is_blacklisted,
+                        file_time_modified_p, dav_level_1_methods, get_raw_fs_metadata, human_readable_size, encode_tail_if_trimmed, extension_is_blacklisted,
                         is_nonexistent_descendant_of, USER_AGENT, ERROR_HTML, MAX_SYMLINKS, INDEX_EXTENSIONS, MIN_ENCODING_GAIN, MAX_ENCODING_SIZE,
-                        MIN_ENCODING_SIZE, DAV_LEVEL_1_METHODS, DIRECTORY_LISTING_HTML, MOBILE_DIRECTORY_LISTING_HTML};
+                        MIN_ENCODING_SIZE, DIRECTORY_LISTING_HTML, MOBILE_DIRECTORY_LISTING_HTML};
 
 
 macro_rules! log {
@@ -140,6 +140,8 @@ pub struct HttpHandler {
     pub cache_fs_size: AtomicU64,
     pub encoded_filesystem_limit: u64,
     pub encoded_generated_limit: u64,
+
+    pub allowed_methods: Vec<method::Method>,
 }
 
 impl HttpHandler {
@@ -159,6 +161,16 @@ impl HttpHandler {
             } else {
                 path_auth_data.insert(path.to_string(), creds);
             }
+        }
+
+        let mut allowed_methods = if opts.webdav {
+            dav_level_1_methods(opts.allow_writes)
+        } else {
+            vec![]
+        };
+        allowed_methods.extend_from_slice(&[method::Options, method::Get, method::Head, method::Trace]);
+        if opts.allow_writes {
+            allowed_methods.extend_from_slice(&[method::Put, method::Delete]);
         }
 
         HttpHandler {
@@ -184,6 +196,7 @@ impl HttpHandler {
             proxy_redirs: opts.proxy_redirs.clone(),
             mime_type_overrides: opts.mime_type_overrides.clone(),
             additional_headers: opts.additional_headers.clone(),
+            allowed_methods: allowed_methods,
         }
     }
 
@@ -333,19 +346,7 @@ impl HttpHandler {
 
     fn handle_options(&self, req: &mut Request) -> IronResult<Response> {
         log!(self.log, "{} asked for {red}OPTIONS{reset}", self.remote_addresses(&req));
-
-        let mut allowed_methods = Vec::with_capacity(6 +
-                                                     if self.webdav {
-            DAV_LEVEL_1_METHODS.len()
-        } else {
-            0
-        });
-        allowed_methods.extend_from_slice(&[method::Options, method::Get, method::Put, method::Delete, method::Head, method::Trace]);
-        if self.webdav {
-            allowed_methods.extend_from_slice(&DAV_LEVEL_1_METHODS);
-        }
-
-        Ok(Response::with((status::NoContent, Header(headers::Server(USER_AGENT.to_string())), Header(headers::Allow(allowed_methods)))))
+        Ok(Response::with((status::NoContent, Header(headers::Server(USER_AGENT.to_string())), Header(headers::Allow(self.allowed_methods.clone())))))
     }
 
     fn handle_get(&self, req: &mut Request) -> IronResult<Response> {
@@ -1074,14 +1075,7 @@ impl HttpHandler {
         if url_err {
             self.handle_invalid_url(req, "<p>Percent-encoding decoded to invalid UTF-8.</p>")
         } else if req_p.is_dir() {
-            self.handle_disallowed_method(req,
-                                          &[&[method::Options, method::Get, method::Delete, method::Head, method::Trace],
-                                            if self.webdav {
-                                                &DAV_LEVEL_1_METHODS[..]
-                                            } else {
-                                                &[]
-                                            }],
-                                          "directory")
+            self.handle_disallowed_method(req, "directory")
         } else if detect_file_as_dir(&req_p) {
             self.handle_invalid_url(req, "<p>Attempted to use file as directory.</p>")
         } else if req.headers.has::<headers::ContentRange>() {
@@ -1094,36 +1088,22 @@ impl HttpHandler {
         }
     }
 
-    fn handle_disallowed_method(&self, req: &mut Request, allowed: &[&[method::Method]], tpe: &str) -> IronResult<Response> {
-        let allowed_s = allowed.iter()
-            .flat_map(|mms| mms.iter())
-            .enumerate()
-            .fold("".to_string(), |cur, (i, m)| {
-                cur + &m.to_string() +
-                if i == allowed.len() - 2 {
-                    ", and "
-                } else if i == allowed.len() - 1 {
-                    ""
-                } else {
-                    ", "
-                }
-            })
-            .to_string();
-
+    fn handle_disallowed_method(&self, req: &mut Request, tpe: &str) -> IronResult<Response> {
         log!(self.log,
              "{} tried to {red}{}{reset} on {magenta}{}{reset} ({blue}{}{reset}) but only {red}{}{reset} are allowed",
              self.remote_addresses(&req),
              req.method,
              url_path(&req.url),
              tpe,
-             allowed_s);
+             CommaList(self.allowed_methods.iter()));
 
-        let resp_text =
-            html_response(ERROR_HTML,
-                          &["405 Method Not Allowed", &format!("Can't {} on a {}.", req.method, tpe), &format!("<p>Allowed methods: {}</p>", allowed_s)]);
+        let resp_text = html_response(ERROR_HTML,
+                                      &["405 Method Not Allowed",
+                                        &format!("Can't {} on a {}.", req.method, tpe),
+                                        &format!("<p>Allowed methods: {}</p>", CommaList(self.allowed_methods.iter()))]);
         self.handle_generated_response_encoding(req, status::MethodNotAllowed, resp_text)
             .map(|mut r| {
-                r.headers.set(headers::Allow(allowed.iter().flat_map(|mms| mms.iter()).cloned().collect()));
+                r.headers.set(headers::Allow(self.allowed_methods.clone()));
                 r
             })
     }
@@ -1275,15 +1255,9 @@ impl HttpHandler {
              self.remote_addresses(&req),
              req.method);
 
-        let last_p = format!("<p>Unsupported request method: {}.<br />\nSupported methods: {}{}OPTIONS, GET, PUT, DELETE, HEAD, and TRACE.</p>",
+        let last_p = format!("<p>Unsupported request method: {}.<br />\nSupported methods: {}.</p>",
                              req.method,
-                             CommaList(if self.webdav {
-                                     &DAV_LEVEL_1_METHODS[..]
-                                 } else {
-                                     &[][..]
-                                 }
-                                 .iter()),
-                             if self.webdav { ", " } else { "" });
+                             CommaList(self.allowed_methods.iter()));
         self.handle_generated_response_encoding(req,
                                                 status::NotImplemented,
                                                 html_response(ERROR_HTML, &["501 Not Implemented", "This operation was not implemented.", &last_p]))
