@@ -16,3 +16,5 @@
 !src/**
 !assets
 !assets/**
+!vendor
+!vendor/**
