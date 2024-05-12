@@ -24,11 +24,6 @@ lazy_static! {
         let raw = include_str!("../../assets/encoding_blacklist");
         raw.split('\n').map(str::trim).filter(|s| !s.is_empty() && !s.starts_with('#')).map(UniCase::new).collect()
     };
-
-    pub static ref BROTLI_PARAMS: BrotliEncoderParams = BrotliEncoderParams {
-        mode: BrotliEncoderMode::BROTLI_MODE_TEXT,
-        ..Default::default()
-    };
 }
 
 /// The minimal size at which to encode filesystem files.
@@ -125,11 +120,14 @@ encode_fn!(encode_str_gzip, encode_file_gzip, GzEncoder, Flate2Compression::defa
 encode_fn!(encode_str_deflate, encode_file_deflate, DeflateEncoder, Flate2Compression::default());
 encode_fn!(encode_str_bzip2, encode_file_bzip2, BzEncoder, Default::default());
 
+/// This should just be a pub const, but the new and default functions aren't const
+pub fn brotli_params() -> BrotliEncoderParams {
+    BrotliEncoderParams { mode: BrotliEncoderMode::BROTLI_MODE_TEXT, ..Default::default() }
+}
 fn encode_str_brotli(dt: &str) -> Option<Vec<u8>> {
     let mut ret = Vec::new();
-    brotli_compress(&mut dt.as_bytes(), &mut ret, &BROTLI_PARAMS).ok().map(|_| ret)
+    brotli_compress(&mut dt.as_bytes(), &mut ret, &brotli_params()).ok().map(|_| ret)
 }
-
 fn encode_file_brotli(mut inf: File, mut outf: File) -> bool {
-    brotli_compress(&mut inf, &mut outf, &BROTLI_PARAMS).is_ok()
+    brotli_compress(&mut inf, &mut outf, &brotli_params()).is_ok()
 }

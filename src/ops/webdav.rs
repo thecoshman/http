@@ -29,9 +29,17 @@ use std::{fmt, mem};
 use time::strptime;
 
 
-lazy_static! {
-    static ref DEFAULT_XML_PARSER_CONFIG: XmlParserConfig = XmlParserConfig { trim_whitespace: true, whitespace_to_characters: true, ..Default::default() };
-    static ref DEFAULT_XML_EMITTER_CONFIG: XmlEmitterConfig = XmlEmitterConfig { perform_indent: cfg!(debug_assertions), ..Default::default() };
+/// This should be a pub const but the default/new function isn't const
+fn default_xml_parser_config() -> XmlParserConfig {
+    XmlParserConfig {
+        trim_whitespace: true,
+        whitespace_to_characters: true,
+        ..Default::default()
+    }
+}
+/// This should be a pub const but the default/new function isn't const
+fn default_xml_emitter_config() -> XmlEmitterConfig {
+    XmlEmitterConfig { perform_indent: cfg!(debug_assertions), ..Default::default() }
 }
 
 
@@ -580,7 +588,7 @@ fn parse_propfind(req: &mut Request) -> Result<PropfindVariant, Result<String, X
     }
 
 
-    let mut xml = XmlReader::new_with_config(&mut req.body, DEFAULT_XML_PARSER_CONFIG.clone());
+    let mut xml = XmlReader::new_with_config(&mut req.body, default_xml_parser_config());
     let mut state = State::Start;
     let mut props = vec![];
 
@@ -678,7 +686,7 @@ fn parse_proppatch(req: &mut Request) -> Result<(Vec<(OwnedXmlName, String)>, Pr
         InProp,
     }
 
-    let mut xml = XmlReader::new_with_config(&mut req.body, DEFAULT_XML_PARSER_CONFIG.clone());
+    let mut xml = XmlReader::new_with_config(&mut req.body, default_xml_parser_config());
     let mut state = State::Start;
     let mut props = vec![];
     let mut propname = None;
@@ -801,7 +809,7 @@ fn copy_response_multierror(errors: &[(IoError, String)], req_url: &GenericUrl) 
 }
 
 fn intialise_xml_output() -> Result<XmlWriter<Vec<u8>>, XmlWError> {
-    let mut out = XmlWriter::new_with_config(vec![], DEFAULT_XML_EMITTER_CONFIG.clone());
+    let mut out = XmlWriter::new_with_config(vec![], default_xml_emitter_config());
 
     out.write(XmlWEvent::StartDocument {
             version: XmlVersion::Version10,
