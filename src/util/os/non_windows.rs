@@ -52,13 +52,25 @@ pub fn file_executable(meta: &Metadata) -> bool {
 }
 
 
-lazy_static! {
-    static ref UMASK: u32 = unsafe {
-        let um = umask(0o777);
-        umask(um);
-        um
-    };
-}
+static mut UMASK: u32 = 0;
+
+// as seen in https://docs.rs/ctor/latest/ctor/attr.ctor.html
+#[used]
+#[cfg_attr(any(target_os = "linux", target_os = "android"), link_section = ".init_array")]
+#[cfg_attr(target_os = "freebsd", link_section = ".init_array")]
+#[cfg_attr(target_os = "netbsd", link_section = ".init_array")]
+#[cfg_attr(target_os = "openbsd", link_section = ".init_array")]
+#[cfg_attr(target_os = "illumos", link_section = ".init_array")]
+#[cfg_attr(any(target_os = "macos", target_os = "ios", target_os = "tvos"), link_section = "__DATA_CONST,__mod_init_func")]
+#[cfg_attr(target_os = "windows", link_section = ".CRT$XCU")]
+static LOAD_UMASK: unsafe extern "C" fn() = {
+    #[cfg_attr(any(target_os = "linux", target_os = "android"), link_section = ".text.startup")]
+    unsafe extern "C" fn load_umask() {
+        UMASK = umask(0o777);
+        umask(UMASK);
+    }
+    load_umask
+};
 
 pub fn set_executable(f: &Path, ex: bool) {
     let mut perm = match fs::metadata(f) {
@@ -66,7 +78,7 @@ pub fn set_executable(f: &Path, ex: bool) {
         Err(_) => return,
     };
     if ex {
-        perm.set_mode(perm.mode() | (0o111 & !*UMASK));
+        perm.set_mode(perm.mode() | (0o111 & unsafe { !UMASK }));
     } else {
         perm.set_mode(perm.mode() & !0o111);
     }
