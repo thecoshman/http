@@ -2,6 +2,7 @@ use std::sync::atomic::{AtomicU64, Ordering as AtomicOrdering};
 use iron::{IronResult, Response, Handler, Request};
 use self::super::super::util::human_readable_size;
 use self::super::super::Options;
+use std::collections::HashSet;
 use self::super::HttpHandler;
 use time::precise_time_ns;
 use std::fs;
@@ -40,6 +41,8 @@ impl PruneChain {
             if self.handler.cache_fs_size.load(AtomicOrdering::Relaxed) > limit {
                 start = precise_time_ns();
 
+                let mut cache_files = self.handler.cache_fs_files.write().expect("Filesystem files cache write lock poisoned");
+                let mut removed_file_hashes = HashSet::new();
                 let mut cache = self.handler.cache_fs.write().expect("Filesystem cache write lock poisoned");
                 let size = self.handler.cache_fs_size.load(AtomicOrdering::Relaxed);
                 while size - freed_fs > limit {
@@ -54,8 +57,10 @@ impl PruneChain {
                     };
                     let ((_, _, sz), _) = cache.remove(&key).unwrap();
                     freed_fs += sz;
+                    removed_file_hashes.insert(key.0);
                 }
                 self.handler.cache_fs_size.fetch_sub(freed_fs, AtomicOrdering::Relaxed);
+                cache_files.retain(|_, v| !removed_file_hashes.contains(v));
             }
         }
 
@@ -87,8 +92,10 @@ impl PruneChain {
             let last = self.last_prune.swap(start, AtomicOrdering::Relaxed);
             if last < start && (start - last) / 1000 / 1000 / 1000 >= self.prune_interval {
                 {
+                    let mut cache_files = self.handler.cache_fs_files.write().expect("Filesystem files cache write lock poisoned");
+                    let mut removed_file_hashes = HashSet::new();
                     let mut cache = self.handler.cache_fs.write().expect("Filesystem cache write lock poisoned");
-                    cache.retain(|_, ((path, _, sz), atime)| {
+                    cache.retain(|(hash, _), ((path, _, sz), atime)| {
                         let atime = atime.load(AtomicOrdering::Relaxed);
                         if atime > start || (start - atime) / 1000 / 1000 / 1000 <= limit {
                             return true;
@@ -99,8 +106,10 @@ impl PruneChain {
                         }
                         freed_fs += *sz;
                         self.handler.cache_fs_size.fetch_sub(*sz, AtomicOrdering::Relaxed);
+                        removed_file_hashes.insert(*hash);
                         false
                     });
+                    cache_files.retain(|_, v| !removed_file_hashes.contains(v));
                 }
                 {
                     let mut cache = self.handler.cache_gen.write().expect("Generated file cache write lock poisoned");

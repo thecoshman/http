@@ -134,6 +134,7 @@ pub struct HttpHandler {
     pub additional_headers: Vec<(String, Vec<u8>)>,
 
     pub cache_gen: RwLock<CacheT<Vec<u8>>>,
+    pub cache_fs_files: RwLock<HashMap<String, blake3::Hash>>, // etag -> cache key
     pub cache_fs: RwLock<CacheT<(PathBuf, bool, u64)>>,
     pub cache_gen_size: AtomicU64,
     pub cache_fs_size: AtomicU64,
@@ -187,6 +188,7 @@ impl HttpHandler {
             encoded_temp_dir: HttpHandler::temp_subdir(&opts.temp_directory, opts.encode_fs, "encoded"),
             cache_gen: Default::default(),
             cache_fs: Default::default(),
+            cache_fs_files: Default::default(),
             cache_gen_size: Default::default(),
             cache_fs_size: Default::default(),
             encoded_filesystem_limit: opts.encoded_filesystem_limit.unwrap_or(u64::MAX),
@@ -643,10 +645,20 @@ impl HttpHandler {
         if let Some(encoding) = req.headers.get_mut::<headers::AcceptEncoding>().and_then(|es| response_encoding(&mut **es)) {
             self.create_temp_dir(&self.encoded_temp_dir);
 
-            let cache_key = match file_hash(&req_p) {
-                Ok(h) => (h, encoding.to_string()),
-                Err(err) => return self.handle_requested_entity_unopenable(req, err, "file"),
+            let hash = self.cache_fs_files.read().expect("Filesystem file cache read lock poisoned").get(&etag).cloned();
+            let hash = match hash {
+                Some(hash) => hash,
+                None => {
+                    match file_hash(&req_p) {
+                        Ok(h) => {
+                            self.cache_fs_files.write().expect("Filesystem file cache write lock poisoned").insert(etag.clone(), h);
+                            h
+                        }
+                        Err(err) => return self.handle_requested_entity_unopenable(req, err, "file"),
+                    }
+                }
             };
+            let cache_key = (hash, encoding.to_string());
 
             {
                 match self.cache_fs.read().expect("Filesystem cache read lock poisoned").get(&cache_key) {
@@ -668,7 +680,11 @@ impl HttpHandler {
                                                   mt)));
                     }
                     Some(&((_, false, _), _)) => {
-                        return Ok(Response::with((status::Ok, headers, Header(headers::ETag(headers::EntityTag::strong(etag))), req_p, mt)));
+                        let file = match File::open(&req_p) {
+                            Ok(file) => file,
+                            Err(err) => return self.handle_requested_entity_unopenable(req, err, "file"),
+                        };
+                        return Ok(Response::with((status::Ok, headers, Header(headers::ETag(headers::EntityTag::strong(etag))), file, mt)));
                     }
                     None => (),
                 }
@@ -715,11 +731,15 @@ impl HttpHandler {
             }
         }
 
+        let file = match File::open(&req_p) {
+            Ok(file) => file,
+            Err(err) => return self.handle_requested_entity_unopenable(req, err, "file"),
+        };
         Ok(Response::with((status::Ok,
                            headers,
                            Header(headers::ETag(headers::EntityTag::strong(etag))),
-                           req_p.as_path(),
-                           Header(headers::ContentLength(file_length(&req_p.metadata().expect("Failed to get requested file metadata"), &req_p))),
+                           Header(headers::ContentLength(file_length(&file.metadata().expect("Failed to get requested file metadata"), &req_p))),
+                           file,
                            mt)))
     }
 
