@@ -488,15 +488,13 @@ pub fn is_nonexistent_descendant_of<Pw: AsRef<Path>, Po: AsRef<Path>>(who: Pw, o
 ///
 /// Stolen, adapted and inlined from [fielsize.js](http://filesizejs.com).
 pub fn human_readable_size(s: u64) -> String {
-    lazy_static! {
-        static ref LN_KIB: f64 = 1024f64.log(f64::consts::E);
-    }
+    const LN_KIB: f64 = 6.931471805599453; // 1024f64.ln()
 
     if s == 0 {
         "0 B".to_string()
     } else {
         let num = s as f64;
-        let exp = cmp::min(cmp::max((num.log(f64::consts::E) / *LN_KIB) as i32, 0), 8);
+        let exp = cmp::min(cmp::max((num.ln() / LN_KIB) as i32, 0), 8);
 
         let val = num / 2f64.powi(exp * 10);
 
