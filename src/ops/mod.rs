@@ -1300,7 +1300,7 @@ impl HttpHandler {
                     return Ok(Response::with((status::NotModified,
                                               Header(headers::Server(USER_AGENT.to_string())),
                                               Header(headers::ETag(headers::EntityTag::strong(etag))),
-                                              Mime(MimeTopLevel::Text, MimeSubLevel::Html, vec![(MimeAttr::Charset, MimeAttrValue::Utf8)])))); // text/html; charset=utf-8
+                                              text_html_charset_utf8())));
                 }
             }
         }
@@ -1321,7 +1321,7 @@ impl HttpHandler {
                                               Header(headers::Server(USER_AGENT.to_string())),
                                               Header(headers::ContentEncoding(vec![encoding])),
                                               Header(headers::ETag(headers::EntityTag::strong(etag))),
-                                              Mime(MimeTopLevel::Text, MimeSubLevel::Html, vec![(MimeAttr::Charset, MimeAttrValue::Utf8)]), /* text/html; charset=utf-8 */
+                                              text_html_charset_utf8(),
                                               &enc_resp.0[..])));
                 }
             }
@@ -1342,14 +1342,14 @@ impl HttpHandler {
                                               Header(headers::Server(USER_AGENT.to_string())),
                                               Header(headers::ContentEncoding(vec![encoding])),
                                               Header(headers::ETag(headers::EntityTag::strong(etag))),
-                                              Mime(MimeTopLevel::Text, MimeSubLevel::Html, vec![(MimeAttr::Charset, MimeAttrValue::Utf8)]), /* text/html; charset=utf-8 */
+                                              text_html_charset_utf8(),
                                               &cache[&cache_key].0[..])));
                 } else {
                     return Ok(Response::with((st,
                                               Header(headers::Server(USER_AGENT.to_string())),
                                               Header(headers::ContentEncoding(vec![encoding])),
                                               Header(headers::ETag(headers::EntityTag::strong(etag))),
-                                              Mime(MimeTopLevel::Text, MimeSubLevel::Html, vec![(MimeAttr::Charset, MimeAttrValue::Utf8)]), /* text/html; charset=utf-8 */
+                                              text_html_charset_utf8(),
                                               enc_resp)));
                 }
             } else {
@@ -1363,7 +1363,7 @@ impl HttpHandler {
         Ok(Response::with((st,
                            Header(headers::Server(USER_AGENT.to_string())),
                            Header(headers::ETag(headers::EntityTag::strong(etag))),
-                           Mime(MimeTopLevel::Text, MimeSubLevel::Html, vec![(MimeAttr::Charset, MimeAttrValue::Utf8)]), // text/html; charset=utf-8
+                           text_html_charset_utf8(),
                            resp)))
     }
 
@@ -1458,6 +1458,11 @@ impl HttpHandler {
                 Mime(MimeTopLevel::Text, MimeSubLevel::Plain, Default::default()) // "text/plain"
             })
     }
+}
+
+/// text/html; charset=utf-8
+fn text_html_charset_utf8() -> Mime {
+    Mime(MimeTopLevel::Text, MimeSubLevel::Html, vec![(MimeAttr::Charset, MimeAttrValue::Utf8)])
 }
 
 
