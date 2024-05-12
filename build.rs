@@ -18,7 +18,7 @@ fn main() {
 
     embed_resource::compile("http-manifest.rc");
 
-    #[cfg(not(any(target_os = "windows", target_os = "macos")))]
+#[cfg(not(any(target_os = "windows", target_os = "macos")))]
     cc::Build::new().file("build-ioctl.c").define("_GNU_SOURCE", "1").compile("http-ioctl");
 }
 
@@ -69,6 +69,7 @@ fn extensions() {
         exts.entry(ext.len()).or_insert(BTreeSet::new()).insert(ext);
     }
     writeln!(out, "pub fn extension_is_blacklisted(ext: &OsStr) -> bool {{").unwrap();
+    writeln!(out, "#[cfg(not(target_os = \"windows\"))] use std::os::unix::ffi::OsStrExt;").unwrap();
 
 
     write!(out, "if !matches!(ext.len(),").unwrap();
@@ -81,11 +82,15 @@ fn extensions() {
     writeln!(out,
              r#"
 let mut buf = [0u8; {}];
-for (i, b) in ext.as_encoded_bytes().iter().enumerate() {{
-    if !b.is_ascii_alphanumeric() {{
-        return false;
-    }}
-    buf[i] = b.to_ascii_lowercase();
+#[cfg(not(target_os = "windows"))]
+let bytes = ext.as_bytes();
+#[cfg(target_os = "windows")]
+let bytes = ext.as_encoded_bytes();
+for (i, b) in bytes.iter().enumerate() {{
+if !b.is_ascii_alphanumeric() {{
+    return false;
+}}
+buf[i] = b.to_ascii_lowercase();
 }}
 let lcase = &buf[0..ext.len()];
 "#,
