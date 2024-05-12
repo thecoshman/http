@@ -6,7 +6,6 @@ use std::borrow::Cow;
 use std::net::IpAddr;
 use serde::Serialize;
 use std::sync::RwLock;
-use lazysort::SortedBy;
 use cidr::{Cidr, IpCidr};
 use time::precise_time_ns;
 use std::fs::{self, File};
@@ -862,7 +861,7 @@ impl HttpHandler {
                     up_path = escape_specials(slash_idx.map(|i| &rel_noslash[0..i]).unwrap_or("")),
                     up_path_slash = if slash_idx.is_some() { "/" } else { "" })
         };
-        let list_s = req_p.read_dir()
+        let mut list = req_p.read_dir()
             .expect("Failed to read requested directory")
             .map(|p| p.expect("Failed to iterate over requested directory"))
             .filter(|f| {
@@ -874,46 +873,49 @@ impl HttpHandler {
                     symlink
                 }) || (self.follow_symlinks && self.sandbox_symlinks && symlink && !is_descendant_of(fp, &self.hosted_directory.1)))
             })
-            .sorted_by(|lhs, rhs| {
-                (is_actually_file(&lhs.file_type().expect("Failed to get file type"), &lhs.path()),
-                 lhs.file_name().to_str().expect("Failed to get file name").to_lowercase())
-                    .cmp(&(is_actually_file(&rhs.file_type().expect("Failed to get file type"), &rhs.path()),
-                           rhs.file_name().to_str().expect("Failed to get file name").to_lowercase()))
-            })
-            .fold("".to_string(), |cur, f| {
-                let is_file = is_actually_file(&f.file_type().expect("Failed to get file type"), &f.path());
-                let fmeta = f.metadata().expect("Failed to get requested file metadata");
-                let fname = f.file_name().into_string().expect("Failed to get file name");
-                let path = f.path();
+            .collect::<Vec<_>>();
+        list.sort_by(|lhs, rhs| {
+            (is_actually_file(&lhs.file_type().expect("Failed to get file type"), &lhs.path()),
+             lhs.file_name().to_str().expect("Failed to get file name").to_lowercase())
+                .cmp(&(is_actually_file(&rhs.file_type().expect("Failed to get file type"), &rhs.path()),
+                       rhs.file_name().to_str().expect("Failed to get file name").to_lowercase()))
+        });
+        let mut list_s = vec![];
+        for f in list {
+            let is_file = is_actually_file(&f.file_type().expect("Failed to get file type"), &f.path());
+            let fmeta = f.metadata().expect("Failed to get requested file metadata");
+            let fname = f.file_name().into_string().expect("Failed to get file name");
+            let path = f.path();
 
-                format!("{}<a href=\"{path}{fname}\" class=\"list entry top\"><span class=\"{}{}_icon\" id=\"{}\">{}{}</span>{}</a> \
-                           <a href=\"{path}{fname}\" class=\"list entry bottom\"><span class=\"marker\">@</span><span class=\"datetime\">{} UTC</span>{}</a>\n",
-                        cur,
-                        if is_file { "file" } else { "dir" },
-                        file_icon_suffix(&path, is_file),
-                        path.file_name().map(|p| p.to_str().expect("Filename not UTF-8").replace('.', "_")).as_ref().unwrap_or(&fname),
-                        fname.replace('&', "&amp;").replace('<', "&lt;"),
-                        if is_file { "" } else { "/" },
-                        if show_file_management_controls {
-                            DisplayThree("<span class=\"manage\"><span class=\"delete_file_icon\">Delete</span>",
-                                         if self.webdav {
-                                             " <span class=\"rename_icon\">Rename</span>"
-                                         } else {
-                                             ""
-                                         },
-                                         "</span>")
-                        } else {
-                            DisplayThree("", "", "")
-                        },
-                        file_time_modified(&fmeta).strftime("%F %T").unwrap(),
-                        if is_file {
-                            DisplayThree("<span class=\"size\">", human_readable_size(file_length(&fmeta, &path)), "</span>")
-                        } else {
-                            DisplayThree("", String::new(), "")
-                        },
-                        path = escape_specials(format!("/{}", relpath).replace("//", "/")),
-                        fname = encode_tail_if_trimmed(escape_specials(&fname)))
-            });
+            write!(&mut list_s,
+                   "<a href=\"{path}{fname}\" class=\"list entry top\"><span class=\"{}{}_icon\" id=\"{}\">{}{}</span>{}</a> <a href=\"{path}{fname}\" \
+                    class=\"list entry bottom\"><span class=\"marker\">@</span><span class=\"datetime\">{} UTC</span>{}</a>\n",
+                   if is_file { "file" } else { "dir" },
+                   file_icon_suffix(&path, is_file),
+                   path.file_name().map(|p| p.to_str().expect("Filename not UTF-8").replace('.', "_")).as_ref().unwrap_or(&fname),
+                   fname.replace('&', "&amp;").replace('<', "&lt;"),
+                   if is_file { "" } else { "/" },
+                   if show_file_management_controls {
+                       DisplayThree("<span class=\"manage\"><span class=\"delete_file_icon\">Delete</span>",
+                                    if self.webdav {
+                                        " <span class=\"rename_icon\">Rename</span>"
+                                    } else {
+                                        ""
+                                    },
+                                    "</span>")
+                   } else {
+                       DisplayThree("", "", "")
+                   },
+                   file_time_modified(&fmeta).strftime("%F %T").unwrap(),
+                   if is_file {
+                       DisplayThree("<span class=\"size\">", human_readable_size(file_length(&fmeta, &path)), "</span>")
+                   } else {
+                       DisplayThree("", String::new(), "")
+                   },
+                   path = escape_specials(format!("/{}", relpath).replace("//", "/")),
+                   fname = encode_tail_if_trimmed(escape_specials(&fname)))
+                .unwrap();
+        }
 
         self.handle_generated_response_encoding(req,
                                                 status::Ok,
@@ -926,7 +928,7 @@ impl HttpHandler {
                                                                     ""
                                                                 },
                                                                 &parent_s[..],
-                                                                &list_s[..],
+                                                                unsafe { str::from_utf8_unchecked(&list_s[..]) },
                                                                 if show_file_management_controls {
                                                                     "<span class=\"list heading top top-border bottom\"> \
                                                                        Upload files: <input id=\"file_upload\" type=\"file\" multiple /> \
@@ -971,7 +973,7 @@ impl HttpHandler {
             Ok(rd) => rd,
             Err(err) => return self.handle_requested_entity_unopenable(req, err, "directory"),
         };
-        let list_s = rd.map(|p| p.expect("Failed to iterate over requested directory"))
+        let mut list = rd.map(|p| p.expect("Failed to iterate over requested directory"))
             .filter(|f| {
                 let fp = f.path();
                 let mut symlink = false;
@@ -981,54 +983,56 @@ impl HttpHandler {
                     symlink
                 }) || (self.follow_symlinks && self.sandbox_symlinks && symlink && !is_descendant_of(fp, &self.hosted_directory.1)))
             })
-            .sorted_by(|lhs, rhs| {
-                (is_actually_file(&lhs.file_type().expect("Failed to get file type"), &lhs.path()),
-                 lhs.file_name().to_str().expect("Failed to get file name").to_lowercase())
-                    .cmp(&(is_actually_file(&rhs.file_type().expect("Failed to get file type"), &rhs.path()),
-                           rhs.file_name().to_str().expect("Failed to get file name").to_lowercase()))
-            })
-            .fold("".to_string(), |cur, f| {
-                let is_file = is_actually_file(&f.file_type().expect("Failed to get file type"), &f.path());
-                let fmeta = f.metadata().expect("Failed to get requested file metadata");
-                let fname = f.file_name().into_string().expect("Failed to get file name");
-                let path = f.path();
-                let len = file_length(&fmeta, &path);
+            .collect::<Vec<_>>();
+        list.sort_by(|lhs, rhs| {
+            (is_actually_file(&lhs.file_type().expect("Failed to get file type"), &lhs.path()),
+             lhs.file_name().to_str().expect("Failed to get file name").to_lowercase())
+                .cmp(&(is_actually_file(&rhs.file_type().expect("Failed to get file type"), &rhs.path()),
+                       rhs.file_name().to_str().expect("Failed to get file name").to_lowercase()))
+        });
+        let mut list_s = vec![];
+        for f in list {
+            let is_file = is_actually_file(&f.file_type().expect("Failed to get file type"), &f.path());
+            let fmeta = f.metadata().expect("Failed to get requested file metadata");
+            let fname = f.file_name().into_string().expect("Failed to get file name");
+            let path = f.path();
+            let len = file_length(&fmeta, &path);
 
-                format!("{}<tr><td><a href=\"{path}{fname}\" id=\"{}\" class=\"{}{}_icon\"></a></td> \
-                               <td><a href=\"{path}{fname}\">{}{}</a></td> <td><a href=\"{path}{fname}\" class=\"datetime\">{}</a></td> \
-                               <td><a href=\"{path}{fname}\">{}{}{}</a></td> {}</tr>\n",
-                        cur,
-                        path.file_name().map(|p| p.to_str().expect("Filename not UTF-8").replace('.', "_")).as_ref().unwrap_or(&fname),
-                        if is_file { "file" } else { "dir" },
-                        file_icon_suffix(&path, is_file),
-                        fname.replace('&', "&amp;").replace('<', "&lt;"),
-                        if is_file { "" } else { "/" },
-                        file_time_modified(&fmeta).strftime("%F %T").unwrap(),
-                        if is_file {
-                            DisplayThree("<abbr title=\"", len.to_string(), " B\">")
-                        } else {
-                            DisplayThree("&nbsp;", String::new(), "")
-                        },
-                        if is_file {
-                            human_readable_size(len)
-                        } else {
-                            String::new()
-                        },
-                        if is_file { "</abbr>" } else { "" },
-                        if show_file_management_controls {
-                            DisplayThree("<td><a href=\"#delete_file\" class=\"delete_file_icon\">Delete</a>",
-                                         if self.webdav {
-                                             " <a href=\"#rename\" class=\"rename_icon\">Rename</a>"
-                                         } else {
-                                             ""
-                                         },
-                                         "</td>")
-                        } else {
-                            DisplayThree("", "", "")
-                        },
-                        path = escape_specials(format!("/{}", relpath).replace("//", "/")),
-                        fname = encode_tail_if_trimmed(escape_specials(&fname)))
-            });
+            write!(&mut list_s,
+                   "<tr><td><a href=\"{path}{fname}\" id=\"{}\" class=\"{}{}_icon\"></a></td> <td><a href=\"{path}{fname}\">{}{}</a></td> <td><a \
+                    href=\"{path}{fname}\" class=\"datetime\">{}</a></td> <td><a href=\"{path}{fname}\">{}{}{}</a></td> {}</tr>\n",
+                   path.file_name().map(|p| p.to_str().expect("Filename not UTF-8").replace('.', "_")).as_ref().unwrap_or(&fname),
+                   if is_file { "file" } else { "dir" },
+                   file_icon_suffix(&path, is_file),
+                   fname.replace('&', "&amp;").replace('<', "&lt;"),
+                   if is_file { "" } else { "/" },
+                   file_time_modified(&fmeta).strftime("%F %T").unwrap(),
+                   if is_file {
+                       DisplayThree("<abbr title=\"", len.to_string(), " B\">")
+                   } else {
+                       DisplayThree("&nbsp;", String::new(), "")
+                   },
+                   if is_file {
+                       human_readable_size(len)
+                   } else {
+                       String::new()
+                   },
+                   if is_file { "</abbr>" } else { "" },
+                   if show_file_management_controls {
+                       DisplayThree("<td><a href=\"#delete_file\" class=\"delete_file_icon\">Delete</a>",
+                                    if self.webdav {
+                                        " <a href=\"#rename\" class=\"rename_icon\">Rename</a>"
+                                    } else {
+                                        ""
+                                    },
+                                    "</td>")
+                   } else {
+                       DisplayThree("", "", "")
+                   },
+                   path = escape_specials(format!("/{}", relpath).replace("//", "/")),
+                   fname = encode_tail_if_trimmed(escape_specials(&fname)))
+                .unwrap()
+        }
 
         self.handle_generated_response_encoding(req,
                                                 status::Ok,
@@ -1040,7 +1044,7 @@ impl HttpHandler {
                                                                     ""
                                                                 },
                                                                 &parent_s[..],
-                                                                &list_s[..],
+                                                                unsafe { str::from_utf8_unchecked(&list_s[..]) },
                                                                 if show_file_management_controls {
                                                                     "<hr /> \
                                                                      <p> \

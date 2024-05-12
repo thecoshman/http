@@ -9,7 +9,6 @@ extern crate serde_json;
 extern crate mime_guess;
 extern crate itertools;
 extern crate tabwriter;
-extern crate lazysort;
 extern crate walkdir;
 extern crate blake3;
 extern crate brotli;
