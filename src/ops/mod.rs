@@ -1472,32 +1472,6 @@ fn text_html_charset_utf8() -> Mime {
 }
 
 
-#[derive(Hash, PartialEq, Eq, PartialOrd, Ord)]
-pub struct RcHandler<T: ?Sized>(pub std::sync::Arc<T>);
-impl<T> RcHandler<T> {
-    pub fn new(dt: T) -> RcHandler<T> {
-        RcHandler(std::sync::Arc::new(dt))
-    }
-}
-impl<H: Handler> Handler for RcHandler<H> {
-    fn handle(&self, req: &mut Request) -> IronResult<Response> {
-        self.0.handle(req)
-    }
-}
-impl<T: ?Sized> std::ops::Deref for RcHandler<T> {
-    type Target = T;
-    #[inline]
-    fn deref(&self) -> &T {
-        &*self.0
-    }
-}
-impl<T: ?Sized> Clone for RcHandler<T> {
-    fn clone(&self) -> RcHandler<T> {
-        RcHandler(std::sync::Arc::clone(&self.0))
-    }
-}
-
-
 pub struct AddressWriter<'r, 'p, 'ra, 'rb: 'ra> {
     pub request: &'r Request<'ra, 'rb>,
     pub proxies: &'p BTreeMap<IpCidr, String>,
@@ -1566,11 +1540,10 @@ impl<'r, 'p, 'ra, 'rb: 'ra> AddressWriter<'r, 'p, 'ra, 'rb> {
 /// # use iron::{status, Response};
 /// let server = try_ports(|req| Ok(Response::with((status::Ok, "Abolish the burgeoisie!"))), 8000, 8100, None).unwrap();
 /// ```
-pub fn try_ports<H: Handler + Clone>(hndlr: H, addr: IpAddr, from: u16, up_to: u16, tls_data: &Option<((String, PathBuf), String)>)
+pub fn try_ports<H: Handler>(hndlr: &'static H, addr: IpAddr, from: u16, up_to: u16, tls_data: &Option<((String, PathBuf), String)>)
                                      -> Result<Listening, Error> {
-    let hndlr = hndlr;
     for port in from..up_to + 1 {
-        let ir = Iron::new(hndlr.clone());
+        let ir = Iron::new(hndlr);
         match if let Some(&((_, ref id), ref pw)) = tls_data.as_ref() {
             ir.https((addr, port),
                      NativeTlsServer::new(id, pw).map_err(|err| {

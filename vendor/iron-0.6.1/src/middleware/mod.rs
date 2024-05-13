@@ -383,14 +383,13 @@ impl Chain {
     }
 }
 
-impl<F> Handler for F
-where F: Send + Sync + 'static + Fn(&mut Request) -> IronResult<Response> {
+impl Handler for Box<Handler> {
     fn handle(&self, req: &mut Request) -> IronResult<Response> {
-        (*self)(req)
+        (**self).handle(req)
     }
 }
 
-impl Handler for Box<Handler> {
+impl<T: Handler> Handler for &'static T {
     fn handle(&self, req: &mut Request) -> IronResult<Response> {
         (**self).handle(req)
     }

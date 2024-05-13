@@ -72,13 +72,13 @@ fn result_main() -> Result<(), Error> {
         opts.path_auth_data.insert(path, Some(ops::generate_auth_data()));
     }
 
-    let handler = ops::RcHandler::new(ops::SimpleChain {
+    let handler: &_ = Box::leak(Box::new(ops::SimpleChain {
         handler: ops::PruneChain::new(&opts),
         after: opts.request_bandwidth.map(ops::LimitBandwidthMiddleware::new),
-    });
+    }));
     let mut responder = if let Some(p) = opts.port {
         if let Some(&((_, ref id), ref pw)) = opts.tls_data.as_ref() {
-                Iron::new(handler.clone()).https((opts.bind_address, p),
+                Iron::new(handler).https((opts.bind_address, p),
                                                  NativeTlsServer::new(id, pw).map_err(|err| {
                         Error {
                             desc: "TLS certificate",
@@ -87,7 +87,7 @@ fn result_main() -> Result<(), Error> {
                         }
                     })?)
             } else {
-                Iron::new(handler.clone()).http((opts.bind_address, p))
+                Iron::new(handler).http((opts.bind_address, p))
             }
             .map_err(|_| {
                 Error {
@@ -97,7 +97,7 @@ fn result_main() -> Result<(), Error> {
                 }
             })
     } else {
-        ops::try_ports(handler.clone(),
+        ops::try_ports(handler,
                        opts.bind_address,
                        util::PORT_SCAN_LOWEST,
                        util::PORT_SCAN_HIGHEST,
