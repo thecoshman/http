@@ -69,7 +69,6 @@
 extern crate hyper;
 extern crate url as url_ext;
 extern crate num_cpus;
-extern crate mime_guess;
 
 // Request + Response
 pub use request::{Request, Url};

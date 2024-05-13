@@ -33,9 +33,6 @@ optional = true
 [dependencies.log]
 version = "0.3"
 
-[dependencies.mime_guess]
-version = "1.8.1"
-
 [dependencies.modifier]
 version = "0.1"
 
