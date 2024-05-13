@@ -205,15 +205,11 @@ impl HttpHandler {
         let tls = HttpHandler::temp_subdir(temp_directory, generate_tls, "tls");
         for (temp_name, temp_dir) in [self.writes_temp_dir.as_ref(), self.encoded_temp_dir.as_ref(), tls.as_ref()].iter().flatten() {
             if fs::remove_dir_all(&temp_dir).is_ok() {
-                log!(self.log,
-                     "Deleted temp dir {magenta}{}{reset}",
-                     temp_name);
+                log!(self.log, "Deleted temp dir {magenta}{}{reset}", temp_name);
             }
         }
         if fs::remove_dir(&temp_directory.1).is_ok() {
-            log!(self.log,
-                 "Deleted temp dir {magenta}{}{reset}",
-                 temp_directory.0);
+            log!(self.log, "Deleted temp dir {magenta}{}{reset}", temp_directory.0);
         }
     }
 
@@ -1547,7 +1543,7 @@ impl<'r, 'p, 'ra, 'rb: 'ra> AddressWriter<'r, 'p, 'ra, 'rb> {
 /// let server = try_ports(|req| Ok(Response::with((status::Ok, "Abolish the burgeoisie!"))), 8000, 8100, None).unwrap();
 /// ```
 pub fn try_ports<H: Handler>(hndlr: &'static H, addr: IpAddr, from: u16, up_to: u16, tls_data: &Option<((String, PathBuf), String)>)
-                                     -> Result<Listening, Error> {
+                             -> Result<Listening, Error> {
     for port in from..up_to + 1 {
         let ir = Iron::new(hndlr);
         match if let Some(&((_, ref id), ref pw)) = tls_data.as_ref() {

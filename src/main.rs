@@ -45,7 +45,7 @@ use std::time::Duration;
 use tabwriter::TabWriter;
 use std::io::{Write, stdout};
 use std::collections::BTreeSet;
-use std::sync::{Arc, Mutex, Condvar};
+use std::sync::{Mutex, Condvar};
 use hyper_native_tls::NativeTlsServer;
 
 
@@ -177,12 +177,8 @@ fn result_main() -> Result<(), Error> {
         println!();
     }
 
-    let end_handler = Arc::new(Condvar::new());
-    ctrlc::set_handler({
-            let r = end_handler.clone();
-            move || r.notify_one()
-        })
-        .unwrap();
+    let end_handler: &_ = Box::leak(Box::new(Condvar::new()));
+    ctrlc::set_handler(move || end_handler.notify_one()).unwrap();
     if opts.encoded_prune.is_some() {
         loop {
             if !end_handler.wait_timeout(Mutex::new(()).lock().unwrap(), Duration::from_secs(handler.handler.prune_interval)).unwrap().1.timed_out() {
@@ -194,9 +190,8 @@ fn result_main() -> Result<(), Error> {
     } else {
         drop(end_handler.wait(Mutex::new(()).lock().unwrap()).unwrap());
     }
+
     responder.close().unwrap();
-
     handler.handler.handler.clean_temp_dirs(&opts.temp_directory, opts.generate_tls);
-
     Ok(())
 }
