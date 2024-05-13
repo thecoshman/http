@@ -196,8 +196,7 @@ fn result_main() -> Result<(), Error> {
     }
     responder.close().unwrap();
 
-    // This is necessary because the server isn't Drop::drop()ped when the responder is
-    ops::HttpHandler::clean_temp_dirs(&opts.temp_directory, opts.loglevel, opts.log_colour);
+    handler.handler.handler.clean_temp_dirs(&opts.temp_directory, opts.generate_tls);
 
     Ok(())
 }

@@ -201,13 +201,19 @@ impl HttpHandler {
         }
     }
 
-    pub fn clean_temp_dirs(temp_dir: &(String, PathBuf), loglevel: LogLevel, log_colour: bool) {
-        for (temp_name, temp_dir) in ["writes", "encoded", "tls"].iter().flat_map(|tn| HttpHandler::temp_subdir(temp_dir, true, tn)) {
+    pub fn clean_temp_dirs(&self, temp_directory: &(String, PathBuf), generate_tls: bool) {
+        let tls = HttpHandler::temp_subdir(temp_directory, generate_tls, "tls");
+        for (temp_name, temp_dir) in [self.writes_temp_dir.as_ref(), self.encoded_temp_dir.as_ref(), tls.as_ref()].iter().flatten() {
             if fs::remove_dir_all(&temp_dir).is_ok() {
-                log!((loglevel < LogLevel::NoServeStatus, log_colour),
+                log!(self.log,
                      "Deleted temp dir {magenta}{}{reset}",
                      temp_name);
             }
+        }
+        if fs::remove_dir(&temp_directory.1).is_ok() {
+            log!(self.log,
+                 "Deleted temp dir {magenta}{}{reset}",
+                 temp_directory.0);
         }
     }
 
