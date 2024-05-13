@@ -863,9 +863,9 @@ impl HttpHandler {
     fn handle_get_mobile_dir_listing(&self, req: &mut Request, req_p: PathBuf) -> IronResult<Response> {
         let relpath = url_path(&req.url);
         let is_root = relpath == "/";
-        let mut relpath_escaped = escape_specials(relpath);
+        let mut relpath_escaped = escape_specials(&relpath);
         if relpath_escaped.as_bytes().last() != Some(&b'/') {
-            relpath_escaped.push('/');
+            relpath_escaped.to_mut().push('/');
         }
         let show_file_management_controls = self.writes_temp_dir.is_some();
         log!(self.log,
@@ -978,9 +978,9 @@ impl HttpHandler {
     fn handle_get_dir_listing(&self, req: &mut Request, req_p: PathBuf) -> IronResult<Response> {
         let relpath = url_path(&req.url);
         let is_root = relpath == "/";
-        let mut relpath_escaped = escape_specials(relpath);
+        let mut relpath_escaped = escape_specials(&relpath);
         if relpath_escaped.as_bytes().last() != Some(&b'/') {
-            relpath_escaped.push('/');
+            relpath_escaped.to_mut().push('/');
         }
         let show_file_management_controls = self.writes_temp_dir.is_some();
         log!(self.log,

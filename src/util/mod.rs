@@ -21,7 +21,7 @@ use iron::headers::{HeaderFormat, UserAgent, Header};
 use xml::name::{OwnedName as OwnedXmlName, Name as XmlName};
 use iron::error::{HttpResult as HyperResult, HttpError as HyperError};
 use iron::mime::{Mime, SubLevel as MimeSubLevel, TopLevel as MimeTopLevel};
-use std::io::{ErrorKind as IoErrorKind, BufReader, BufRead, Result as IoResult, Error as IoError};
+use std::io::{ErrorKind as IoErrorKind, BufReader, BufRead, Result as IoResult, Error as IoError, Write};
 
 pub use self::os::*;
 pub use self::webdav::*;
@@ -251,30 +251,25 @@ pub fn uppercase_first(s: &str) -> String {
 ///
 /// Firefox treats, e.g. `href="http://henlo/menlo   "` as `href="http://henlo/menlo"`,
 /// but that final whitespace is significant, so this turns it into `href="http://henlo/menlo  %20"`
-pub fn encode_tail_if_trimmed(mut s: String) -> String {
-    let c = s.chars().rev().next();
-    if c.map(|c| c.is_whitespace()).unwrap_or(false) {
-        let c = c.unwrap();
-
-        s.pop();
-        s.push('%');
-
-        let mut cb = [0u8; 4];
-        c.encode_utf8(&mut cb);
-        for b in cb.iter().take(c.len_utf8()) {
-            write!(s, "{:02X}", b).expect("Couldn't allocate two more characters?");
+pub fn encode_tail_if_trimmed(mut s: Cow<str>) -> Cow<str> {
+    if let Some(c) = s.as_bytes().last().copied() {
+        if c.is_ascii_whitespace() {
+            let ed = unsafe { s.to_mut().as_mut_vec() };
+            ed.pop();
+            write!(ed, "%{:02X}", c).expect("Couldn't allocate two more characters?");
         }
-
-        s
-    } else {
-        s
     }
+    s
 }
 
 /// %-escape special characters in an URL
-pub fn escape_specials<S: AsRef<str>>(s: S) -> String {
-    let s = s.as_ref();
-    let mut ret = Vec::with_capacity(s.len());
+pub fn escape_specials(s: &str) -> Cow<str> {
+    let replacements = s.bytes().filter(|b| matches!(b, b'%' | b'#' | b'?' | b'[' | b']')).count();
+    if replacements == 0 {
+        return s.into();
+    }
+
+    let mut ret = Vec::with_capacity(s.len() + replacements * 2);
     for &b in s.as_bytes() {
         match b {
             b'%' => ret.extend(b"%25"),
@@ -285,7 +280,7 @@ pub fn escape_specials<S: AsRef<str>>(s: S) -> String {
             _ => ret.push(b),
         }
     }
-    unsafe { String::from_utf8_unchecked(ret) }
+    unsafe { String::from_utf8_unchecked(ret) }.into()
 }
 
 /// Check if the specified file is to be considered "binary".
@@ -551,9 +546,9 @@ fn get_raw_fs_metadata_impl(f: &Path) -> RawFileData {
     let meta = f.metadata().expect("Failed to get requested file metadata");
     RawFileData {
         mime_type: guess_mime_type_opt(f).unwrap_or_else(|| if file_binary(f) {
-            Mime(MimeTopLevel::Application, MimeSubLevel::OctetStream, Default::default())  // application/octet-stream
+            Mime(MimeTopLevel::Application, MimeSubLevel::OctetStream, Default::default()) // application/octet-stream
         } else {
-            Mime(MimeTopLevel::Text, MimeSubLevel::Plain, Default::default())  // text/plain
+            Mime(MimeTopLevel::Text, MimeSubLevel::Plain, Default::default()) // text/plain
         }),
         name: f.file_name().unwrap().to_str().expect("Failed to get requested file name").to_string(),
         last_modified: file_time_modified(&meta),
