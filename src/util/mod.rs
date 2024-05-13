@@ -343,16 +343,12 @@ pub fn html_response<S: AsRef<str>>(data: &[PreparsedHtml], format_strings: &[S]
 /// let url = Url::parse("127.0.0.1:8000/capitalism/русский/");
 /// assert_eq!(url_path(&url), "capitalism/русский/");
 /// ```
-pub fn url_path(url: &Url) -> String {
-    let path = url.path();
-    if path == [""] {
-        "/".to_string()
-    } else {
-        path.into_iter().fold("".to_string(),
-                              |cur, pp| format!("{}/{}", cur, percent_decode(pp).unwrap_or(Cow::Borrowed("<incorrect UTF8>"))))
-            [1..]
-            .to_string()
+pub fn url_path(url: &Url) -> Cow<str> {
+    let mut path = url.as_ref().path();
+    while path.bytes().nth(0) == Some(b'/') && path.bytes().nth(1) == Some(b'/') {
+        path = &path[1..];
     }
+    percent_decode(path).unwrap_or(Cow::Borrowed("<incorrect UTF8>"))
 }
 
 /// Decode a percent-encoded string (like a part of a URL).

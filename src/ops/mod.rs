@@ -861,8 +861,12 @@ impl HttpHandler {
     }
 
     fn handle_get_mobile_dir_listing(&self, req: &mut Request, req_p: PathBuf) -> IronResult<Response> {
-        let relpath = (url_path(&req.url) + "/").replace("//", "/");
-        let is_root = req.url.as_ref().path_segments().unwrap().count() + !req.url.as_ref().as_str().ends_with('/') as usize == 1;
+        let relpath = url_path(&req.url);
+        let is_root = relpath == "/";
+        let mut relpath_escaped = escape_specials(relpath);
+        if relpath_escaped.as_bytes().last() != Some(&b'/') {
+            relpath_escaped.push('/');
+        }
         let show_file_management_controls = self.writes_temp_dir.is_some();
         log!(self.log,
              "{} was served mobile directory listing for {magenta}{}{reset}",
@@ -872,16 +876,18 @@ impl HttpHandler {
         let parent_s = if is_root {
             String::new()
         } else {
-            let rel_noslash = &relpath[0..relpath.len() - 1];
-            let slash_idx = rel_noslash.rfind('/');
-            format!("<a href=\"/{up_path}{up_path_slash}\" class=\"list entry top\"><span class=\"back_arrow_icon\">Parent directory</span></a> \
-                     <a href=\"/{up_path}{up_path_slash}\" class=\"list entry bottom\"><span class=\"marker\">@</span>\
+            let mut parentpath = &relpath_escaped[..];
+            while parentpath.as_bytes().last() == Some(&b'/') {
+                parentpath = &parentpath[0..parentpath.len() - 1];
+            }
+            while parentpath.as_bytes().last() != Some(&b'/') {
+                parentpath = &parentpath[0..parentpath.len() - 1];
+            }
+            format!("<a href=\"{up_path}\" class=\"list entry top\"><span class=\"back_arrow_icon\">Parent directory</span></a> \
+                     <a href=\"{up_path}\" class=\"list entry bottom\"><span class=\"marker\">@</span>\
                        <span class=\"datetime\">{} UTC</span></a>",
-                    file_time_modified_p(req_p.parent().unwrap_or(&req_p))
-                        .strftime("%F %T")
-                        .unwrap(),
-                    up_path = escape_specials(slash_idx.map(|i| &rel_noslash[0..i]).unwrap_or("")),
-                    up_path_slash = if slash_idx.is_some() { "/" } else { "" })
+                    file_time_modified_p(req_p.parent().unwrap_or(&req_p)).strftime("%F %T").unwrap(),
+                    up_path = parentpath)
         };
         let mut list = req_p.read_dir()
             .expect("Failed to read requested directory")
@@ -934,7 +940,7 @@ impl HttpHandler {
                    } else {
                        DisplayThree("", String::new(), "")
                    },
-                   path = escape_specials(format!("/{}", relpath).replace("//", "/")),
+                   path = relpath_escaped,
                    fname = encode_tail_if_trimmed(escape_specials(&fname)))
                 .unwrap();
         }
@@ -942,8 +948,7 @@ impl HttpHandler {
         self.handle_generated_response_encoding(req,
                                                 status::Ok,
                                                 html_response(MOBILE_DIRECTORY_LISTING_HTML,
-                                                              &[&relpath[..],
-                                                                if is_root { "" } else { "/" },
+                                                              &[&relpath_escaped[!is_root as usize..],
                                                                 if show_file_management_controls {
                                                                     concat!(r#"<script type="text/javascript">"#,
                                                                             include_str!("../../assets/upload.js"),
@@ -971,28 +976,35 @@ impl HttpHandler {
     }
 
     fn handle_get_dir_listing(&self, req: &mut Request, req_p: PathBuf) -> IronResult<Response> {
-        let relpath = (url_path(&req.url) + "/").replace("//", "/");
-        let is_root = req.url.as_ref().path_segments().unwrap().count() + !req.url.as_ref().as_str().ends_with('/') as usize == 1;
+        let relpath = url_path(&req.url);
+        let is_root = relpath == "/";
+        let mut relpath_escaped = escape_specials(relpath);
+        if relpath_escaped.as_bytes().last() != Some(&b'/') {
+            relpath_escaped.push('/');
+        }
         let show_file_management_controls = self.writes_temp_dir.is_some();
         log!(self.log,
              "{} was served directory listing for {magenta}{}{reset}",
              self.remote_addresses(&req),
              req_p.display());
 
-        let parent_s = if is_root {
-            String::new()
-        } else {
-            let rel_noslash = &relpath[0..relpath.len() - 1];
-            let slash_idx = rel_noslash.rfind('/');
-            format!("<tr><td><a href=\"/{up_path}{up_path_slash}\" id=\"parent_dir\" class=\"back_arrow_icon\"></a></td> \
-                         <td><a href=\"/{up_path}{up_path_slash}\">Parent directory</a></td> \
-                         <td><a href=\"/{up_path}{up_path_slash}\" class=\"datetime\">{}</a></td> \
-                         <td><a href=\"/{up_path}{up_path_slash}\">&nbsp;</a></td> \
-                         <td><a href=\"/{up_path}{up_path_slash}\">&nbsp;</a></td></tr>",
-                    file_time_modified_p(req_p.parent().unwrap_or(&req_p)).strftime("%F %T").unwrap(),
-                    up_path = escape_specials(slash_idx.map(|i| &rel_noslash[0..i]).unwrap_or("")),
-                    up_path_slash = if slash_idx.is_some() { "/" } else { "" })
-        };
+        let parent_s =
+            if is_root {
+                String::new()
+            } else {
+                let mut parentpath = &relpath_escaped[..];
+                while parentpath.as_bytes().last() == Some(&b'/') {
+                    parentpath = &parentpath[0..parentpath.len() - 1];
+                }
+                while parentpath.as_bytes().last() != Some(&b'/') {
+                    parentpath = &parentpath[0..parentpath.len() - 1];
+                }
+                format!("<tr><td><a href=\"{up_path}\" id=\"parent_dir\" class=\"back_arrow_icon\"></a></td> <td><a href=\"{up_path}\">Parent \
+                         directory</a></td> <td><a href=\"{up_path}\" class=\"datetime\">{}</a></td> <td><a href=\"{up_path}\">&nbsp;</a></td> <td><a \
+                         href=\"{up_path}\">&nbsp;</a></td></tr>",
+                        file_time_modified_p(req_p.parent().unwrap_or(&req_p)).strftime("%F %T").unwrap(),
+                        up_path = parentpath)
+            };
 
 
         let rd = match req_p.read_dir() {
@@ -1055,7 +1067,7 @@ impl HttpHandler {
                    } else {
                        DisplayThree("", "", "")
                    },
-                   path = escape_specials(format!("/{}", relpath).replace("//", "/")),
+                   path = relpath_escaped,
                    fname = encode_tail_if_trimmed(escape_specials(&fname)))
                 .unwrap()
         }
@@ -1063,7 +1075,7 @@ impl HttpHandler {
         self.handle_generated_response_encoding(req,
                                                 status::Ok,
                                                 html_response(DIRECTORY_LISTING_HTML,
-                                                              &[&relpath[..],
+                                                              &[&relpath_escaped[!is_root as usize..],
                                                                 if show_file_management_controls {
                                                                     concat!(r#"<script type="text/javascript">"#,
                                                                             include_str!("../../assets/upload.js"),
