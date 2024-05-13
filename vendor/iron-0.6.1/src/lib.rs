@@ -62,9 +62,6 @@
 //! middleware. No plugins or middleware are bundled with Iron.
 //!
 
-// Stdlib dependencies
-#[macro_use] extern crate log;
-
 // Third party packages
 extern crate hyper;
 extern crate url as url_ext;

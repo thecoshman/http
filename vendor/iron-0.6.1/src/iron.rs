@@ -174,12 +174,12 @@ impl<H: Handler> ::hyper::server::Handler for RawHandler<H> {
             Ok(mut req) => {
                 // Dispatch the request, write the response back to http_res
                 self.handler.handle(&mut req).unwrap_or_else(|e| {
-                    error!("Error handling:\n{:?}\nError was: {:?}", req, e.error);
+                    eprintln!("[iron] Error handling:\n{:?}\nError was: {:?}", req, e.error);
                     e.response
                 }).write_back(http_res)
             },
             Err(e) => {
-                error!("Error creating request:\n    {}", e);
+                eprintln!("[iron] Error creating request:\n    {}", e);
                 bad_request(http_res)
             }
         }

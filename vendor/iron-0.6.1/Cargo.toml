@@ -30,9 +30,6 @@ version = "0.10"
 version = "0.3"
 optional = true
 
-[dependencies.log]
-version = "0.3"
-
 [dependencies.modifier]
 version = "0.1"
 

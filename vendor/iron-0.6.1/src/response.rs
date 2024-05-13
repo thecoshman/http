@@ -120,7 +120,7 @@ impl Response {
         };
 
         if let Err(e) = out {
-            error!("Error writing response: {}", e);
+            eprintln!("[iron] Error writing response: {}", e);
         }
     }
 }
