@@ -772,7 +772,7 @@ impl HttpHandler {
                         get_raw_fs_metadata(f.path())
                     } else {
                         RawFileData {
-                            mime_type: "text/directory".parse().unwrap(),
+                            mime_type: Mime(MimeTopLevel::Text, MimeSubLevel::Ext("directory".to_string()), Default::default()), // text/directory
                             name: f.file_name().into_string().expect("Failed to get file name"),
                             last_modified: file_time_modified_p(&f.path()),
                             size: 0,
@@ -1253,7 +1253,7 @@ impl HttpHandler {
              url_path(&req.url));
 
         let mut hdr = req.headers.clone();
-        hdr.set(headers::ContentType("message/http".parse().unwrap()));
+        hdr.set(headers::ContentType(Mime(MimeTopLevel::Message, MimeSubLevel::Ext("http".to_string()), Default::default()))); // message/http
 
         Ok(Response {
             status: Some(status::Ok),

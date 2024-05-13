@@ -20,6 +20,7 @@ use std::fs::{self, FileType, Metadata, File};
 use iron::headers::{HeaderFormat, UserAgent, Header};
 use xml::name::{OwnedName as OwnedXmlName, Name as XmlName};
 use iron::error::{HttpResult as HyperResult, HttpError as HyperError};
+use iron::mime::{Mime, SubLevel as MimeSubLevel, TopLevel as MimeTopLevel};
 use std::io::{ErrorKind as IoErrorKind, BufReader, BufRead, Result as IoResult, Error as IoError};
 
 pub use self::os::*;
@@ -554,9 +555,9 @@ fn get_raw_fs_metadata_impl(f: &Path) -> RawFileData {
     let meta = f.metadata().expect("Failed to get requested file metadata");
     RawFileData {
         mime_type: guess_mime_type_opt(f).unwrap_or_else(|| if file_binary(f) {
-            "application/octet-stream".parse().unwrap()
+            Mime(MimeTopLevel::Application, MimeSubLevel::OctetStream, Default::default())  // application/octet-stream
         } else {
-            "text/plain".parse().unwrap()
+            Mime(MimeTopLevel::Text, MimeSubLevel::Plain, Default::default())  // text/plain
         }),
         name: f.file_name().unwrap().to_str().expect("Failed to get requested file name").to_string(),
         last_modified: file_time_modified(&meta),
