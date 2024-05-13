@@ -67,8 +67,6 @@
 
 // Third party packages
 extern crate hyper;
-extern crate typemap as tmap;
-extern crate plugin;
 extern crate url as url_ext;
 extern crate num_cpus;
 extern crate mime_guess;
@@ -84,15 +82,9 @@ pub use middleware::{BeforeMiddleware, AfterMiddleware, AroundMiddleware,
 // Server
 pub use iron::*;
 
-// Extensions
-pub use typemap::TypeMap;
-
 // Headers
 pub use hyper::header as headers;
 pub use hyper::header::Headers;
-
-// Expose `Pluggable` as `Plugin` so users can do `use iron::Plugin`.
-pub use plugin::Pluggable as Plugin;
 
 // Expose modifiers.
 pub use modifier::Set;
@@ -123,13 +115,8 @@ pub type IronResult<T> = Result<T, IronError>;
 /// `IronResult`, `IronError` and `Iron`.
 pub mod prelude {
     #[doc(no_inline)]
-    pub use {Set, Plugin, Chain, Request, Response,
+    pub use {Set, Chain, Request, Response,
              IronResult, IronError, Iron};
-}
-
-/// Re-exports from the `TypeMap` crate.
-pub mod typemap {
-    pub use tmap::{TypeMap, Key};
 }
 
 /// Re-exports from the Modifier crate.

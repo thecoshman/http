@@ -4,13 +4,11 @@ use std::io::{self, Write};
 use std::fmt::{self, Debug};
 use std::fs::File;
 
-use typemap::TypeMap;
-use plugin::Extensible;
 use modifier::{Set, Modifier};
 use hyper::header::Headers;
 
 use status::{self, Status};
-use {Plugin, headers};
+use headers;
 
 pub use hyper::server::response::Response as HttpResponse;
 use hyper::net::Fresh;
@@ -82,10 +80,6 @@ pub struct Response {
     /// The headers of the response.
     pub headers: Headers,
 
-    /// A TypeMap to be used as an extensible storage for data
-    /// associated with this Response.
-    pub extensions: TypeMap,
-
     /// The body of the response.
     pub body: Option<Box<WriteBody>>
 }
@@ -97,7 +91,6 @@ impl Response {
             status: None, // Start with no response code.
             body: None, // Start with no body.
             headers: Headers::new(),
-            extensions: TypeMap::new()
         }
     }
 
@@ -159,16 +152,4 @@ impl fmt::Display for Response {
     }
 }
 
-// Allow plugins to attach to responses.
-impl Extensible for Response {
-    fn extensions(&self) -> &TypeMap {
-        &self.extensions
-    }
-
-    fn extensions_mut(&mut self) -> &mut TypeMap {
-        &mut self.extensions
-    }
-}
-
-impl Plugin for Response {}
 impl Set for Response {}

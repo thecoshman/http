@@ -9,8 +9,6 @@ use hyper::net::NetworkStream;
 use hyper::http::h1::HttpReader;
 use hyper::version::HttpVersion;
 
-use typemap::TypeMap;
-use plugin::Extensible;
 use method::Method;
 
 pub use hyper::server::request::Request as HttpRequest;
@@ -21,7 +19,7 @@ use std::net::ToSocketAddrs;
 
 pub use self::url::Url;
 
-use {Protocol, Plugin, Headers, Set, headers};
+use {Protocol, Headers, Set, headers};
 
 mod url;
 
@@ -47,9 +45,6 @@ pub struct Request<'a, 'b: 'a> {
 
     /// The request method.
     pub method: Method,
-
-    /// Extensible storage for data passed between middleware.
-    pub extensions: TypeMap,
 
     /// The version of the HTTP protocol used.
     pub version: HttpVersion,
@@ -124,7 +119,6 @@ impl<'a, 'b> Request<'a, 'b> {
             headers: headers,
             body: Body::new(reader),
             method: method,
-            extensions: TypeMap::new(),
             version: version,
             _p: (),
         })
@@ -139,7 +133,6 @@ impl<'a, 'b> Request<'a, 'b> {
             headers: Headers::new(),
             body: unsafe { ::std::mem::uninitialized() }, // FIXME(reem): Ugh
             method: Method::Get,
-            extensions: TypeMap::new(),
             version: HttpVersion::Http11,
             _p: (),
         }
@@ -162,16 +155,4 @@ impl<'a, 'b> Read for Body<'a, 'b> {
     }
 }
 
-// Allow plugins to attach to requests.
-impl<'a, 'b> Extensible for Request<'a, 'b> {
-    fn extensions(&self) -> &TypeMap {
-        &self.extensions
-    }
-
-    fn extensions_mut(&mut self) -> &mut TypeMap {
-        &mut self.extensions
-    }
-}
-
-impl<'a, 'b> Plugin for Request<'a, 'b> {}
 impl<'a, 'b> Set for Request<'a, 'b> {}

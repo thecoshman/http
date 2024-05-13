@@ -24,7 +24,7 @@ use std::sync::atomic::{AtomicU64, Ordering as AtomicOrdering};
 use rand::distributions::uniform::Uniform as UniformDistribution;
 use rand::distributions::Alphanumeric as AlphanumericDistribution;
 use std::io::{self, ErrorKind as IoErrorKind, SeekFrom, Write, Error as IoError, Read, Seek};
-use iron::{headers, status, method, mime, IronResult, Listening, Response, TypeMap, Request, Handler, Iron};
+use iron::{headers, status, method, mime, IronResult, Listening, Response, Request, Handler, Iron};
 use iron::mime::{Mime, Attr as MimeAttr, Value as MimeAttrValue, SubLevel as MimeSubLevel, TopLevel as MimeTopLevel};
 use self::super::util::{WwwAuthenticate, XLastModified, DisplayThree, CommaList, XOcMTime, Spaces, MsAsS, Maybe, Dav, url_path, file_etag, file_hash, set_mtime,
                         is_symlink, encode_str, encode_file, file_length, html_response, file_binary, client_mobile, percent_decode, escape_specials,
@@ -1260,7 +1260,6 @@ impl HttpHandler {
         Ok(Response {
             status: Some(status::Ok),
             headers: hdr,
-            extensions: TypeMap::new(),
             body: None,
         })
     }
