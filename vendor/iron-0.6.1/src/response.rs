@@ -125,13 +125,8 @@ impl Response {
     }
 }
 
-fn write_with_body(mut res: HttpResponse<Fresh>, mut body: Box<WriteBody>)
+fn write_with_body(res: HttpResponse<Fresh>, mut body: Box<WriteBody>)
                    -> io::Result<()> {
-    let content_type = res.headers().get::<headers::ContentType>()
-                           .map_or_else(|| headers::ContentType("text/plain".parse().unwrap()),
-                                        |cx| cx.clone());
-    res.headers_mut().set(content_type);
-
     let mut raw_res = try!(res.start());
     try!(body.write_body(&mut raw_res));
     raw_res.end()
