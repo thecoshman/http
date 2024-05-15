@@ -58,6 +58,9 @@ features = ["std"]
 path = "vendor/iron-0.6.1"
 features = ["hyper-native-tls"]
 
+[patch.crates-io.hyper]
+path = "vendor/hyper-0.10.16"
+
 [target.'cfg(target_os = "windows")'.dependencies.winapi]
 version = "0.3"
 features = ["fileapi"]
