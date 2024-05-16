@@ -470,7 +470,7 @@ impl HttpHandler {
                         return Ok(Response::with((status::NotModified,
                                                   (Header(headers::Server(USER_AGENT.into())),
                                                    Header(headers::LastModified(headers::HttpDate(file_time_modified_p(&req_p)))),
-                                                   Header(headers::AcceptRanges(vec![headers::RangeUnit::Bytes]))),
+                                                   Header(headers::AcceptRanges(headers::RangeUnit::Bytes))),
                                                   Header(headers::ETag(headers::EntityTag::strong(etag))))));
                     }
 
@@ -523,7 +523,7 @@ impl HttpHandler {
                                 instance_length: Some(file_length(&f.metadata().expect("Failed to get requested file metadata"), &req_p)),
                             })),
                             Header(headers::ETag(headers::EntityTag::strong(etag))),
-                            Header(headers::AcceptRanges(vec![headers::RangeUnit::Bytes]))),
+                            Header(headers::AcceptRanges(headers::RangeUnit::Bytes))),
                            buf,
                            mime_type)))
     }
@@ -570,7 +570,7 @@ impl HttpHandler {
                             })),
                             Header(headers::ETag(headers::EntityTag::strong(etag))),
                             Header(headers::ContentLength(clen)),
-                            Header(headers::AcceptRanges(vec![headers::RangeUnit::Bytes]))),
+                            Header(headers::AcceptRanges(headers::RangeUnit::Bytes))),
                            mt)))
     }
 
@@ -601,7 +601,7 @@ impl HttpHandler {
                                 instance_length: Some(file_length(&req_p.metadata().expect("Failed to get requested file metadata"), &req_p)),
                             }))),
                            Header(headers::ETag(headers::EntityTag::strong(etag))),
-                           Header(headers::AcceptRanges(vec![headers::RangeUnit::Bytes])),
+                           Header(headers::AcceptRanges(headers::RangeUnit::Bytes)),
                            mime_type)))
     }
 
@@ -617,7 +617,7 @@ impl HttpHandler {
         let etag = file_etag(&metadata);
         let headers = (Header(headers::Server(USER_AGENT.into())),
                        Header(headers::LastModified(headers::HttpDate(file_time_modified(&metadata)))),
-                       Header(headers::AcceptRanges(vec![headers::RangeUnit::Bytes])));
+                       Header(headers::AcceptRanges(headers::RangeUnit::Bytes)));
         if HttpHandler::should_304_path(req, &req_p, &etag) {
             log!(self.log, "{} Not Modified", Spaces(self.remote_addresses(req).width()));
             return Ok(Response::with((status::NotModified, headers, Header(headers::ETag(headers::EntityTag::strong(etag))))));

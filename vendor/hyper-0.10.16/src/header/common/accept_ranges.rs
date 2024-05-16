@@ -45,13 +45,11 @@ header! {
     ///     ])
     /// );
     /// ```
-    (AcceptRanges, "Accept-Ranges") => (RangeUnit)+
+    (AcceptRanges, "Accept-Ranges") => [RangeUnit]
 
     test_acccept_ranges {
         test_header!(test1, vec![b"bytes"]);
         test_header!(test2, vec![b"none"]);
-        test_header!(test3, vec![b"unknown-unit"]);
-        test_header!(test4, vec![b"bytes, unknown-unit"]);
     }
 }
 
@@ -73,8 +71,6 @@ pub enum RangeUnit {
     Bytes,
     /// Reserved as keyword, indicating no ranges are supported.
     None,
-    /// The given range unit is not registered at IANA.
-    Unregistered(String),
 }
 
 
@@ -85,7 +81,7 @@ impl FromStr for RangeUnit {
             "bytes" => Ok(RangeUnit::Bytes),
             "none" => Ok(RangeUnit::None),
             // FIXME: Check if s is really a Token
-            _ => Ok(RangeUnit::Unregistered(s.to_owned())),
+            _ => Err(::Error::Method),
         }
     }
 }
@@ -95,7 +91,6 @@ impl Display for RangeUnit {
         match *self {
             RangeUnit::Bytes => f.write_str("bytes"),
             RangeUnit::None => f.write_str("none"),
-            RangeUnit::Unregistered(ref x) => f.write_str(&x),
         }
     }
 }
