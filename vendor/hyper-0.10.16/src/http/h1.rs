@@ -12,7 +12,7 @@ use url::Position as UrlPosition;
 use buffer::BufReader;
 use Error;
 use header::{Headers, ContentLength, TransferEncoding};
-use header::Encoding::Chunked;
+use header::{EncodingType, Encoding};
 use method::{Method};
 use net::{NetworkConnector, NetworkStream};
 use status::StatusCode;
@@ -204,7 +204,7 @@ impl HttpMessage for Http11Message {
                             let encodings = match head.headers.get_mut::<header::TransferEncoding>() {
                                 Some(encodings) => {
                                     //TODO: check if chunked is already in encodings. use HashSet?
-                                    encodings.push(header::Encoding::Chunked);
+                                    encodings.push(Encoding::Chunked);
                                     false
                                 },
                                 None => true
@@ -212,7 +212,7 @@ impl HttpMessage for Http11Message {
 
                             if encodings {
                                 head.headers.set(
-                                    header::TransferEncoding(vec![header::Encoding::Chunked]))
+                                    header::TransferEncoding(vec![Encoding::Chunked]))
                             }
                         }
 
@@ -303,7 +303,7 @@ impl HttpMessage for Http11Message {
                 EmptyReader(stream)
             } else {
                 if let Some(&TransferEncoding(ref codings)) = headers.get() {
-                    if codings.last() == Some(&Chunked) {
+                    if matches!(codings.last(), Some(Encoding(EncodingType::Chunked, ..))) {
                         ChunkedReader(stream, None)
                     } else {
                         trace!("not chuncked. read till eof");

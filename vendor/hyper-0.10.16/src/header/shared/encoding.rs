@@ -1,12 +1,19 @@
 use std::fmt;
 use std::str;
 
-pub use self::Encoding::{Chunked, Gzip, Deflate, Compress, Identity, EncodingExt};
-
 /// A value to represent an encoding used in `Transfer-Encoding`
 /// or `Accept-Encoding` header.
-#[derive(Clone, PartialEq, Debug)]
-pub enum Encoding {
+///
+/// bool is `x-`-prefixed.
+#[derive(Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Debug)]
+pub struct Encoding(pub EncodingType, pub String, pub bool);
+impl Encoding {
+    #[allow(non_upper_case_globals)]
+    pub const Chunked: Encoding = Encoding(EncodingType::Chunked, String::new(), false);
+}
+
+#[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Debug)]
+pub enum EncodingType {
     /// The `chunked` encoding.
     Chunked,
     /// The `gzip` encoding.
@@ -17,33 +24,53 @@ pub enum Encoding {
     Compress,
     /// The `identity` encoding.
     Identity,
-    /// Some other encoding that is less common, can be any String.
-    EncodingExt(String)
+    /// The `br` encoding.
+    Brotli,
+    /// The `bzip2` encoding.
+    Bzip2,
+    /// See upper String.
+    Custom,
 }
 
 impl fmt::Display for Encoding {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        f.write_str(match *self {
-            Chunked => "chunked",
-            Gzip => "gzip",
-            Deflate => "deflate",
-            Compress => "compress",
-            Identity => "identity",
-            EncodingExt(ref s) => s.as_ref()
+        if self.2 {
+            f.write_str("x-")?;
+        }
+        f.write_str(match self.0 {
+            EncodingType::Chunked => "chunked",
+            EncodingType::Gzip => "gzip",
+            EncodingType::Deflate => "deflate",
+            EncodingType::Compress => "compress",
+            EncodingType::Identity => "identity",
+            EncodingType::Brotli => "br",
+            EncodingType::Bzip2 => "bzip2",
+            EncodingType::Custom => self.1.as_ref(),
         })
     }
 }
 
 impl str::FromStr for Encoding {
     type Err = ::Error;
-    fn from_str(s: &str) -> ::Result<Encoding> {
-        match s {
-            "chunked" => Ok(Chunked),
-            "deflate" => Ok(Deflate),
-            "gzip" => Ok(Gzip),
-            "compress" => Ok(Compress),
-            "identity" => Ok(Identity),
-            _ => Ok(EncodingExt(s.to_owned()))
+    fn from_str(mut s: &str) -> ::Result<Encoding> {
+        let x = s.starts_with("x-");
+        if x {
+            s = &s[2..];
         }
+        let mut custom = String::new();
+        let enc = match s {
+            "chunked" => EncodingType::Chunked,
+            "deflate" => EncodingType::Deflate,
+            "gzip" => EncodingType::Gzip,
+            "compress" => EncodingType::Compress,
+            "identity" => EncodingType::Identity,
+            "br" => EncodingType::Brotli,
+            "bzip2" => EncodingType::Bzip2,
+            _ => {
+                custom = s.to_owned();
+                EncodingType::Custom
+            },
+        };
+        Ok(Encoding(enc, custom, x))
     }
 }

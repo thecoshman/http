@@ -13,6 +13,7 @@ use std::default::Default;
 use rand::{Rng, thread_rng};
 use iron::modifiers::Header;
 use std::path::{PathBuf, Path};
+use iron::headers::EncodingType;
 use iron::url::Url as GenericUrl;
 use mime_guess::get_mime_type_opt;
 use hyper_native_tls::NativeTlsServer;
@@ -111,8 +112,7 @@ pub use self::prune::PruneChain;
 pub use self::bandwidth::{LimitBandwidthMiddleware, SimpleChain};
 
 
-// TODO: ideally this String here would be Encoding instead but hyper is bad
-type CacheT<Cnt> = HashMap<(blake3::Hash, String), (Cnt, AtomicU64)>;
+type CacheT<Cnt> = HashMap<(blake3::Hash, EncodingType), (Cnt, AtomicU64)>;
 
 pub struct HttpHandler {
     pub hosted_directory: (String, PathBuf),
@@ -660,7 +660,7 @@ impl HttpHandler {
                     }
                 }
             };
-            let cache_key = (hash, encoding.to_string());
+            let cache_key = (hash, encoding.0);
 
             {
                 match self.cache_fs.read().expect("Filesystem cache read lock poisoned").get(&cache_key) {
@@ -1325,7 +1325,7 @@ impl HttpHandler {
         }
 
         if let Some(encoding) = req.headers.get_mut::<headers::AcceptEncoding>().and_then(|es| response_encoding(&mut **es)) {
-            let cache_key = (hash, encoding.to_string());
+            let cache_key = (hash, encoding.0);
 
             {
                 if let Some(enc_resp) = self.cache_gen.read().expect("Generated file cache read lock poisoned").get(&cache_key) {

@@ -1,5 +1,5 @@
 pub use self::charset::Charset;
-pub use self::encoding::Encoding;
+pub use self::encoding::{Encoding, EncodingType};
 pub use self::entity::EntityTag;
 pub use self::httpdate::HttpDate;
 pub use self::quality_item::{Quality, QualityItem, qitem, q};

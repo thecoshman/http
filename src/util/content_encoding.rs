@@ -1,9 +1,9 @@
 use brotli::enc::backward_references::{BrotliEncoderParams, BrotliEncoderMode};
 use std::io::{self, BufReader, BufWriter, Error as IoError, Write};
+use iron::headers::{QualityItem, EncodingType, Encoding};
 use brotli::enc::BrotliCompress as brotli_compress;
 use flate2::write::{DeflateEncoder, GzEncoder};
 use flate2::Compression as Flate2Compression;
-use iron::headers::{QualityItem, Encoding};
 use bzip2::write::BzEncoder;
 use std::path::Path;
 use std::ffi::OsStr;
@@ -72,18 +72,11 @@ pub fn file_hash(p: &Path) -> Result<blake3::Hash, IoError> {
 
 
 fn encoding_idx(enc: &Encoding) -> Option<usize> {
-    match *enc {
-        Encoding::Gzip => Some(0),
-        Encoding::Deflate => Some(1),
-        Encoding::EncodingExt(ref e) => {
-            match &e[..] {
-                "x-gzip" => Some(0),
-                "x-deflate" => Some(1),
-                "br" | "x-br" => Some(2),
-                "bzip2" | "x-bzip2" => Some(3),
-                _ => None,
-            }
-        }
+    match enc.0 {
+        EncodingType::Gzip => Some(0),
+        EncodingType::Deflate => Some(1),
+        EncodingType::Brotli => Some(2),
+        EncodingType::Bzip2 => Some(3),
         _ => None,
     }
 }
