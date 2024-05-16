@@ -57,8 +57,7 @@ version = "1.0"
 version = "1.0"
 
 [dependencies]
-tcplistener-accept-timeout = "0.0"
-spmc = "0.3"
+crossbeam-channel = "0.5"
 
 [dev-dependencies.env_logger]
 version = "0.4"

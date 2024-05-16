@@ -6,8 +6,6 @@ use std::thread;
 use net::NetworkListener;
 
 
-type Message<A> = Option<<A as NetworkListener>::Stream>;
-
 pub struct ListenerPool<A: NetworkListener> {
     acceptor: A
 }
@@ -30,13 +28,11 @@ impl<A: NetworkListener + Send + 'static> ListenerPool<A> {
         let work = Arc::new(work);
         let live_threads = Arc::new(AtomicUsize::new(0));
         let free_threads = Arc::new(AtomicUsize::new(0));
-        let queue_depth = Arc::new(AtomicUsize::new(0));
-        let (mut send, recv) = spmc::channel();
+        let (send, recv) = crossbeam_channel::bounded(20);
 
         loop {
             let msg = match self.acceptor.accept() {
-                Ok(stream) => Some(stream),
-                Err(::error::Error::__Nonexhaustive(..)) => None,  // timeout
+                Ok(stream) => stream,
                 Err(e) => {
                     info!("Connection failed: {}", e);
                     continue;
@@ -45,51 +41,40 @@ impl<A: NetworkListener + Send + 'static> ListenerPool<A> {
 
             let free = free_threads.load(Ordering::Acquire);
             let live = live_threads.load(Ordering::SeqCst);
-            // eprintln!("free = {}, live = {}", free, live);
-            if msg.is_some() && free == 0 && live != max_threads {
-                spawn_with::<A, _>(recv.clone(), work.clone(), live_threads.clone(), free_threads.clone(), queue_depth.clone(), msg.unwrap());
-                if live + 1 > 1 {
-                    self.acceptor.accept_with_timeout(true);
-                }
-                continue;
-            }
-            self.acceptor.accept_with_timeout(live > 1);
-            if msg.is_none() && (free == 0 || live <= 1) {
-                continue;
-            }
-
-            let depth = queue_depth.fetch_add(1, Ordering::Relaxed);
-            send.send(msg).expect("impossible");
-            if depth > 20 {
-                while queue_depth.load(Ordering::Relaxed) > 5 {
-                    thread::sleep(Duration::from_millis(10));
-                }
+            eprintln!("free = {}, live = {}", free, live);
+            if free == 0 && live != max_threads {
+                spawn_with::<A, _>(recv.clone(), work.clone(), live_threads.clone(), free_threads.clone(),  msg);
+            } else {
+                let _ = send.send(msg);
             }
         }
     }
 }
 
-fn spawn_with<A, F>(recv: spmc::Receiver<Message<A>>, work: Arc<F>, live_threads: Arc<AtomicUsize>, free_threads: Arc<AtomicUsize>, queue_depth: Arc<AtomicUsize>, first: A::Stream)
+fn spawn_with<A, F>(recv: crossbeam_channel::Receiver<A::Stream>, work: Arc<F>, live_threads: Arc<AtomicUsize>, free_threads: Arc<AtomicUsize>, first: A::Stream)
 where A: NetworkListener + Send + 'static,
       F: Fn(<A as NetworkListener>::Stream) + Send + Sync + 'static {
     thread::spawn(move || {
-        let impervious = live_threads.fetch_add(1, Ordering::SeqCst) == 0;
+        let thread_id = live_threads.fetch_add(1, Ordering::SeqCst);
         let _sentinel = LiveSentinel { live_threads };
 
         work(first);
+
         free_threads.fetch_add(1, Ordering::AcqRel);
         let _sentinel = FreeSentinel { free_threads: &free_threads };
         loop {
-            let msg = recv.recv().expect("impossible");
-            queue_depth.fetch_sub(1, Ordering::Relaxed);
-            match msg {
-                None => if !impervious { return },
-                Some(stream) => {
-                    free_threads.fetch_sub(1, Ordering::AcqRel);
-                    work(stream);
-                    free_threads.fetch_add(1, Ordering::AcqRel);
-                }
-            }
+            let stream = match if thread_id == 0 {
+                recv.recv().ok()  // infallible
+            } else {
+                recv.recv_timeout(Duration::from_secs((thread_id * 5).min(300) as u64)).ok()
+            } {
+                None => return,
+                Some(stream) => stream,
+            };
+
+            free_threads.fetch_sub(1, Ordering::AcqRel);
+            work(stream);
+            free_threads.fetch_add(1, Ordering::AcqRel);
         }
     });
 }

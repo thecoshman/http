@@ -32,7 +32,6 @@ where C: NetworkConnector + Send + Sync + 'static,
     type Stream = Proxied<C::Stream, S::Stream>;
 
     fn connect(&self, host: &str, port: u16, scheme: &str) -> ::Result<Self::Stream> {
-        use httparse;
         use std::io::{Read, Write};
         use ::version::HttpVersion::Http11;
         trace!("{:?} proxy for '{}://{}:{}'", self.proxy, scheme, host, port);

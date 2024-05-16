@@ -7,6 +7,7 @@
 #![allow(anonymous_parameters)]
 #![allow(ellipsis_inclusive_range_patterns)]
 #![allow(bare_trait_objects)]
+#![allow(unused_must_use)]
 
 //! # Hyper
 //!
@@ -141,8 +142,7 @@ extern crate httparse;
 extern crate num_cpus;
 extern crate traitobject;
 extern crate typeable;
-extern crate spmc;
-extern crate tcplistener_accept_timeout;
+extern crate crossbeam_channel;
 
 #[cfg_attr(test, macro_use)]
 extern crate language_tags;
