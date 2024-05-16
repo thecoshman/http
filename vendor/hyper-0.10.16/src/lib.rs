@@ -143,6 +143,7 @@ extern crate num_cpus;
 extern crate traitobject;
 extern crate typeable;
 extern crate crossbeam_channel;
+extern crate smallvec;
 
 #[cfg_attr(test, macro_use)]
 extern crate language_tags;

@@ -677,7 +677,7 @@ impl HttpHandler {
                         return Ok(Response::with((status::Ok,
                                                   headers,
                                                   Header(headers::ETag(headers::EntityTag::strong(etag))),
-                                                  Header(headers::ContentEncoding(vec![encoding])),
+                                                  Header(headers::ContentEncoding([encoding].into())),
                                                   resp_p.as_path(),
                                                   mt)));
                     }
@@ -721,7 +721,7 @@ impl HttpHandler {
                     return Ok(Response::with((status::Ok,
                                               headers,
                                               Header(headers::ETag(headers::EntityTag::strong(etag))),
-                                              Header(headers::ContentEncoding(vec![encoding])),
+                                              Header(headers::ContentEncoding([encoding].into())),
                                               resp_p.as_path(),
                                               mt)));
                 }
@@ -1338,7 +1338,7 @@ impl HttpHandler {
 
                     return Ok(Response::with((st,
                                               Header(headers::Server(USER_AGENT.into())),
-                                              Header(headers::ContentEncoding(vec![encoding])),
+                                              Header(headers::ContentEncoding([encoding].into())),
                                               Header(headers::ETag(headers::EntityTag::strong(etag))),
                                               text_html_charset_utf8(),
                                               &enc_resp.0[..])));
@@ -1359,14 +1359,14 @@ impl HttpHandler {
 
                     return Ok(Response::with((st,
                                               Header(headers::Server(USER_AGENT.into())),
-                                              Header(headers::ContentEncoding(vec![encoding])),
+                                              Header(headers::ContentEncoding([encoding].into())),
                                               Header(headers::ETag(headers::EntityTag::strong(etag))),
                                               text_html_charset_utf8(),
                                               &cache[&cache_key].0[..])));
                 } else {
                     return Ok(Response::with((st,
                                               Header(headers::Server(USER_AGENT.into())),
-                                              Header(headers::ContentEncoding(vec![encoding])),
+                                              Header(headers::ContentEncoding([encoding].into())),
                                               Header(headers::ETag(headers::EntityTag::strong(etag))),
                                               text_html_charset_utf8(),
                                               enc_resp)));

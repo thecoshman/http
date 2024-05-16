@@ -240,6 +240,32 @@ macro_rules! header {
             }
         }
     };
+    // List header, one or more items, smallvec of size 1
+    ($(#[$a:meta])*($id:ident, $n:expr) => [$item:ty]+) => {
+        $(#[$a])*
+        #[derive(Clone, Debug, PartialEq)]
+        pub struct $id(pub smallvec::SmallVec<[$item; 1]>);
+        __hyper__deref!($id => smallvec::SmallVec<[$item; 1]>);
+        impl $crate::header::Header for $id {
+            fn header_name() -> &'static str {
+                $n
+            }
+            fn parse_header(raw: &[Vec<u8>]) -> $crate::Result<Self> {
+                $crate::header::parsing::from_comma_delimited_small(raw).map($id)
+            }
+        }
+        impl $crate::header::HeaderFormat for $id {
+            fn fmt_header(&self, f: &mut ::std::fmt::Formatter) -> ::std::fmt::Result {
+                $crate::header::parsing::fmt_comma_delimited(f, &self.0[..])
+            }
+        }
+        impl ::std::fmt::Display for $id {
+            fn fmt(&self, f: &mut ::std::fmt::Formatter) -> ::std::fmt::Result {
+                use $crate::header::HeaderFormat;
+                self.fmt_header(f)
+            }
+        }
+    };
     // Single value header
     ($(#[$a:meta])*($id:ident, $n:expr) => [$value:ty]) => {
         $(#[$a])*

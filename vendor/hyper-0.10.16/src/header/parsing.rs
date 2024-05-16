@@ -37,6 +37,22 @@ pub fn from_comma_delimited<T: str::FromStr, S: AsRef<[u8]>>(raw: &[S]) -> ::Res
     Ok(result)
 }
 
+/// Reads a comma-delimited raw header into a Vec.
+#[inline]
+pub fn from_comma_delimited_small<T: str::FromStr, S: AsRef<[u8]>>(raw: &[S]) -> ::Result<smallvec::SmallVec<[T; 1]>> {
+    let mut result = smallvec::SmallVec::new();
+    for s in raw {
+        let s = try!(str::from_utf8(s.as_ref()));
+        result.extend(s.split(',')
+                      .filter_map(|x| match x.trim() {
+                          "" => None,
+                          y => Some(y)
+                      })
+                      .filter_map(|x| x.parse().ok()))
+    }
+    Ok(result)
+}
+
 /// Format an array into a comma-delimited string.
 pub fn fmt_comma_delimited<T: Display>(f: &mut fmt::Formatter, parts: &[T]) -> fmt::Result {
     for (i, part) in parts.iter().enumerate() {
