@@ -158,7 +158,6 @@ extern crate test;
 
 
 pub use url::Url;
-pub use client::Client;
 pub use error::{Result, Error};
 pub use method::Method::{Get, Head, Post, Delete};
 pub use status::StatusCode::{Ok, BadRequest, NotFound};
@@ -176,7 +175,6 @@ macro_rules! todo(
 mod mock;
 #[doc(hidden)]
 pub mod buffer;
-pub mod client;
 pub mod error;
 pub mod method;
 pub mod header;
@@ -197,13 +195,7 @@ fn _assert_types() {
     fn _assert_send<T: Send>() {}
     fn _assert_sync<T: Sync>() {}
 
-    _assert_send::<Client>();
-    _assert_send::<client::Request<net::Fresh>>();
-    _assert_send::<client::Response>();
     _assert_send::<error::Error>();
-    _assert_send::<::client::pool::Pool<::net::DefaultConnector>>();
 
-    _assert_sync::<Client>();
     _assert_sync::<error::Error>();
-    _assert_sync::<::client::pool::Pool<::net::DefaultConnector>>();
 }
