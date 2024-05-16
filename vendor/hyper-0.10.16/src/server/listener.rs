@@ -58,10 +58,10 @@ where A: NetworkListener + Send + 'static,
         let thread_id = live_threads.fetch_add(1, Ordering::SeqCst);
         let _sentinel = LiveSentinel { live_threads };
 
+        let mut _free_sentinel = FreeSentinel { free_threads: &free_threads, subbed: true };
         work(first);
+        _free_sentinel.unsub();
 
-        free_threads.fetch_add(1, Ordering::AcqRel);
-        let _sentinel = FreeSentinel { free_threads: &free_threads };
         loop {
             let stream = match if thread_id == 0 {
                 recv.recv().ok()  // infallible
@@ -72,9 +72,9 @@ where A: NetworkListener + Send + 'static,
                 Some(stream) => stream,
             };
 
-            free_threads.fetch_sub(1, Ordering::AcqRel);
+            _free_sentinel.sub();
             work(stream);
-            free_threads.fetch_add(1, Ordering::AcqRel);
+            _free_sentinel.unsub();
         }
     });
 }
@@ -90,9 +90,22 @@ impl Drop for LiveSentinel {
 
 struct FreeSentinel<'t> {
     free_threads: &'t Arc<AtomicUsize>,
+    subbed: bool,
+}
+impl<'t> FreeSentinel<'t> {
+    fn sub(&mut self) {
+        self.free_threads.fetch_sub(1, Ordering::AcqRel);
+        self.subbed = true;
+    }
+    fn unsub(&mut self) {
+        self.free_threads.fetch_add(1, Ordering::AcqRel);
+        self.subbed = false;
+    }
 }
 impl<'t> Drop for FreeSentinel<'t> {
     fn drop(&mut self) {
-        self.free_threads.fetch_sub(1, Ordering::AcqRel);
+        if !self.subbed {
+            self.free_threads.fetch_sub(1, Ordering::AcqRel);
+        }
     }
 }
