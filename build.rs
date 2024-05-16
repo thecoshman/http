@@ -37,7 +37,7 @@ fn assets() -> Vec<(&'static str, String)> {
          ("delete_file_icon", "image/png", "assets/icons/delete_file.png"),
          ("rename_icon", "image/png", "assets/icons/rename.png"),
          ("confirm_icon", "image/png", "assets/icons/confirm.png")] {
-        println!("cargo::rerun-if-changed={}", file);
+        println!("cargo:rerun-if-changed={}", file);
         assets.push((key,
                      format!("data:{};base64,{}",
                              mime,
@@ -49,7 +49,7 @@ fn assets() -> Vec<(&'static str, String)> {
                         ("manage_desktop", "assets/manage_desktop.js"),
                         ("upload", "assets/upload.js"),
                         ("adjust_tz", "assets/adjust_tz.js")] {
-        println!("cargo::rerun-if-changed={}", file);
+        println!("cargo:rerun-if-changed={}", file);
         assets.push((key, fs::read_to_string(file).unwrap()));
     }
     assets
@@ -58,7 +58,7 @@ fn assets() -> Vec<(&'static str, String)> {
 fn htmls() {
     let assets = assets();
     for html in ["error.html", "directory_listing.html", "directory_listing_mobile.html"] {
-        println!("cargo::rerun-if-changed=assets/{}", html);
+        println!("cargo:rerun-if-changed=assets/{}", html);
 
         let with_assets = assets.iter().fold(fs::read_to_string(format!("assets/{}", html)).unwrap(),
                                              |d, (k, v)| d.replace(&format!("{{{}}}", k), v));
@@ -87,7 +87,7 @@ fn htmls() {
 
 
 fn extensions() {
-    println!("cargo::rerun-if-changed={}", "assets/encoding_blacklist");
+    println!("cargo:rerun-if-changed={}", "assets/encoding_blacklist");
     let mut out = File::create(Path::new(&env::var("OUT_DIR").unwrap()).join("extensions.rs")).unwrap();
 
     let raw = fs::read_to_string("assets/encoding_blacklist").unwrap();
