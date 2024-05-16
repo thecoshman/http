@@ -112,12 +112,12 @@ encode_fn!(encode_str_bzip2, encode_file_bzip2, BzEncoder, Default::default());
 
 /// This should just be a pub const, but the new and default functions aren't const
 pub fn brotli_params() -> BrotliEncoderParams {
-    BrotliEncoderParams { mode: BrotliEncoderMode::BROTLI_MODE_TEXT, ..Default::default() }
+    BrotliEncoderParams { mode: BrotliEncoderMode::BROTLI_MODE_TEXT, quality: 9, ..Default::default() }
 }
 fn encode_str_brotli(dt: &str) -> Option<Vec<u8>> {
     let mut ret = Vec::new();
     brotli_compress(&mut dt.as_bytes(), &mut ret, &brotli_params()).ok().map(|_| ret)
 }
-fn encode_file_brotli(mut inf: File, mut outf: File) -> bool {
-    brotli_compress(&mut inf, &mut outf, &brotli_params()).is_ok()
+fn encode_file_brotli(inf: File, outf: File) -> bool {
+    brotli_compress(&mut BufReader::with_capacity(1024 * 1024, inf), &mut BufWriter::with_capacity(1024 * 1024, outf), &brotli_params()).is_ok()
 }
