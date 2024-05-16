@@ -3,6 +3,10 @@
 //#![cfg_attr(test, deny(warnings))]
 #![cfg_attr(all(test, feature = "nightly"), feature(test))]
 #![allow(useless_deprecated)]
+#![allow(deprecated)]
+#![allow(anonymous_parameters)]
+#![allow(ellipsis_inclusive_range_patterns)]
+#![allow(bare_trait_objects)]
 
 //! # Hyper
 //!
@@ -137,6 +141,8 @@ extern crate httparse;
 extern crate num_cpus;
 extern crate traitobject;
 extern crate typeable;
+extern crate spmc;
+extern crate tcplistener_accept_timeout;
 
 #[cfg_attr(test, macro_use)]
 extern crate language_tags;

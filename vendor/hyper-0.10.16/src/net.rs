@@ -8,6 +8,7 @@ use std::sync::Arc;
 
 use std::time::Duration;
 
+use tcplistener_accept_timeout::TcpListenerAcceptTimeout;
 use typeable::Typeable;
 use traitobject;
 
@@ -48,6 +49,8 @@ pub trait NetworkListener: Clone {
         // when the next breaking release is made.
         warn!("Ignoring write timeout");
     }
+
+    fn accept_with_timeout(&mut self, yn: bool);
 }
 
 /// An iterator wrapper over a `NetworkAcceptor`.
@@ -226,6 +229,7 @@ pub struct HttpListener {
 
     read_timeout : Option<Duration>,
     write_timeout: Option<Duration>,
+    accept_timeout: bool,
 }
 
 impl From<TcpListener> for HttpListener {
@@ -235,6 +239,7 @@ impl From<TcpListener> for HttpListener {
 
             read_timeout : None,
             write_timeout: None,
+            accept_timeout: false,
         }
     }
 }
@@ -242,7 +247,8 @@ impl From<TcpListener> for HttpListener {
 impl HttpListener {
     /// Start listening to an address over HTTP.
     pub fn new<To: ToSocketAddrs>(addr: To) -> ::Result<HttpListener> {
-        Ok(HttpListener::from(try!(TcpListener::bind(addr))))
+        let listener = TcpListener::bind(addr)?;
+        Ok(HttpListener::from(listener))
     }
 }
 
@@ -251,7 +257,20 @@ impl NetworkListener for HttpListener {
 
     #[inline]
     fn accept(&mut self) -> ::Result<HttpStream> {
-        let stream = HttpStream(try!(self.listener.accept()).0);
+        let res =
+            if self.accept_timeout {
+                loop {
+                    match self.listener.accept_timeout(Some(Duration::from_secs(15))) {
+                        None => return Err(::error::Error::__Nonexhaustive(::error::Void(()))),
+                        Some(Err(err)) if err.kind() == ErrorKind::WouldBlock => {},
+                        Some(res) => break res,
+                    }
+                }
+            } else {
+                self.listener.accept()
+            };
+
+        let stream = HttpStream(res?.0);
         try!(stream.set_read_timeout(self.read_timeout));
         try!(stream.set_write_timeout(self.write_timeout));
         Ok(stream)
@@ -268,6 +287,10 @@ impl NetworkListener for HttpListener {
 
     fn set_write_timeout(&mut self, duration: Option<Duration>) {
         self.write_timeout = duration;
+    }
+
+    fn accept_with_timeout(&mut self, yn: bool) {
+        self.accept_timeout = yn;
     }
 }
 
@@ -570,6 +593,10 @@ impl<S: SslServer + Clone> NetworkListener for HttpsListener<S> {
 
     fn set_write_timeout(&mut self, duration: Option<Duration>) {
         self.listener.set_write_timeout(duration)
+    }
+
+    fn accept_with_timeout(&mut self, yn: bool) {
+        self.listener.accept_with_timeout(yn);
     }
 }
 

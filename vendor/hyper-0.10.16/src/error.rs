@@ -55,7 +55,7 @@ pub enum Error {
 }
 
 #[doc(hidden)]
-pub struct Void(());
+pub struct Void(pub ());
 
 impl fmt::Debug for Void {
     fn fmt(&self, _: &mut fmt::Formatter) -> fmt::Result {
