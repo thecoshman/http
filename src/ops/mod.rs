@@ -349,7 +349,7 @@ impl HttpHandler {
 
     fn handle_options(&self, req: &mut Request) -> IronResult<Response> {
         log!(self.log, "{} asked for {red}OPTIONS{reset}", self.remote_addresses(&req));
-        Ok(Response::with((status::NoContent, Header(headers::Server(USER_AGENT.to_string())), Header(headers::Allow(self.allowed_methods.clone())))))
+        Ok(Response::with((status::NoContent, Header(headers::Server(USER_AGENT.into())), Header(headers::Allow(self.allowed_methods.clone())))))
     }
 
     fn handle_get(&self, req: &mut Request) -> IronResult<Response> {
@@ -468,7 +468,7 @@ impl HttpHandler {
                     if HttpHandler::should_304_path(req, &req_p, &etag) {
                         log!(self.log, "{} Not Modified", Spaces(self.remote_addresses(req).width()));
                         return Ok(Response::with((status::NotModified,
-                                                  (Header(headers::Server(USER_AGENT.to_string())),
+                                                  (Header(headers::Server(USER_AGENT.into())),
                                                    Header(headers::LastModified(headers::HttpDate(file_time_modified_p(&req_p)))),
                                                    Header(headers::AcceptRanges(vec![headers::RangeUnit::Bytes]))),
                                                   Header(headers::ETag(headers::EntityTag::strong(etag))))));
@@ -516,7 +516,7 @@ impl HttpHandler {
         f.read_exact(&mut buf).expect("Failed to read requested file");
 
         Ok(Response::with((status::PartialContent,
-                           (Header(headers::Server(USER_AGENT.to_string())),
+                           (Header(headers::Server(USER_AGENT.into())),
                             Header(headers::LastModified(headers::HttpDate(file_time_modified_p(&req_p)))),
                             Header(headers::ContentRange(headers::ContentRangeSpec::Bytes {
                                 range: Some((from, to)),
@@ -562,7 +562,7 @@ impl HttpHandler {
 
         Ok(Response::with((status::PartialContent,
                            f,
-                           (Header(headers::Server(USER_AGENT.to_string())),
+                           (Header(headers::Server(USER_AGENT.into())),
                             Header(headers::LastModified(headers::HttpDate(file_time_modified(&fmeta)))),
                             Header(headers::ContentRange(headers::ContentRangeSpec::Bytes {
                                 range: Some((b_from, flen - 1)),
@@ -594,7 +594,7 @@ impl HttpHandler {
              mime_type);
 
         Ok(Response::with((status::NoContent,
-                           (Header(headers::Server(USER_AGENT.to_string())),
+                           (Header(headers::Server(USER_AGENT.into())),
                             Header(headers::LastModified(headers::HttpDate(file_time_modified_p(&req_p)))),
                             Header(headers::ContentRange(headers::ContentRangeSpec::Bytes {
                                 range: Some((from, to)),
@@ -615,7 +615,7 @@ impl HttpHandler {
 
         let metadata = req_p.metadata().expect("Failed to get requested file metadata");
         let etag = file_etag(&metadata);
-        let headers = (Header(headers::Server(USER_AGENT.to_string())),
+        let headers = (Header(headers::Server(USER_AGENT.into())),
                        Header(headers::LastModified(headers::HttpDate(file_time_modified(&metadata)))),
                        Header(headers::AcceptRanges(vec![headers::RangeUnit::Bytes])));
         if HttpHandler::should_304_path(req, &req_p, &etag) {
@@ -857,7 +857,7 @@ impl HttpHandler {
         //     https://cloud.githubusercontent.com/assets/6709544/21442017/9eb20d64-c89b-11e6-8c7b-888b5f70a403.png
         //   - With following slash:
         //     https://cloud.githubusercontent.com/assets/6709544/21442028/a50918c4-c89b-11e6-8936-c29896947f6a.png
-        Ok(Response::with((status::SeeOther, Header(headers::Server(USER_AGENT.to_string())), Header(headers::Location(new_url)))))
+        Ok(Response::with((status::SeeOther, Header(headers::Server(USER_AGENT.into())), Header(headers::Location(new_url)))))
     }
 
     fn handle_get_mobile_dir_listing(&self, req: &mut Request, req_p: PathBuf) -> IronResult<Response> {
@@ -1212,7 +1212,7 @@ impl HttpHandler {
                            } else {
                                status::NoContent
                            },
-                           Header(headers::Server(USER_AGENT.to_string())))))
+                           Header(headers::Server(USER_AGENT.into())))))
     }
 
     fn handle_delete(&self, req: &mut Request) -> IronResult<Response> {
@@ -1257,7 +1257,7 @@ impl HttpHandler {
             });
         }
 
-        Ok(Response::with((status::NoContent, Header(headers::Server(USER_AGENT.to_string())))))
+        Ok(Response::with((status::NoContent, Header(headers::Server(USER_AGENT.into())))))
     }
 
     fn handle_trace(&self, req: &mut Request) -> IronResult<Response> {
@@ -1317,7 +1317,7 @@ impl HttpHandler {
                 if HttpHandler::etag_match(inm, &etag) {
                     log!(self.log, "{} Not Modified", Spaces(self.remote_addresses(req).width()));
                     return Ok(Response::with((status::NotModified,
-                                              Header(headers::Server(USER_AGENT.to_string())),
+                                              Header(headers::Server(USER_AGENT.into())),
                                               Header(headers::ETag(headers::EntityTag::strong(etag))),
                                               text_html_charset_utf8())));
                 }
@@ -1337,7 +1337,7 @@ impl HttpHandler {
                          ((resp.len() as f64) / (enc_resp.0.len() as f64)) * 100f64);
 
                     return Ok(Response::with((st,
-                                              Header(headers::Server(USER_AGENT.to_string())),
+                                              Header(headers::Server(USER_AGENT.into())),
                                               Header(headers::ContentEncoding(vec![encoding])),
                                               Header(headers::ETag(headers::EntityTag::strong(etag))),
                                               text_html_charset_utf8(),
@@ -1358,14 +1358,14 @@ impl HttpHandler {
                     cache.insert(cache_key.clone(), (enc_resp, AtomicU64::new(precise_time_ns())));
 
                     return Ok(Response::with((st,
-                                              Header(headers::Server(USER_AGENT.to_string())),
+                                              Header(headers::Server(USER_AGENT.into())),
                                               Header(headers::ContentEncoding(vec![encoding])),
                                               Header(headers::ETag(headers::EntityTag::strong(etag))),
                                               text_html_charset_utf8(),
                                               &cache[&cache_key].0[..])));
                 } else {
                     return Ok(Response::with((st,
-                                              Header(headers::Server(USER_AGENT.to_string())),
+                                              Header(headers::Server(USER_AGENT.into())),
                                               Header(headers::ContentEncoding(vec![encoding])),
                                               Header(headers::ETag(headers::EntityTag::strong(etag))),
                                               text_html_charset_utf8(),
@@ -1380,7 +1380,7 @@ impl HttpHandler {
         }
 
         Ok(Response::with((st,
-                           Header(headers::Server(USER_AGENT.to_string())),
+                           Header(headers::Server(USER_AGENT.into())),
                            Header(headers::ETag(headers::EntityTag::strong(etag))),
                            text_html_charset_utf8(),
                            resp)))
@@ -1400,7 +1400,7 @@ impl HttpHandler {
 
     fn handle_raw_fs_api_response<R: Serialize>(&self, st: status::Status, resp: &R) -> IronResult<Response> {
         Ok(Response::with((st,
-                           Header(headers::Server(USER_AGENT.to_string())),
+                           Header(headers::Server(USER_AGENT.into())),
                            Header(RawFsApiHeader(true)),
                            "application/json;charset=utf-8".parse::<mime::Mime>().unwrap(),
                            serde_json::to_string(&resp).unwrap())))
