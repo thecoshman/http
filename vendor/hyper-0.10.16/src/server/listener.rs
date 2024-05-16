@@ -41,9 +41,9 @@ impl<A: NetworkListener + Send + 'static> ListenerPool<A> {
 
             let free = free_threads.load(Ordering::Acquire);
             let live = live_threads.load(Ordering::SeqCst);
-            eprintln!("free = {}, live = {}", free, live);
+            // eprintln!("free = {}, live = {}", free, live);
             if free == 0 && live != max_threads {
-                spawn_with::<A, _>(recv.clone(), work.clone(), live_threads.clone(), free_threads.clone(),  msg);
+                spawn_with::<A, _>(recv.clone(), work.clone(), live_threads.clone(), free_threads.clone(), msg);
             } else {
                 let _ = send.send(msg);
             }
