@@ -11,6 +11,7 @@ use self::super::super::util::{BorrowXmlName, Destination, DisplayThree, CommaLi
                                html_response, file_length, set_times, copy_dir, WEBDAV_ALLPROP_PROPERTIES_NON_WINDOWS, WEBDAV_ALLPROP_PROPERTIES_WINDOWS,
                                WEBDAV_XML_NAMESPACE_MICROSOFT, WEBDAV_XML_NAMESPACE_APACHE, WEBDAV_PROPNAME_PROPERTIES, WEBDAV_XML_NAMESPACE_DAV,
                                WEBDAV_XML_NAMESPACES, MAX_SYMLINKS, ERROR_HTML};
+use iron::mime::{Mime, Attr as MimeAttr, Value as MimeAttrValue, SubLevel as MimeSubLevel, TopLevel as MimeTopLevel};
 use std::io::{ErrorKind as IoErrorKind, Result as IoResult, Error as IoError, Write, Read};
 use xml::reader::{EventReader as XmlReader, XmlEvent as XmlREvent, Error as XmlRError};
 use xml::writer::{EventWriter as XmlWriter, XmlEvent as XmlWEvent, Error as XmlWError};
@@ -24,7 +25,6 @@ use std::path::{PathBuf, Path};
 use std::fs::{self, Metadata};
 use self::super::HttpHandler;
 use itertools::Itertools;
-use iron::mime::Mime;
 use std::{fmt, mem};
 use time::strptime;
 
@@ -112,7 +112,7 @@ impl HttpHandler {
         };
 
         match resp.expect("Couldn't write PROPFIND XML") {
-            Ok(xml_resp) => Ok(Response::with((status::MultiStatus, xml_resp, "text/xml;charset=utf-8".parse::<Mime>().unwrap()))),
+            Ok(xml_resp) => Ok(Response::with((status::MultiStatus, xml_resp, text_xml_charset_utf8()))),
             Err(resp) => resp,
         }
     }
@@ -233,7 +233,7 @@ impl HttpHandler {
         }
 
         match write_proppatch_output(&props, req.url.as_ref()).expect("Couldn't write PROPPATCH XML") {
-            Ok(xml_resp) => Ok(Response::with((status::MultiStatus, xml_resp, "text/xml;charset=utf-8".parse::<Mime>().unwrap()))),
+            Ok(xml_resp) => Ok(Response::with((status::MultiStatus, xml_resp, text_xml_charset_utf8()))),
             Err(resp) => resp,
         }
     }
@@ -830,4 +830,9 @@ fn namespaces_for_props<'n, N: 'n + BorrowXmlName<'n>, Ni: Iterator<Item = &'n N
     }
 
     bldr
+}
+
+/// text/xml; charset=utf-8
+fn text_xml_charset_utf8() -> Mime {
+    Mime(MimeTopLevel::Text, MimeSubLevel::Xml, vec![(MimeAttr::Charset, MimeAttrValue::Utf8)])
 }
