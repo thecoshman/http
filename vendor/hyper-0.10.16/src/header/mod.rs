@@ -83,7 +83,6 @@ use std::borrow::{Cow, ToOwned};
 //use std::collections::HashMap;
 //use std::collections::hash_map::{Iter, Entry};
 use std::iter::{FromIterator, IntoIterator};
-use std::ops::{Deref, DerefMut};
 use std::{mem, fmt};
 
 use {httparse, traitobject};
@@ -101,7 +100,7 @@ mod internals;
 mod shared;
 pub mod parsing;
 
-type HeaderName = UniCase<CowStr>;
+type HeaderName = UniCase<Cow<'static, str>>;
 
 /// A trait for any object that will represent a header field and value.
 ///
@@ -287,7 +286,7 @@ impl Headers {
         let mut headers = Headers::new();
         for header in raw {
             trace!("raw header: {:?}={:?}", header.name, &header.value[..]);
-            let name = UniCase(CowStr(Cow::Owned(header.name.to_owned())));
+            let name = UniCase(Cow::Owned(header.name.to_owned()));
             let item = match headers.data.entry(name) {
                 Entry::Vacant(entry) => entry.insert(Item::new_raw(vec![])),
                 Entry::Occupied(entry) => entry.into_mut()
@@ -304,7 +303,7 @@ impl Headers {
     /// The field is determined by the type of the value being set.
     pub fn set<H: Header + HeaderFormat>(&mut self, value: H) {
         trace!("Headers.set( {:?}, {:?} )", header_name::<H>(), value);
-        self.data.insert(UniCase(CowStr(Cow::Borrowed(header_name::<H>()))),
+        self.data.insert(UniCase(Cow::Borrowed(header_name::<H>())),
                          Item::new_typed(Box::new(value)));
     }
 
@@ -321,7 +320,7 @@ impl Headers {
     /// ```
     pub fn get_raw(&self, name: &str) -> Option<&[Vec<u8>]> {
         self.data
-            .get(&UniCase(CowStr(Cow::Borrowed(unsafe { mem::transmute::<&str, &str>(name) }))))
+            .get(&UniCase(Cow::Borrowed(unsafe { mem::transmute::<&str, &str>(name) })))
             .map(Item::raw)
     }
 
@@ -341,7 +340,7 @@ impl Headers {
             value: Vec<Vec<u8>>) {
         let name = name.into();
         trace!("Headers.set_raw( {:?}, {:?} )", name, value);
-        self.data.insert(UniCase(CowStr(name)), Item::new_raw(value));
+        self.data.insert(UniCase(name), Item::new_raw(value));
     }
 
     /// Append a value to raw value of this header.
@@ -362,7 +361,7 @@ impl Headers {
     pub fn append_raw<K: Into<Cow<'static, str>>>(&mut self, name: K, value: Vec<u8>) {
         let name = name.into();
         trace!("Headers.append_raw( {:?}, {:?} )", name, value);
-        match self.data.entry(UniCase(CowStr(name))) {
+        match self.data.entry(UniCase(name)) {
             Entry::Vacant(ve) => { ve.insert(Item::new_raw(vec![value])); },
             Entry::Occupied(oe) => oe.into_mut().raw_mut().push(value),
         }
@@ -372,19 +371,19 @@ impl Headers {
     pub fn remove_raw(&mut self, name: &str) {
         trace!("Headers.remove_raw( {:?} )", name);
         self.data.remove(
-            &UniCase(CowStr(Cow::Borrowed(unsafe { mem::transmute::<&str, &str>(name) })))
+            &UniCase(Cow::Borrowed(unsafe { mem::transmute::<&str, &str>(name) }))
         );
     }
 
     /// Get a reference to the header field's value, if it exists.
     pub fn get<H: Header + HeaderFormat>(&self) -> Option<&H> {
-        self.data.get(&UniCase(CowStr(Cow::Borrowed(header_name::<H>()))))
+        self.data.get(&UniCase(Cow::Borrowed(header_name::<H>())))
         .and_then(Item::typed::<H>)
     }
 
     /// Get a mutable reference to the header field's value, if it exists.
     pub fn get_mut<H: Header + HeaderFormat>(&mut self) -> Option<&mut H> {
-        self.data.get_mut(&UniCase(CowStr(Cow::Borrowed(header_name::<H>()))))
+        self.data.get_mut(&UniCase(Cow::Borrowed(header_name::<H>())))
         .and_then(Item::typed_mut::<H>)
     }
 
@@ -399,14 +398,14 @@ impl Headers {
     /// let has_type = headers.has::<ContentType>();
     /// ```
     pub fn has<H: Header + HeaderFormat>(&self) -> bool {
-        self.data.contains_key(&UniCase(CowStr(Cow::Borrowed(header_name::<H>()))))
+        self.data.contains_key(&UniCase(Cow::Borrowed(header_name::<H>())))
     }
 
     /// Removes a header from the map, if one existed.
     /// Returns true if a header has been removed.
     pub fn remove<H: Header + HeaderFormat>(&mut self) -> bool {
         trace!("Headers.remove( {:?} )", header_name::<H>());
-        self.data.remove(&UniCase(CowStr(Cow::Borrowed(header_name::<H>())))).is_some()
+        self.data.remove(&UniCase(Cow::Borrowed(header_name::<H>()))).is_some()
     }
 
     /// Returns an iterator over the header fields.
@@ -483,7 +482,7 @@ impl<'a> HeaderView<'a> {
     /// Check if a HeaderView is a certain Header.
     #[inline]
     pub fn is<H: Header>(&self) -> bool {
-        UniCase(CowStr(Cow::Borrowed(header_name::<H>()))) == *self.0
+        UniCase(Cow::Borrowed(header_name::<H>())) == *self.0
     }
 
     /// Get the Header name as a slice.
@@ -571,41 +570,6 @@ impl<'a, H: HeaderFormat> fmt::Debug for HeaderFormatter<'a, H> {
     #[inline]
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         fmt::Display::fmt(self, f)
-    }
-}
-
-#[derive(Clone, Hash, Eq, PartialEq, PartialOrd, Ord)]
-struct CowStr(Cow<'static, str>);
-
-impl Deref for CowStr {
-    type Target = Cow<'static, str>;
-
-    fn deref(&self) -> &Cow<'static, str> {
-        &self.0
-    }
-}
-
-impl fmt::Debug for CowStr {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        fmt::Debug::fmt(&self.0, f)
-    }
-}
-
-impl fmt::Display for CowStr {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        fmt::Display::fmt(&self.0, f)
-    }
-}
-
-impl DerefMut for CowStr {
-    fn deref_mut(&mut self) -> &mut Cow<'static, str> {
-        &mut self.0
-    }
-}
-
-impl AsRef<str> for CowStr {
-    fn as_ref(&self) -> &str {
-        self
     }
 }
 
