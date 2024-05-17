@@ -5,7 +5,7 @@ use std::convert::AsRef;
 
 use error::Error;
 use self::Method::{Options, Get, Post, Put, Delete, Head, Trace, Connect, Patch,
-                   Extension};
+                   Extension, DavCopy, DavMkcol, DavMove, DavPropfind, DavProppatch, DavLock};
 
 
 /// The Request Method (VERB)
@@ -36,6 +36,18 @@ pub enum Method {
     Connect,
     /// PATCH
     Patch,
+    // WebDAV COPY
+    DavCopy,
+    // WebDAV MKCOL
+    DavMkcol,
+    // WebDAV MOVE
+    DavMove,
+    // WebDAV PROPFIND
+    DavPropfind,
+    // WebDAV PROPPATCH
+    DavProppatch,
+    // WebDAV LOCK
+    DavLock,
     /// Method extensions. An example would be `let m = Extension("FOO".to_string())`.
     Extension(String)
 }
@@ -52,6 +64,12 @@ impl AsRef<str> for Method {
             Trace => "TRACE",
             Connect => "CONNECT",
             Patch => "PATCH",
+            DavCopy => "COPY",
+            DavMkcol => "MKCOL",
+            DavMove => "MOVE",
+            DavPropfind => "PROPFIND",
+            DavProppatch => "PROPPATCH",
+            DavLock => "LOCK",
             Extension(ref s) => s.as_ref()
         }
     }
@@ -103,6 +121,12 @@ impl FromStr for Method {
                 "TRACE" => Trace,
                 "CONNECT" => Connect,
                 "PATCH" => Patch,
+                "COPY" => DavCopy,
+                "MKCOL" => DavMkcol,
+                "MOVE" => DavMove,
+                "PROPFIND" => DavPropfind,
+                "PROPPATCH" => DavProppatch,
+                "LOCK" => DavLock,
                 _ => Extension(s.to_owned())
             })
         }
@@ -111,18 +135,7 @@ impl FromStr for Method {
 
 impl fmt::Display for Method {
     fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
-        fmt.write_str(match *self {
-            Options => "OPTIONS",
-            Get => "GET",
-            Post => "POST",
-            Put => "PUT",
-            Delete => "DELETE",
-            Head => "HEAD",
-            Trace => "TRACE",
-            Connect => "CONNECT",
-            Patch => "PATCH",
-            Extension(ref s) => s.as_ref()
-        })
+        fmt.write_str(self.as_ref())
     }
 }
 

@@ -163,15 +163,13 @@ impl HttpHandler {
             }
         }
 
-        let mut allowed_methods = if opts.webdav {
-            dav_level_1_methods(opts.allow_writes)
-        } else {
-            vec![]
-        };
-        allowed_methods.extend_from_slice(&[method::Options, method::Get, method::Head, method::Trace]);
-        if opts.allow_writes {
-            allowed_methods.extend_from_slice(&[method::Put, method::Delete]);
-        }
+        let allowed_methods = Some(&[method::Options, method::Get, method::Head, method::Trace][..])
+            .into_iter()
+            .chain(Some(dav_level_1_methods(opts.allow_writes)).filter(|_| opts.webdav))
+            .chain(Some(&[method::Put, method::Delete][..]).filter(|_| opts.allow_writes))
+            .flatten()
+            .cloned()
+            .collect();
 
         HttpHandler {
             hosted_directory: opts.hosted_directory.clone(),
@@ -250,21 +248,13 @@ impl Handler for HttpHandler {
                 })
             }
             method::Trace => self.handle_trace(req),
-            method::Extension(ref ext) => {
-                if self.webdav {
-                    match &ext[..] {
-                        "COPY" => self.handle_webdav_copy(req),
-                        "MKCOL" => self.handle_webdav_mkcol(req),
-                        "MOVE" => self.handle_webdav_move(req),
-                        "PROPFIND" => self.handle_webdav_propfind(req),
-                        "PROPPATCH" => self.handle_webdav_proppatch(req),
 
-                        _ => self.handle_bad_method(req),
-                    }
-                } else {
-                    self.handle_bad_method(req)
-                }
-            }
+            method::DavCopy if self.webdav => self.handle_webdav_copy(req),
+            method::DavMkcol if self.webdav => self.handle_webdav_mkcol(req),
+            method::DavMove if self.webdav => self.handle_webdav_move(req),
+            method::DavPropfind if self.webdav => self.handle_webdav_propfind(req),
+            method::DavProppatch if self.webdav => self.handle_webdav_proppatch(req),
+
             _ => self.handle_bad_method(req),
         }?;
         if self.webdav {
@@ -990,23 +980,22 @@ impl HttpHandler {
              self.remote_addresses(&req),
              req_p.display());
 
-        let parent_s =
-            if is_root {
-                String::new()
-            } else {
-                let mut parentpath = &relpath_escaped[..];
-                while parentpath.as_bytes().last() == Some(&b'/') {
-                    parentpath = &parentpath[0..parentpath.len() - 1];
-                }
-                while parentpath.as_bytes().last() != Some(&b'/') {
-                    parentpath = &parentpath[0..parentpath.len() - 1];
-                }
-                format!("<tr><td><a href=\"{up_path}\" id=\"parent_dir\" class=\"back_arrow_icon\"></a></td> <td><a href=\"{up_path}\">Parent \
-                         directory</a></td> <td><a href=\"{up_path}\" class=\"datetime\">{}</a></td> <td><a href=\"{up_path}\">&nbsp;</a></td> <td><a \
-                         href=\"{up_path}\">&nbsp;</a></td></tr>",
-                        file_time_modified_p(req_p.parent().unwrap_or(&req_p)).strftime("%F %T").unwrap(),
-                        up_path = parentpath)
-            };
+        let parent_s = if is_root {
+            String::new()
+        } else {
+            let mut parentpath = &relpath_escaped[..];
+            while parentpath.as_bytes().last() == Some(&b'/') {
+                parentpath = &parentpath[0..parentpath.len() - 1];
+            }
+            while parentpath.as_bytes().last() != Some(&b'/') {
+                parentpath = &parentpath[0..parentpath.len() - 1];
+            }
+            format!("<tr><td><a href=\"{up_path}\" id=\"parent_dir\" class=\"back_arrow_icon\"></a></td> <td><a href=\"{up_path}\">Parent directory</a></td> \
+                     <td><a href=\"{up_path}\" class=\"datetime\">{}</a></td> <td><a href=\"{up_path}\">&nbsp;</a></td> <td><a \
+                     href=\"{up_path}\">&nbsp;</a></td></tr>",
+                    file_time_modified_p(req_p.parent().unwrap_or(&req_p)).strftime("%F %T").unwrap(),
+                    up_path = parentpath)
+        };
 
 
         let rd = match req_p.read_dir() {
