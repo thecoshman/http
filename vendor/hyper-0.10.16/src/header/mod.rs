@@ -362,12 +362,10 @@ impl Headers {
     pub fn append_raw<K: Into<Cow<'static, str>>>(&mut self, name: K, value: Vec<u8>) {
         let name = name.into();
         trace!("Headers.append_raw( {:?}, {:?} )", name, value);
-        let name = UniCase(CowStr(name));
-        if let Some(item) = self.data.get_mut(&name) {
-            item.raw_mut().push(value);
-            return;
+        match self.data.entry(UniCase(CowStr(name))) {
+            Entry::Vacant(ve) => { ve.insert(Item::new_raw(vec![value])); },
+            Entry::Occupied(oe) => oe.into_mut().raw_mut().push(value),
         }
-        self.data.insert(name, Item::new_raw(vec![value]));
     }
 
     /// Remove a header set by set_raw

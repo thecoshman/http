@@ -1,11 +1,11 @@
 use blake3;
 use serde_json;
-use std::{fmt, str};
 use std::ffi::OsStr;
 use std::borrow::Cow;
 use std::net::IpAddr;
 use serde::Serialize;
 use std::sync::RwLock;
+use std::{fmt, str, mem};
 use cidr::{Cidr, IpCidr};
 use time::precise_time_ns;
 use std::fs::{self, File};
@@ -270,8 +270,10 @@ impl Handler for HttpHandler {
         if self.webdav {
             resp.headers.set(Dav::LEVEL_1);
         }
-        for (h, v) in &self.additional_headers {
-            resp.headers.append_raw(h.clone(), v.clone());
+        // We really are 'static, but this is still valid if we outlive the request (we must do ex def)
+        let static_self = unsafe { mem::transmute::<_, &'static HttpHandler>(self) };
+        for (h, v) in &static_self.additional_headers {
+            resp.headers.append_raw(&h[..], v.clone());
         }
         Ok(resp)
     }
