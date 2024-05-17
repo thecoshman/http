@@ -2,17 +2,13 @@
 use std::borrow::Cow;
 use std::cmp::min;
 use std::fmt;
-use std::io::{self, Write, BufWriter, BufRead, Read};
-use std::net::Shutdown;
-use std::time::Duration;
+use std::io::{self, Write, BufRead, Read};
 
 use httparse;
-use url::Position as UrlPosition;
 
 use buffer::BufReader;
 use Error;
-use header::{Headers, ContentLength, TransferEncoding};
-use header::{EncodingType, Encoding};
+use header::{Headers};
 use method::{Method};
 use net::{NetworkConnector, NetworkStream};
 use status::StatusCode;
@@ -21,443 +17,11 @@ use version::HttpVersion::{Http10, Http11};
 use uri::RequestUri;
 
 use self::HttpReader::{SizedReader, ChunkedReader, EofReader, EmptyReader};
-use self::HttpWriter::{ChunkedWriter, SizedWriter, EmptyWriter, ThroughWriter};
+use self::HttpWriter::{SizedWriter, ThroughWriter};
 
 use http::{
     RawStatus,
-    Protocol,
-    HttpMessage,
-    RequestHead,
-    ResponseHead,
 };
-use header;
-use version;
-
-const MAX_INVALID_RESPONSE_BYTES: usize = 1024 * 128;
-
-#[derive(Debug)]
-struct Wrapper<T> {
-    obj: Option<T>,
-}
-
-impl<T> Wrapper<T> {
-    pub fn new(obj: T) -> Wrapper<T> {
-        Wrapper { obj: Some(obj) }
-    }
-
-    pub fn map_in_place<F>(&mut self, f: F) where F: FnOnce(T) -> T {
-        let obj = self.obj.take().unwrap();
-        let res = f(obj);
-        self.obj = Some(res);
-    }
-
-    pub fn into_inner(self) -> T { self.obj.unwrap() }
-    pub fn as_mut(&mut self) -> &mut T { self.obj.as_mut().unwrap() }
-    pub fn as_ref(&self) -> &T { self.obj.as_ref().unwrap() }
-}
-
-#[derive(Debug)]
-enum Stream {
-    Idle(Box<NetworkStream + Send>),
-    Writing(HttpWriter<BufWriter<Box<NetworkStream + Send>>>),
-    Reading(HttpReader<BufReader<Box<NetworkStream + Send>>>),
-}
-
-impl Stream {
-    fn writer_mut(&mut self) -> Option<&mut HttpWriter<BufWriter<Box<NetworkStream + Send>>>> {
-        match *self {
-            Stream::Writing(ref mut writer) => Some(writer),
-            _ => None,
-        }
-    }
-    fn reader_mut(&mut self) -> Option<&mut HttpReader<BufReader<Box<NetworkStream + Send>>>> {
-        match *self {
-            Stream::Reading(ref mut reader) => Some(reader),
-            _ => None,
-        }
-    }
-    fn reader_ref(&self) -> Option<&HttpReader<BufReader<Box<NetworkStream + Send>>>> {
-        match *self {
-            Stream::Reading(ref reader) => Some(reader),
-            _ => None,
-        }
-    }
-
-    fn new(stream: Box<NetworkStream + Send>) -> Stream {
-        Stream::Idle(stream)
-    }
-}
-
-/// An implementation of the `HttpMessage` trait for HTTP/1.1.
-#[derive(Debug)]
-pub struct Http11Message {
-    is_proxied: bool,
-    method: Option<Method>,
-    stream: Wrapper<Stream>,
-}
-
-impl Write for Http11Message {
-    #[inline]
-    fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
-        match self.stream.as_mut().writer_mut() {
-            None => Err(io::Error::new(io::ErrorKind::Other,
-                                          "Not in a writable state")),
-            Some(ref mut writer) => writer.write(buf),
-        }
-    }
-    #[inline]
-    fn flush(&mut self) -> io::Result<()> {
-        match self.stream.as_mut().writer_mut() {
-            None => Err(io::Error::new(io::ErrorKind::Other,
-                                          "Not in a writable state")),
-            Some(ref mut writer) => writer.flush(),
-        }
-    }
-}
-
-impl Read for Http11Message {
-    #[inline]
-    fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
-        match self.stream.as_mut().reader_mut() {
-            None => Err(io::Error::new(io::ErrorKind::Other,
-                                          "Not in a readable state")),
-            Some(ref mut reader) => reader.read(buf),
-        }
-    }
-}
-
-impl HttpMessage for Http11Message {
-    fn set_outgoing(&mut self, mut head: RequestHead) -> ::Result<RequestHead> {
-        let mut res = Err(Error::from(io::Error::new(
-                            io::ErrorKind::Other,
-                            "")));
-        let mut method = None;
-        let is_proxied = self.is_proxied;
-        self.stream.map_in_place(|stream: Stream| -> Stream {
-            let stream = match stream {
-                Stream::Idle(stream) => stream,
-                _ => {
-                    res = Err(Error::from(io::Error::new(
-                                io::ErrorKind::Other,
-                                "Message not idle, cannot start new outgoing")));
-                    return stream;
-                },
-            };
-            let mut stream = BufWriter::new(stream);
-
-            {
-                let uri = if is_proxied {
-                    head.url.as_ref()
-                } else {
-                    &head.url[UrlPosition::BeforePath..UrlPosition::AfterQuery]
-                };
-
-                let version = version::HttpVersion::Http11;
-                debug!("request line: {:?} {:?} {:?}", head.method, uri, version);
-                match write!(&mut stream, "{} {} {}{}",
-                             head.method, uri, version, LINE_ENDING) {
-                                 Err(e) => {
-                                     res = Err(From::from(e));
-                                     // TODO What should we do if the BufWriter doesn't wanna
-                                     // relinquish the stream?
-                                     return Stream::Idle(stream.into_inner().ok().unwrap());
-                                 },
-                                 Ok(_) => {},
-                             };
-            }
-
-            let stream = {
-                let write_headers = |mut stream: BufWriter<Box<NetworkStream + Send>>, head: &RequestHead| {
-                    debug!("headers={:?}", head.headers);
-                    match write!(&mut stream, "{}{}", head.headers, LINE_ENDING) {
-                        Ok(_) => Ok(stream),
-                        Err(e) => {
-                            Err((e, stream.into_inner().unwrap()))
-                        }
-                    }
-                };
-                match head.method {
-                    Method::Get | Method::Head => {
-                        let writer = match write_headers(stream, &head) {
-                            Ok(w) => w,
-                            Err(e) => {
-                                res = Err(From::from(e.0));
-                                return Stream::Idle(e.1);
-                            }
-                        };
-                        EmptyWriter(writer)
-                    },
-                    _ => {
-                        let mut chunked = true;
-                        let mut len = 0;
-
-                        match head.headers.get::<header::ContentLength>() {
-                            Some(cl) => {
-                                chunked = false;
-                                len = **cl;
-                            },
-                            None => ()
-                        };
-
-                        // can't do in match above, thanks borrowck
-                        if chunked {
-                            let encodings = match head.headers.get_mut::<header::TransferEncoding>() {
-                                Some(encodings) => {
-                                    //TODO: check if chunked is already in encodings. use HashSet?
-                                    encodings.push(Encoding::Chunked);
-                                    false
-                                },
-                                None => true
-                            };
-
-                            if encodings {
-                                head.headers.set(
-                                    header::TransferEncoding(vec![Encoding::Chunked]))
-                            }
-                        }
-
-                        let stream = match write_headers(stream, &head) {
-                            Ok(s) => s,
-                            Err(e) => {
-                                res = Err(From::from(e.0));
-                                return Stream::Idle(e.1);
-                            },
-                        };
-
-                        if chunked {
-                            ChunkedWriter(stream)
-                        } else {
-                            SizedWriter(stream, len)
-                        }
-                    }
-                }
-            };
-
-            method = Some(head.method.clone());
-            res = Ok(head);
-            Stream::Writing(stream)
-        });
-
-        self.method = method;
-        res
-    }
-
-    fn get_incoming(&mut self) -> ::Result<ResponseHead> {
-        try!(self.flush_outgoing());
-        let method = self.method.take().unwrap_or(Method::Get);
-        let mut res = Err(From::from(
-                        io::Error::new(io::ErrorKind::Other,
-                        "Read already in progress")));
-        self.stream.map_in_place(|stream| {
-            let stream = match stream {
-                Stream::Idle(stream) => stream,
-                _ => {
-                    // The message was already in the reading state...
-                    // TODO Decide what happens in case we try to get a new incoming at that point
-                    res = Err(From::from(
-                            io::Error::new(io::ErrorKind::Other,
-                                           "Read already in progress")));
-                    return stream;
-                }
-            };
-
-            let expected_no_content = stream.previous_response_expected_no_content();
-            trace!("previous_response_expected_no_content = {}", expected_no_content);
-
-            let mut stream = BufReader::new(stream);
-
-            let mut invalid_bytes_read = 0;
-            let head;
-            loop {
-                head = match parse_response(&mut stream) {
-                    Ok(head) => head,
-                    Err(::Error::Version)
-                        if expected_no_content && invalid_bytes_read < MAX_INVALID_RESPONSE_BYTES => {
-                            trace!("expected_no_content, found content");
-                            invalid_bytes_read += 1;
-                            stream.consume(1);
-                            continue;
-                        }
-                    Err(e) => {
-                        res = Err(e);
-                        return Stream::Idle(stream.into_inner());
-                    }
-                };
-                break;
-            }
-
-            let raw_status = head.subject;
-            let headers = head.headers;
-
-            let is_empty = !should_have_response_body(&method, raw_status.0);
-            stream.get_mut().set_previous_response_expected_no_content(is_empty);
-            // According to https://tools.ietf.org/html/rfc7230#section-3.3.3
-            // 1. HEAD reponses, and Status 1xx, 204, and 304 cannot have a body.
-            // 2. Status 2xx to a CONNECT cannot have a body.
-            // 3. Transfer-Encoding: chunked has a chunked body.
-            // 4. If multiple differing Content-Length headers or invalid, close connection.
-            // 5. Content-Length header has a sized body.
-            // 6. Not Client.
-            // 7. Read till EOF.
-            let reader = if is_empty {
-                EmptyReader(stream)
-            } else {
-                if let Some(&TransferEncoding(ref codings)) = headers.get() {
-                    if matches!(codings.last(), Some(Encoding(EncodingType::Chunked, ..))) {
-                        ChunkedReader(stream, None)
-                    } else {
-                        trace!("not chuncked. read till eof");
-                        EofReader(stream)
-                    }
-                } else if let Some(&ContentLength(len)) =  headers.get() {
-                    SizedReader(stream, len)
-                } else if headers.has::<ContentLength>() {
-                    trace!("illegal Content-Length: {:?}", headers.get_raw("Content-Length"));
-                    res = Err(Error::Header);
-                    return Stream::Idle(stream.into_inner());
-                } else {
-                    trace!("neither Transfer-Encoding nor Content-Length");
-                    EofReader(stream)
-                }
-            };
-
-            trace!("Http11Message.reader = {:?}", reader);
-
-
-            res = Ok(ResponseHead {
-                headers: headers,
-                raw_status: raw_status,
-                version: head.version,
-            });
-
-            Stream::Reading(reader)
-        });
-        res
-    }
-
-    fn has_body(&self) -> bool {
-        match self.stream.as_ref().reader_ref() {
-            Some(&EmptyReader(..)) |
-            Some(&SizedReader(_, 0)) |
-            Some(&ChunkedReader(_, Some(0))) => false,
-            // specifically EofReader is always true
-            _ => true
-        }
-    }
-
-    #[inline]
-    fn set_read_timeout(&self, dur: Option<Duration>) -> io::Result<()> {
-        self.get_ref().set_read_timeout(dur)
-    }
-
-    #[inline]
-    fn set_write_timeout(&self, dur: Option<Duration>) -> io::Result<()> {
-        self.get_ref().set_write_timeout(dur)
-    }
-
-    #[inline]
-    fn close_connection(&mut self) -> ::Result<()> {
-        try!(self.get_mut().close(Shutdown::Both));
-        Ok(())
-    }
-
-    #[inline]
-    fn set_proxied(&mut self, val: bool) {
-        self.is_proxied = val;
-    }
-}
-
-impl Http11Message {
-    /// Consumes the `Http11Message` and returns the underlying `NetworkStream`.
-    pub fn into_inner(self) -> Box<NetworkStream + Send> {
-        match self.stream.into_inner() {
-            Stream::Idle(stream) => stream,
-            Stream::Writing(stream) => stream.into_inner().into_inner().unwrap(),
-            Stream::Reading(stream) => stream.into_inner().into_inner(),
-        }
-    }
-
-    /// Gets a borrowed reference to the underlying `NetworkStream`, regardless of the state of the
-    /// `Http11Message`.
-    pub fn get_ref(&self) -> &(NetworkStream + Send) {
-        match *self.stream.as_ref() {
-            Stream::Idle(ref stream) => &**stream,
-            Stream::Writing(ref stream) => &**stream.get_ref().get_ref(),
-            Stream::Reading(ref stream) => &**stream.get_ref().get_ref()
-        }
-    }
-
-    /// Gets a mutable reference to the underlying `NetworkStream`, regardless of the state of the
-    /// `Http11Message`.
-    pub fn get_mut(&mut self) -> &mut (NetworkStream + Send) {
-        match *self.stream.as_mut() {
-            Stream::Idle(ref mut stream) => &mut **stream,
-            Stream::Writing(ref mut stream) => &mut **stream.get_mut().get_mut(),
-            Stream::Reading(ref mut stream) => &mut **stream.get_mut().get_mut()
-        }
-    }
-
-    /// Creates a new `Http11Message` that will use the given `NetworkStream` for communicating to
-    /// the peer.
-    pub fn with_stream(stream: Box<NetworkStream + Send>) -> Http11Message {
-        Http11Message {
-            is_proxied: false,
-            method: None,
-            stream: Wrapper::new(Stream::new(stream)),
-        }
-    }
-
-    /// Flushes the current outgoing content and moves the stream into the `stream` property.
-    ///
-    /// TODO It might be sensible to lift this up to the `HttpMessage` trait itself...
-    pub fn flush_outgoing(&mut self) -> ::Result<()> {
-        let mut res = Ok(());
-        self.stream.map_in_place(|stream| {
-            let writer = match stream {
-                Stream::Writing(writer) => writer,
-                _ => {
-                    res = Ok(());
-                    return stream;
-                },
-            };
-            // end() already flushes
-            let raw = match writer.end() {
-                Ok(buf) => buf.into_inner().unwrap(),
-                Err(e) => {
-                    res = Err(From::from(e.0));
-                    return Stream::Writing(e.1);
-                }
-            };
-            Stream::Idle(raw)
-        });
-        res
-    }
-}
-
-/// The `Protocol` implementation provides HTTP/1.1 messages.
-pub struct Http11Protocol {
-    connector: Connector,
-}
-
-impl Protocol for Http11Protocol {
-    fn new_message(&self, host: &str, port: u16, scheme: &str) -> ::Result<Box<HttpMessage>> {
-        let stream = try!(self.connector.connect(host, port, scheme)).into();
-
-        Ok(Box::new(Http11Message::with_stream(stream)))
-    }
-}
-
-impl Http11Protocol {
-    /// Creates a new `Http11Protocol` instance that will use the given `NetworkConnector` for
-    /// establishing HTTP connections.
-    pub fn with_connector<C, S>(c: C) -> Http11Protocol
-            where C: NetworkConnector<Stream=S> + Send + Sync + 'static,
-                  S: NetworkStream + Send {
-        Http11Protocol {
-            connector: Connector(Box::new(ConnAdapter(c))),
-        }
-    }
-}
 
 struct ConnAdapter<C: NetworkConnector + Send + Sync>(C);
 
@@ -713,30 +277,14 @@ fn read_chunk_size<R: Read>(rdr: &mut R) -> io::Result<u64> {
     Ok(size)
 }
 
-fn should_have_response_body(method: &Method, status: u16) -> bool {
-    trace!("should_have_response_body({:?}, {})", method, status);
-    match (method, status) {
-        (&Method::Head, _) |
-        (_, 100...199) |
-        (_, 204) |
-        (_, 304) |
-        (&Method::Connect, 200...299) => false,
-        _ => true
-    }
-}
-
 /// Writers to handle different Transfer-Encodings.
 pub enum HttpWriter<W: Write> {
     /// A no-op Writer, used initially before Transfer-Encoding is determined.
     ThroughWriter(W),
-    /// A Writer for when Transfer-Encoding includes `chunked`.
-    ChunkedWriter(W),
     /// A Writer for when Content-Length is set.
     ///
     /// Enforces that the body is not longer than the Content-Length header.
     SizedWriter(W, u64),
-    /// A writer that should not write any body.
-    EmptyWriter(W),
 }
 
 impl<W: Write> HttpWriter<W> {
@@ -745,9 +293,7 @@ impl<W: Write> HttpWriter<W> {
     pub fn into_inner(self) -> W {
         match self {
             ThroughWriter(w) => w,
-            ChunkedWriter(w) => w,
             SizedWriter(w, _) => w,
-            EmptyWriter(w) => w,
         }
     }
 
@@ -756,9 +302,7 @@ impl<W: Write> HttpWriter<W> {
     pub fn get_ref(&self) -> &W {
         match *self {
             ThroughWriter(ref w) => w,
-            ChunkedWriter(ref w) => w,
             SizedWriter(ref w, _) => w,
-            EmptyWriter(ref w) => w,
         }
     }
 
@@ -770,9 +314,7 @@ impl<W: Write> HttpWriter<W> {
     pub fn get_mut(&mut self) -> &mut W {
         match *self {
             ThroughWriter(ref mut w) => w,
-            ChunkedWriter(ref mut w) => w,
             SizedWriter(ref mut w, _) => w,
-            EmptyWriter(ref mut w) => w,
         }
     }
 
@@ -782,12 +324,7 @@ impl<W: Write> HttpWriter<W> {
     /// The ChunkedWriter variant will use this to write the 0-sized last-chunk.
     #[inline]
     pub fn end(mut self) -> Result<W, EndError<W>> {
-        fn inner<W: Write>(w: &mut W) -> io::Result<()> {
-            try!(w.write(&[]));
-            w.flush()
-        }
-
-        match inner(&mut self) {
+        match self.flush() {
             Ok(..) => Ok(self.into_inner()),
             Err(e) => Err(EndError(e, self))
         }
@@ -808,14 +345,6 @@ impl<W: Write> Write for HttpWriter<W> {
     fn write(&mut self, msg: &[u8]) -> io::Result<usize> {
         match *self {
             ThroughWriter(ref mut w) => w.write(msg),
-            ChunkedWriter(ref mut w) => {
-                let chunk_size = msg.len();
-                trace!("chunked write, size = {:?}", chunk_size);
-                try!(write!(w, "{:X}{}", chunk_size, LINE_ENDING));
-                try!(w.write_all(msg));
-                try!(w.write_all(LINE_ENDING.as_bytes()));
-                Ok(msg.len())
-            },
             SizedWriter(ref mut w, ref mut remaining) => {
                 let len = msg.len() as u64;
                 if len > *remaining {
@@ -829,23 +358,12 @@ impl<W: Write> Write for HttpWriter<W> {
                     Ok(len as usize)
                 }
             },
-            EmptyWriter(..) => {
-                if !msg.is_empty() {
-                    error!("Cannot include a body with this kind of message");
-                }
-                Ok(0)
-            }
         }
     }
 
     #[inline]
     fn flush(&mut self) -> io::Result<()> {
-        match *self {
-            ThroughWriter(ref mut w) => w.flush(),
-            ChunkedWriter(ref mut w) => w.flush(),
-            SizedWriter(ref mut w, _) => w.flush(),
-            EmptyWriter(ref mut w) => w.flush(),
-        }
+        self.get_mut().flush()
     }
 }
 
@@ -853,9 +371,7 @@ impl<W: Write> fmt::Debug for HttpWriter<W> {
     fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
         match *self {
             ThroughWriter(_) => write!(fmt, "ThroughWriter"),
-            ChunkedWriter(_) => write!(fmt, "ChunkedWriter"),
             SizedWriter(_, rem) => write!(fmt, "SizedWriter(remaining={:?})", rem),
-            EmptyWriter(_) => write!(fmt, "EmptyWriter"),
         }
     }
 }
@@ -996,17 +512,6 @@ mod tests {
     use http::HttpMessage;
 
     use super::{read_chunk_size, parse_request, parse_response, Http11Message};
-
-    #[test]
-    fn test_write_chunked() {
-        use std::str::from_utf8;
-        let mut w = super::HttpWriter::ChunkedWriter(Vec::new());
-        w.write_all(b"foo bar").unwrap();
-        w.write_all(b"baz quux herp").unwrap();
-        let buf = w.end().unwrap();
-        let s = from_utf8(buf.as_ref()).unwrap();
-        assert_eq!(s, "7\r\nfoo bar\r\nD\r\nbaz quux herp\r\n0\r\n\r\n");
-    }
 
     #[test]
     fn test_write_sized() {

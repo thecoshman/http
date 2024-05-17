@@ -13,7 +13,7 @@ use time::now_utc;
 
 use header;
 use http::h1::{LINE_ENDING, HttpWriter};
-use http::h1::HttpWriter::{ThroughWriter, ChunkedWriter, SizedWriter, EmptyWriter};
+use http::h1::HttpWriter::{ThroughWriter, SizedWriter};
 use status;
 use net::{Fresh, Streaming};
 use version;
@@ -89,36 +89,17 @@ impl<'a, W: Any> Response<'a, W> {
         }
 
         let body_type = match self.status {
-            status::StatusCode::NoContent | status::StatusCode::NotModified => Body::Empty,
-            c if c.class() == status::StatusClass::Informational => Body::Empty,
+            status::StatusCode::NoContent | status::StatusCode::NotModified => Body(0),
+            c if c.class() == status::StatusClass::Informational => Body(0),
             _ => if let Some(cl) = self.headers.get::<header::ContentLength>() {
-                Body::Sized(**cl)
+                Body(**cl)
             } else {
-                Body::Chunked
+                panic!("Body::Chunked");
             }
         };
 
-        // can't do in match above, thanks borrowck
-        if body_type == Body::Chunked {
-            let encodings = match self.headers.get_mut::<header::TransferEncoding>() {
-                Some(&mut header::TransferEncoding(ref mut encodings)) => {
-                    //TODO: check if chunked is already in encodings. use HashSet?
-                    encodings.push(header::Encoding::Chunked);
-                    false
-                },
-                None => true
-            };
-
-            if encodings {
-                self.headers.set::<header::TransferEncoding>(
-                    header::TransferEncoding(vec![header::Encoding::Chunked]))
-            }
-        }
-
-
         debug!("headers [\n{:?}]", self.headers);
-        try!(write!(&mut self.body, "{}", self.headers));
-        try!(write!(&mut self.body, "{}", LINE_ENDING));
+        try!(write!(&mut self.body, "{}{}", self.headers, LINE_ENDING));
 
         Ok(body_type)
     }
@@ -169,7 +150,7 @@ impl<'a> Response<'a, Fresh> {
     pub fn send(self, body: &[u8]) -> io::Result<()> {
         self.headers.set(header::ContentLength(body.len() as u64));
         let mut stream = try!(self.start());
-        try!(stream.write_all(body));
+        try!(stream.writer().write_all(body));
         stream.end()
     }
 
@@ -178,11 +159,7 @@ impl<'a> Response<'a, Fresh> {
     pub fn start(mut self) -> io::Result<Response<'a, Streaming>> {
         let body_type = try!(self.write_head());
         let (version, body, status, headers) = self.deconstruct();
-        let stream = match body_type {
-            Body::Chunked => ChunkedWriter(body.into_inner()),
-            Body::Sized(len) => SizedWriter(body.into_inner(), len),
-            Body::Empty => EmptyWriter(body.into_inner()),
-        };
+        let stream = SizedWriter(body.into_inner(), body_type.0);
 
         // "copy" to change the phantom type
         Ok(Response {
@@ -214,25 +191,14 @@ impl<'a> Response<'a, Streaming> {
     }
 }
 
-impl<'a> Write for Response<'a, Streaming> {
-    #[inline]
-    fn write(&mut self, msg: &[u8]) -> io::Result<usize> {
-        debug!("write {:?} bytes", msg.len());
-        self.body.write(msg)
-    }
-
-    #[inline]
-    fn flush(&mut self) -> io::Result<()> {
-        self.body.flush()
+impl<'a> Response<'a, Streaming> {
+    pub fn writer(&mut self) -> &mut HttpWriter<&'a mut (Write + 'a)> {
+        &mut self.body
     }
 }
 
-#[derive(PartialEq)]
-enum Body {
-    Chunked,
-    Sized(u64),
-    Empty,
-}
+#[derive(PartialEq, Debug)]
+struct Body(u64);
 
 impl<'a, T: Any> Drop for Response<'a, T> {
     fn drop(&mut self) {
@@ -242,9 +208,7 @@ impl<'a, T: Any> Drop for Response<'a, T> {
             }
 
             let mut body = match self.write_head() {
-                Ok(Body::Chunked) => ChunkedWriter(self.body.get_mut()),
-                Ok(Body::Sized(len)) => SizedWriter(self.body.get_mut(), len),
-                Ok(Body::Empty) => EmptyWriter(self.body.get_mut()),
+                Ok(Body(len)) => SizedWriter(self.body.get_mut(), len),
                 Err(e) => {
                     debug!("error dropping request: {:?}", e);
                     return;
