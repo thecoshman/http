@@ -8,6 +8,7 @@
 #![allow(ellipsis_inclusive_range_patterns)]
 #![allow(bare_trait_objects)]
 #![allow(unused_must_use)]
+#![allow(unused_variables)]
 
 //! # Hyper
 //!
@@ -151,8 +152,11 @@ extern crate language_tags;
 #[macro_use]
 extern crate mime as mime_crate;
 
-#[macro_use]
-extern crate log;
+macro_rules! trace { ($($i:tt)*) => { () } }
+macro_rules! debug { ($($i:tt)*) => { () } }
+macro_rules! info  { ($($i:tt)*) => { () } }
+macro_rules! warn  { ($($i:tt)*) => { () } }
+macro_rules! error { ($($i:tt)*) => { eprint!("[hyper] "); eprintln!($($i)*) } }
 
 #[cfg(all(test, feature = "nightly"))]
 extern crate test;
