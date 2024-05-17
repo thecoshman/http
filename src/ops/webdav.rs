@@ -513,7 +513,7 @@ impl HttpHandler {
                 }
 
                 "Win32LastAccessTime" => {
-                    out.write(XmlWEvent::start_element((WEBDAV_XML_NAMESPACE_MICROSOFT.0, "Win32FileAttributes")))?;
+                    out.write(XmlWEvent::start_element((WEBDAV_XML_NAMESPACE_MICROSOFT.0, "Win32LastAccessTime")))?;
                     out.write(XmlWEvent::characters(&file_time_accessed(meta).rfc3339().to_string()))?;
                 }
 
