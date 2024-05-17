@@ -30,6 +30,7 @@ pub type Result<T> = ::std::result::Result<T, Error>;
 
 /// A set of errors that can occur parsing HTTP streams.
 #[derive(Debug)]
+#[non_exhaustive]
 pub enum Error {
     /// An invalid `Method`, such as `GE,T`.
     Method,
@@ -49,18 +50,6 @@ pub enum Error {
     Ssl(Box<StdError + Send + Sync>),
     /// Parsing a field as string failed
     Utf8(Utf8Error),
-
-    #[doc(hidden)]
-    __Nonexhaustive(Void)
-}
-
-#[doc(hidden)]
-pub struct Void(());
-
-impl fmt::Debug for Void {
-    fn fmt(&self, _: &mut fmt::Formatter) -> fmt::Result {
-        unreachable!()
-    }
 }
 
 impl fmt::Display for Error {
@@ -87,7 +76,6 @@ impl StdError for Error {
             Io(ref e) => e.description(),
             Ssl(ref e) => e.description(),
             Utf8(ref e) => e.description(),
-            Error::__Nonexhaustive(..) =>  unreachable!(),
         }
     }
 

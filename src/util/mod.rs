@@ -75,9 +75,9 @@ impl Header for WwwAuthenticate {
         "WWW-Authenticate"
     }
 
-    /// Dummy impl returning an empty value, since we're only ever sending these
+    /// We only ever send these
     fn parse_header(_: &[Vec<u8>]) -> HyperResult<WwwAuthenticate> {
-        Ok(WwwAuthenticate("".into()))
+        unreachable!()
     }
 }
 
@@ -108,10 +108,10 @@ impl Header for XLastModified {
     }
 }
 
-/// Dummy impl returning an empty value, since we're only ever sending these
+/// We only ever receive these
 impl HeaderFormat for XLastModified {
     fn fmt_header(&self, _: &mut fmt::Formatter) -> fmt::Result {
-        Ok(())
+        unreachable!()
     }
 }
 

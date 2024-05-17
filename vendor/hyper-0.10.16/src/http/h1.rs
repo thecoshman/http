@@ -1,5 +1,4 @@
 //! Adapts the HTTP/1.1 implementation into the `HttpMessage` API.
-use std::borrow::Cow;
 use std::cmp::min;
 use std::fmt;
 use std::io::{self, Write, BufRead, Read};
@@ -11,17 +10,12 @@ use Error;
 use header::{Headers};
 use method::{Method};
 use net::{NetworkConnector, NetworkStream};
-use status::StatusCode;
 use version::HttpVersion;
 use version::HttpVersion::{Http10, Http11};
 use uri::RequestUri;
 
 use self::HttpReader::{SizedReader, ChunkedReader, EofReader, EmptyReader};
 use self::HttpWriter::{SizedWriter, ThroughWriter};
-
-use http::{
-    RawStatus,
-};
 
 struct ConnAdapter<C: NetworkConnector + Send + Sync>(C);
 
@@ -384,12 +378,6 @@ pub fn parse_request<R: Read>(buf: &mut BufReader<R>) -> ::Result<Incoming<(Meth
     parse::<R, httparse::Request, (Method, RequestUri)>(buf)
 }
 
-/// Parses a response into an Incoming message head.
-#[inline]
-pub fn parse_response<R: Read>(buf: &mut BufReader<R>) -> ::Result<Incoming<RawStatus>> {
-    parse::<R, httparse::Response, RawStatus>(buf)
-}
-
 fn parse<R: Read, T: TryParse<Subject=I>, I>(rdr: &mut BufReader<R>) -> ::Result<Incoming<I>> {
     loop {
         match try!(try_parse::<R, T, I>(rdr)) {
@@ -450,32 +438,6 @@ impl<'a> TryParse for httparse::Request<'a, 'a> {
                         try!(req.path.unwrap().parse())
                     ),
                     headers: try!(Headers::from_raw(req.headers))
-                }, len))
-            },
-            httparse::Status::Partial => httparse::Status::Partial
-        })
-    }
-}
-
-impl<'a> TryParse for httparse::Response<'a, 'a> {
-    type Subject = RawStatus;
-
-    fn try_parse<'b>(headers: &'b mut [httparse::Header<'b>], buf: &'b [u8]) ->
-            TryParseResult<RawStatus> {
-        trace!("Response.try_parse([Header; {}], [u8; {}])", headers.len(), buf.len());
-        let mut res = httparse::Response::new(headers);
-        Ok(match try!(res.parse(buf)) {
-            httparse::Status::Complete(len) => {
-                trace!("Response.try_parse Complete({})", len);
-                let code = res.code.unwrap();
-                let reason = match StatusCode::from_u16(code).canonical_reason() {
-                    Some(reason) if reason == res.reason.unwrap() => Cow::Borrowed(reason),
-                    _ => Cow::Owned(res.reason.unwrap().to_owned())
-                };
-                httparse::Status::Complete((Incoming {
-                    version: if res.version.unwrap() == 1 { Http11 } else { Http10 },
-                    subject: RawStatus(code, reason),
-                    headers: try!(Headers::from_raw(res.headers))
                 }, len))
             },
             httparse::Status::Partial => httparse::Status::Partial
