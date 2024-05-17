@@ -951,11 +951,17 @@ impl HttpHandler {
                                                 html_response(MOBILE_DIRECTORY_LISTING_HTML,
                                                               &[&relpath_escaped[!is_root as usize..],
                                                                 if show_file_management_controls {
-                                                                    concat!(r#"<script type="text/javascript">"#,
-                                                                            include_str!("../../assets/upload.js"),
-                                                                            include_str!("../../assets/manage_mobile.js"),
-                                                                            include_str!("../../assets/manage.js"),
-                                                                            r#"</script>"#)
+                                                                    concat!(r#"<script type="text/javascript">"#, include_str!("../../assets/upload.js"))
+                                                                } else {
+                                                                    ""
+                                                                },
+                                                                if show_file_management_controls {
+                                                                    include_str!("../../assets/manage_mobile.js")
+                                                                } else {
+                                                                    ""
+                                                                },
+                                                                if show_file_management_controls {
+                                                                    concat!(include_str!("../../assets/manage.js"), r#"</script>"#)
                                                                 } else {
                                                                     ""
                                                                 },
@@ -1077,11 +1083,17 @@ impl HttpHandler {
                                                 html_response(DIRECTORY_LISTING_HTML,
                                                               &[&relpath_escaped[!is_root as usize..],
                                                                 if show_file_management_controls {
-                                                                    concat!(r#"<script type="text/javascript">"#,
-                                                                            include_str!("../../assets/upload.js"),
-                                                                            include_str!("../../assets/manage_desktop.js"),
-                                                                            include_str!("../../assets/manage.js"),
-                                                                            r#"</script>"#)
+                                                                    concat!(r#"<script type="text/javascript">"#, include_str!("../../assets/upload.js"))
+                                                                } else {
+                                                                    ""
+                                                                },
+                                                                if show_file_management_controls {
+                                                                    include_str!("../../assets/manage_desktop.js")
+                                                                } else {
+                                                                    ""
+                                                                },
+                                                                if show_file_management_controls {
+                                                                    concat!(include_str!("../../assets/manage.js"), r#"</script>"#)
                                                                 } else {
                                                                     ""
                                                                 },

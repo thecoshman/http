@@ -136,10 +136,10 @@ impl Header for XOcMTime {
     }
 }
 
-/// Dummy impl returning an empty value, since we're only ever sending these
+/// We only ever receive these
 impl HeaderFormat for XOcMTime {
     fn fmt_header(&self, _: &mut fmt::Formatter) -> fmt::Result {
-        Ok(())
+        unreachable!()
     }
 }
 

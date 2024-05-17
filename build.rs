@@ -57,7 +57,8 @@ fn assets() -> Vec<(&'static str, String)> {
 
 fn htmls() {
     let assets = assets();
-    for html in ["error.html", "directory_listing.html", "directory_listing_mobile.html"] {
+    // for html in ["error.html", "directory_listing.html", "directory_listing_mobile.html"] {
+    for html in ["directory_listing_mobile.html"] {
         println!("cargo:rerun-if-changed=assets/{}", html);
 
         let with_assets = assets.iter().fold(fs::read_to_string(format!("assets/{}", html)).unwrap(),
