@@ -6,7 +6,6 @@ use std::str::FromStr;
 use std::ascii::AsciiExt;
 
 use mime::Mime;
-use language_tags::LanguageTag;
 
 use header::parsing;
 use header::{Header, HeaderFormat};
@@ -89,10 +88,6 @@ pub struct LinkValue {
 
     /// Reverse Relation Types: `rev`.
     rev: Option<Vec<RelationType>>,
-
-    /// Hint on the language of the result of dereferencing
-    /// the link: `hreflang`.
-    href_lang: Option<Vec<LanguageTag>>,
 
     /// Destination medium or media: `media`.
     media_desc: Option<Vec<MediaDesc>>,
@@ -252,7 +247,6 @@ impl LinkValue {
             rel: None,
             anchor: None,
             rev: None,
-            href_lang: None,
             media_desc: None,
             title: None,
             title_star: None,
@@ -278,11 +272,6 @@ impl LinkValue {
     /// Get the `LinkValue`'s `rev` parameter(s).
     pub fn rev(&self) -> Option<&[RelationType]> {
         self.rev.as_ref().map(AsRef::as_ref)
-    }
-
-    /// Get the `LinkValue`'s `hreflang` parameter(s).
-    pub fn href_lang(&self) -> Option<&[LanguageTag]> {
-        self.href_lang.as_ref().map(AsRef::as_ref)
     }
 
     /// Get the `LinkValue`'s `media` parameter(s).
@@ -330,17 +319,6 @@ impl LinkValue {
         v.push(rev);
 
         self.rev = Some(v);
-
-        self
-    }
-
-    /// Add a `LanguageTag` to the `LinkValue`'s `hreflang` parameter.
-    pub fn push_href_lang(mut self, language_tag: LanguageTag) -> LinkValue {
-        let mut v = self.href_lang.take().unwrap_or(Vec::new());
-
-        v.push(language_tag);
-
-        self.href_lang = Some(v);
 
         self
     }
@@ -432,11 +410,6 @@ impl fmt::Display for LinkValue {
         if let Some(ref rev) = self.rev {
             try!(fmt_delimited(f, rev.as_slice(), " ", ("; rev=\"", "\"")));
         }
-        if let Some(ref href_lang) = self.href_lang {
-            for tag in href_lang {
-                try!(write!(f, "; hreflang={}", tag));
-            }
-        }
         if let Some(ref media_desc) = self.media_desc {
             try!(fmt_delimited(f, media_desc.as_slice(), ", ", ("; media=\"", "\"")));
         }
@@ -478,7 +451,6 @@ impl FromStr for Link {
                                 rel: None,
                                 anchor: None,
                                 rev: None,
-                                href_lang: None,
                                 media_desc: None,
                                 title: None,
                                 title_star: None,
@@ -546,23 +518,6 @@ impl FromStr for Link {
                             },
                         }
                     }
-                } else if "hreflang".eq_ignore_ascii_case(link_param_name) {
-                    // Parse target attribute: `hreflang`.
-                    // https://tools.ietf.org/html/rfc5988#section-5.4
-                    let mut v = link_header.href_lang.take().unwrap_or(Vec::new());
-
-                    v.push(
-                        match link_param_split.next() {
-                            None => return Err(::Error::Header),
-                            Some("") =>  return Err(::Error::Header),
-                            Some(s) => match s.trim().parse() {
-                                Err(_) => return Err(::Error::Header),
-                                Ok(t) => t,
-                            },
-                        }
-                    );
-
-                    link_header.href_lang = Some(v);
                 } else if "media".eq_ignore_ascii_case(link_param_name) {
                     // Parse target attribute: `media`.
                     // https://tools.ietf.org/html/rfc5988#section-5.4
@@ -954,7 +909,6 @@ mod tests {
             .push_rel(RelationType::Previous)
             .set_anchor("../anchor/example/")
             .push_rev(RelationType::Next)
-            .push_href_lang(langtag!(de))
             .push_media_desc(MediaDesc::Screen)
             .set_title("previous chapter")
             .set_title_star("title* unparsed")
@@ -962,7 +916,7 @@ mod tests {
 
         let link_header = b"<http://example.com/TheBook/chapter2>; \
             rel=\"previous\"; anchor=\"../anchor/example/\"; \
-            rev=\"next\"; hreflang=de; media=\"screen\"; \
+            rev=\"next\"; media=\"screen\"; \
             title=\"previous chapter\"; title*=title* unparsed; \
             type=\"text/plain\"";
 
@@ -1014,7 +968,6 @@ mod tests {
             .push_rel(RelationType::Previous)
             .set_anchor("/anchor/example/")
             .push_rev(RelationType::Next)
-            .push_href_lang(langtag!(de))
             .push_media_desc(MediaDesc::Screen)
             .set_title("previous chapter")
             .set_title_star("title* unparsed")
@@ -1027,7 +980,7 @@ mod tests {
 
         let expected_link_header = "<http://example.com/TheBook/chapter2>; \
             rel=\"previous\"; anchor=\"/anchor/example/\"; \
-            rev=\"next\"; hreflang=de; media=\"screen\"; \
+            rev=\"next\"; media=\"screen\"; \
             title=\"previous chapter\"; title*=title* unparsed; \
             type=\"text/plain\"";
 

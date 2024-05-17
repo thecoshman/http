@@ -29,9 +29,6 @@ version = "0.9.0"
 [dependencies.httparse]
 version = "1.0"
 
-[dependencies.language-tags]
-version = "0.2"
-
 [dependencies.mime]
 version = "0.2"
 

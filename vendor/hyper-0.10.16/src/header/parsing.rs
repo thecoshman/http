@@ -1,6 +1,5 @@
 //! Utility functions for Header implementations.
 
-use language_tags::LanguageTag;
 use std::str;
 use std::str::FromStr;
 use std::fmt::{self, Display};
@@ -70,8 +69,6 @@ pub fn fmt_comma_delimited<T: Display>(f: &mut fmt::Formatter, parts: &[T]) -> f
 pub struct ExtendedValue {
     /// The character set that is used to encode the `value` to a string.
     pub charset: Charset,
-    /// The human language details of the `value`, if available.
-    pub language_tag: Option<LanguageTag>,
     /// The parameter value, as expressed in octets.
     pub value: Vec<u8>,
 }
@@ -121,14 +118,10 @@ pub fn parse_extended_value(val: &str) -> ::Result<ExtendedValue> {
         Some(n) => try!(FromStr::from_str(n)),
     };
 
-    // Interpret the second piece as a language tag
-    let lang: Option<LanguageTag> = match parts.next() {
+    // Ignore the second piece (language tag)
+    match parts.next() {
         None => return Err(::Error::Header),
-        Some("") => None,
-        Some(s) => match s.parse() {
-            Ok(lt) => Some(lt),
-            Err(_) => return Err(::Error::Header),
-        }
+        Some(_) => (),
     };
 
     // Interpret the third piece as a sequence of value characters
@@ -139,7 +132,6 @@ pub fn parse_extended_value(val: &str) -> ::Result<ExtendedValue> {
 
     Ok(ExtendedValue {
         charset: charset,
-        language_tag: lang,
         value: value,
     })
 }
@@ -157,11 +149,7 @@ impl Display for ExtendedValue {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         let encoded_value =
             percent_encoding::percent_encode(&self.value[..], HTTP_VALUE);
-        if let Some(ref lang) = self.language_tag {
-            write!(f, "{}'{}'{}", self.charset, lang, encoded_value)
-        } else {
-            write!(f, "{}''{}", self.charset, encoded_value)
-        }
+        write!(f, "{}''{}", self.charset, encoded_value)
     }
 }
 

@@ -146,9 +146,6 @@ extern crate typeable;
 extern crate crossbeam_channel;
 extern crate smallvec;
 
-#[cfg_attr(test, macro_use)]
-extern crate language_tags;
-
 #[macro_use]
 extern crate mime as mime_crate;
 
@@ -167,7 +164,6 @@ pub use error::{Result, Error};
 pub use method::Method::{Get, Head, Post, Delete};
 pub use status::StatusCode::{Ok, BadRequest, NotFound};
 pub use server::Server;
-pub use language_tags::LanguageTag;
 
 macro_rules! todo(
     ($($arg:tt)*) => (if cfg!(not(ndebug)) {
