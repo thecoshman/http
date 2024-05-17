@@ -716,7 +716,7 @@ fn parse_proppatch(req: &mut Request) -> Result<(Vec<(OwnedXmlName, String)>, Pr
 
             (State::Prop, XmlREvent::StartElement { name, .. }) => {
                 state = State::InProp;
-                propname = Some(name.clone());
+                propname = Some(name);
             }
             (State::Prop, XmlREvent::EndElement { .. }) => state = State::Action,
 
