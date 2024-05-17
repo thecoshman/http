@@ -92,6 +92,8 @@ pub struct Options {
     ///   * >= 2 – suppress startup except for auth data, if present
     ///   * >= 3 – suppress all startup messages
     pub loglevel: LogLevel,
+    /// Whether to include the time in the log output. Default: `true`
+    pub log_time: bool,
     /// Whether to colourise the log output. Default: `true`
     pub log_colour: bool,
     /// Whether to handle WebDAV requests. Default: false
@@ -145,6 +147,7 @@ impl Options {
                 .validator(|s| Options::age_parse(s.into()).map(|_| ())))
             .arg(Arg::from_usage("-x --strip-extensions 'Allow stripping index extensions from served paths. Default: false'"))
             .arg(Arg::from_usage("-q --quiet... 'Suppress increasing amounts of output'"))
+            .arg(Arg::from_usage("-Q --quiet-time 'Don't prefix logs with the timestamp'"))
             .arg(Arg::from_usage("-c --no-colour 'Don't colourise the log output'"))
             .arg(Arg::from_usage("-d --webdav 'Handle WebDAV requests. Default: false'"))
             .arg(Arg::from_usage("--ssl [TLS_IDENTITY] 'Data for HTTPS, identity file. Password in HTTP_SSL_PASS env var, otherwise empty'")
@@ -253,6 +256,7 @@ impl Options {
             encoded_generated_limit: matches.value_of("encoded-generated").and_then(|s| Options::size_parse(s.into()).ok()),
             encoded_prune: matches.value_of("encoded-prune").and_then(|s| Options::age_parse(s.into()).ok()),
             loglevel: matches.occurrences_of("quiet").into(),
+            log_time: !matches.is_present("quiet-time"),
             log_colour: !matches.is_present("no-colour"),
             webdav: matches.is_present("webdav"),
             tls_data: matches.value_of("ssl").map(|id| ((id.to_string(), fs::canonicalize(id).unwrap()), env::var("HTTP_SSL_PASS").unwrap_or_default())),

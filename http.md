@@ -253,6 +253,10 @@ pass parameters like what port to use.
       N >= 2 – suppress startup except for auth data, if present
       N >= 3 – suppress all startup messages
 
+  -Q --quiet-time
+
+    Don't prepend log lines with the timestamp.
+
   -c --no-colour
 
     Don't colourise log output.

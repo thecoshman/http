@@ -41,8 +41,10 @@ macro_rules! log {
         use trivial_colours::{Reset as CReset, Colour as C};
 
         if $logcfg.0 {
-            if $logcfg.1 {
-                print!("{}[{}]{} ", C::Cyan, now().strftime("%F %T").unwrap(), CReset);
+            if $logcfg.2 {
+                if $logcfg.1 {
+                    print!("{}[{}]{} ", C::Cyan, now().strftime("%F %T").unwrap(), CReset);
+                }
                 println!(concat!($fmt, "{black:.0}{red:.0}{green:.0}{yellow:.0}{blue:.0}{magenta:.0}{cyan:.0}{white:.0}{reset:.0}"),
                          black = C::Black,
                          red = C::Red,
@@ -54,7 +56,9 @@ macro_rules! log {
                          white = C::White,
                          reset = CReset);
             } else {
-                print!("[{}] ", now().strftime("%F %T").unwrap());
+                if $logcfg.1 {
+                    print!("[{}] ", now().strftime("%F %T").unwrap());
+                }
                 println!(concat!($fmt, "{black:.0}{red:.0}{green:.0}{yellow:.0}{blue:.0}{magenta:.0}{cyan:.0}{white:.0}{reset:.0}"),
                          black = "",
                          red = "",
@@ -73,8 +77,10 @@ macro_rules! log {
         use trivial_colours::{Reset as CReset, Colour as C};
 
         if $logcfg.0 {
-            if $logcfg.1 {
-                print!("{}[{}]{} ", C::Cyan, now().strftime("%F %T").unwrap(), CReset);
+            if $logcfg.2 {
+                if $logcfg.1 {
+                    print!("{}[{}]{} ", C::Cyan, now().strftime("%F %T").unwrap(), CReset);
+                }
                 println!(concat!($fmt, "{black:.0}{red:.0}{green:.0}{yellow:.0}{blue:.0}{magenta:.0}{cyan:.0}{white:.0}{reset:.0}"),
                          $($arg)*,
                          black = C::Black,
@@ -87,7 +93,9 @@ macro_rules! log {
                          white = C::White,
                          reset = CReset);
             } else {
-                print!("[{}] ", now().strftime("%F %T").unwrap());
+                if $logcfg.1 {
+                    print!("[{}] ", now().strftime("%F %T").unwrap());
+                }
                 println!(concat!($fmt, "{black:.0}{red:.0}{green:.0}{yellow:.0}{blue:.0}{magenta:.0}{cyan:.0}{white:.0}{reset:.0}"),
                          $($arg)*,
                          black = "",
@@ -121,8 +129,8 @@ pub struct HttpHandler {
     pub generate_listings: bool,
     pub check_indices: bool,
     pub strip_extensions: bool,
-    /// (at all, log_colour)
-    pub log: (bool, bool),
+    /// (at all, log_time, log_colour)
+    pub log: (bool, bool, bool),
     pub webdav: bool,
     pub global_auth_data: Option<(String, Option<String>)>,
     pub path_auth_data: BTreeMap<String, Option<(String, Option<String>)>>,
@@ -179,7 +187,7 @@ impl HttpHandler {
             generate_listings: opts.generate_listings,
             check_indices: opts.check_indices,
             strip_extensions: opts.strip_extensions,
-            log: (opts.loglevel < LogLevel::NoServeStatus, opts.log_colour),
+            log: (opts.loglevel < LogLevel::NoServeStatus, opts.log_time, opts.log_colour),
             webdav: opts.webdav,
             global_auth_data: global_auth_data,
             path_auth_data: path_auth_data,
@@ -1480,15 +1488,15 @@ fn text_html_charset_utf8() -> Mime {
 pub struct AddressWriter<'r, 'p, 'ra, 'rb: 'ra> {
     pub request: &'r Request<'ra, 'rb>,
     pub proxies: &'p BTreeMap<IpCidr, String>,
-    /// (at all, log_colour)
-    pub log: (bool, bool),
+    /// (at all, log_time, log_colour)
+    pub log: (bool, bool, bool),
 }
 
 impl<'r, 'p, 'ra, 'rb: 'ra> fmt::Display for AddressWriter<'r, 'p, 'ra, 'rb> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         use trivial_colours::{Reset as CReset, Colour as C};
 
-        if self.log.1 {
+        if self.log.2 {
             write!(f, "{green}{}{reset}", self.request.remote_addr, green = C::Green, reset = CReset)?;
         } else {
             write!(f, "{}", self.request.remote_addr)?;
