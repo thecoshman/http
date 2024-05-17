@@ -141,7 +141,7 @@ pub struct HttpHandler {
     pub encoded_filesystem_limit: u64,
     pub encoded_generated_limit: u64,
 
-    pub allowed_methods: Vec<method::Method>,
+    pub allowed_methods: &'static [method::Method],
 }
 
 impl HttpHandler {
@@ -169,7 +169,8 @@ impl HttpHandler {
             .chain(Some(&[method::Put, method::Delete][..]).filter(|_| opts.allow_writes))
             .flatten()
             .cloned()
-            .collect();
+            .collect::<Vec<_>>()
+            .leak();
 
         HttpHandler {
             hosted_directory: opts.hosted_directory.clone(),
@@ -341,7 +342,7 @@ impl HttpHandler {
 
     fn handle_options(&self, req: &mut Request) -> IronResult<Response> {
         log!(self.log, "{} asked for {red}OPTIONS{reset}", self.remote_addresses(&req));
-        Ok(Response::with((status::NoContent, Header(headers::Server(USER_AGENT.into())), Header(headers::Allow(self.allowed_methods.clone())))))
+        Ok(Response::with((status::NoContent, Header(headers::Server(USER_AGENT.into())), Header(headers::Allow(self.allowed_methods.into())))))
     }
 
     fn handle_get(&self, req: &mut Request) -> IronResult<Response> {
@@ -1140,7 +1141,7 @@ impl HttpHandler {
                                         &format!("<p>Allowed methods: {}</p>", CommaList(self.allowed_methods.iter()))]);
         self.handle_generated_response_encoding(req, status::MethodNotAllowed, resp_text)
             .map(|mut r| {
-                r.headers.set(headers::Allow(self.allowed_methods.clone()));
+                r.headers.set(headers::Allow(self.allowed_methods.into()));
                 r
             })
     }
