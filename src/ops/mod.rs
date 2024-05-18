@@ -1564,7 +1564,7 @@ impl<'r, 'p, 'ra, 'rb: 'ra> AddressWriter<'r, 'p, 'ra, 'rb> {
 /// ```
 pub fn try_ports<H: Handler + Copy>(hndlr: H, addr: IpAddr, from: u16, up_to: u16, tls_data: &Option<((String, PathBuf), String)>)
                                     -> Result<Listening, Error> {
-    for port in from..up_to + 1 {
+    for port in from..=up_to {
         let ir = Iron::new(hndlr);
         match if let Some(&((_, ref id), ref pw)) = tls_data.as_ref() {
             ir.https((addr, port),
