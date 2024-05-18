@@ -35,7 +35,7 @@ fn assets() -> Vec<(&'static str, String)> {
          ("back_arrow_icon", "image/gif", "assets/icons/back_arrow.gif"),
          ("new_dir_icon", "image/gif", "assets/icons/new_directory.gif"),
          ("delete_file_icon", "image/png", "assets/icons/delete_file.png"),
-         ("rename_icon", "image/png", "assets/icons/rename.png"),
+         ("rename_icon", "image/gif", "assets/icons/rename.gif"),
          ("confirm_icon", "image/png", "assets/icons/confirm.png")] {
         println!("cargo:rerun-if-changed={}", file);
         assets.push((key,
