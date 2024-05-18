@@ -9,37 +9,12 @@ use buffer::BufReader;
 use Error;
 use header::{Headers};
 use method::{Method};
-use net::{NetworkConnector, NetworkStream};
 use version::HttpVersion;
 use version::HttpVersion::{Http10, Http11};
 use uri::RequestUri;
 
 use self::HttpReader::{SizedReader, ChunkedReader, EofReader, EmptyReader};
 use self::HttpWriter::{SizedWriter, ThroughWriter};
-
-struct ConnAdapter<C: NetworkConnector + Send + Sync>(C);
-
-impl<C: NetworkConnector<Stream=S> + Send + Sync, S: NetworkStream + Send>
-        NetworkConnector for ConnAdapter<C> {
-    type Stream = Box<NetworkStream + Send>;
-    #[inline]
-    fn connect(&self, host: &str, port: u16, scheme: &str)
-        -> ::Result<Box<NetworkStream + Send>> {
-        Ok(try!(self.0.connect(host, port, scheme)).into())
-    }
-}
-
-struct Connector(Box<NetworkConnector<Stream=Box<NetworkStream + Send>> + Send + Sync>);
-
-impl NetworkConnector for Connector {
-    type Stream = Box<NetworkStream + Send>;
-    #[inline]
-    fn connect(&self, host: &str, port: u16, scheme: &str)
-        -> ::Result<Box<NetworkStream + Send>> {
-        Ok(try!(self.0.connect(host, port, scheme)).into())
-    }
-}
-
 
 /// Readers to handle different Transfer-Encodings.
 ///
