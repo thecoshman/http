@@ -1,4 +1,4 @@
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct VecMap<K, V> {
     vec: Vec<(K, V)>,
 }
@@ -7,6 +7,12 @@ impl<K: PartialEq, V> VecMap<K, V> {
     pub fn new() -> VecMap<K, V> {
         VecMap {
             vec: Vec::new()
+        }
+    }
+
+    pub fn with_capacity(cap: usize) -> VecMap<K, V> {
+        VecMap {
+            vec: Vec::with_capacity(cap)
         }
     }
 

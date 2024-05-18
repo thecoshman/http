@@ -1,6 +1,6 @@
 use std::any::{Any, TypeId};
 use std::cell::UnsafeCell;
-use std::collections::HashMap;
+use self::super::VecMap;
 use std::fmt;
 use std::mem;
 use std::ops::Deref;
@@ -50,7 +50,7 @@ pub struct PtrMapCell<V: ?Sized>(UnsafeCell<PtrMap<Box<V>>>);
 enum PtrMap<T> {
     Empty,
     One(TypeId, T),
-    Many(HashMap<TypeId, T>)
+    Many(VecMap<TypeId, T>)
 }
 
 impl<V: ?Sized + fmt::Debug + Any + 'static> PtrMapCell<V> {
@@ -97,12 +97,12 @@ impl<V: ?Sized + fmt::Debug + Any + 'static> PtrMapCell<V> {
                 match one {
                     PtrMap::One(id, one) => {
                         debug_assert!(id != key);
-                        let mut hm = HashMap::with_capacity(2);
+                        let mut hm = VecMap::with_capacity(2);
                         hm.insert(id, one);
                         hm.insert(key, val);
                         mem::replace(map, PtrMap::Many(hm));
                     },
-                    _ => unreachable!()
+                    _ => unsafe { std::hint::unreachable_unchecked(); },
                 }
             },
             PtrMap::Many(ref mut hm) => { hm.insert(key, val); }
