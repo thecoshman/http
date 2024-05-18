@@ -1,6 +1,5 @@
 use blake3;
 use serde_json;
-use std::ffi::OsStr;
 use std::borrow::Cow;
 use std::net::IpAddr;
 use serde::Serialize;
@@ -13,6 +12,7 @@ use std::default::Default;
 use rand::{Rng, thread_rng};
 use iron::modifiers::Header;
 use std::path::{PathBuf, Path};
+use std::ffi::{OsString, OsStr};
 use iron::headers::EncodingType;
 use iron::url::Url as GenericUrl;
 use mime_guess::get_mime_type_opt;
@@ -138,7 +138,7 @@ pub struct HttpHandler {
     pub encoded_temp_dir: Option<(String, PathBuf)>,
     pub proxies: BTreeMap<IpCidr, String>,
     pub proxy_redirs: BTreeMap<IpCidr, String>,
-    pub mime_type_overrides: BTreeMap<String, Mime>,
+    pub mime_type_overrides: BTreeMap<OsString, Mime>,
     pub additional_headers: Vec<(String, Vec<u8>)>,
 
     pub cache_gen: RwLock<CacheT<Vec<u8>>>,
@@ -1476,10 +1476,10 @@ impl HttpHandler {
 
     fn guess_mime_type(&self, req_p: &Path) -> Mime {
         // Based on mime_guess::guess_mime_type_opt(); that one does to_str() instead of to_string_lossy()
-        let ext = req_p.extension().map(OsStr::to_string_lossy).unwrap_or("".into());
+        let ext = req_p.extension().unwrap_or(OsStr::new(""));
 
         (self.mime_type_overrides.get(&*ext).cloned())
-            .or_else(|| get_mime_type_opt(&*ext))
+            .or_else(|| ext.to_str().and_then(get_mime_type_opt))
             .unwrap_or_else(|| if file_binary(req_p) {
                 Mime(MimeTopLevel::Application, MimeSubLevel::OctetStream, Default::default()) // "application/octet-stream"
             } else {
@@ -1562,8 +1562,7 @@ impl<'r, 'p, 'ra, 'rb: 'ra> AddressWriter<'r, 'p, 'ra, 'rb> {
 /// # use iron::{status, Response};
 /// let server = try_ports(|req| Ok(Response::with((status::Ok, "Abolish the burgeoisie!"))), 8000, 8100, None).unwrap();
 /// ```
-pub fn try_ports<H: Handler + Copy>(hndlr: H, addr: IpAddr, from: u16, up_to: u16, tls_data: &Option<((String, PathBuf), String)>)
-                                    -> Result<Listening, Error> {
+pub fn try_ports<H: Handler + Copy>(hndlr: H, addr: IpAddr, from: u16, up_to: u16, tls_data: &Option<((String, PathBuf), String)>) -> Result<Listening, Error> {
     for port in from..=up_to {
         let ir = Iron::new(hndlr);
         match if let Some(&((_, ref id), ref pw)) = tls_data.as_ref() {

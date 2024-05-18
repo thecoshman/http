@@ -129,9 +129,9 @@ fn result_main() -> Result<(), Error> {
         }
 
         for (ext, mime_type) in opts.mime_type_overrides {
-            match &ext[..] {
+            match &ext.to_string_lossy()[..] {
                 "" => println!("Serving files with no extension as {}.", mime_type),
-                _ => println!("Serving files with .{} extension as {}.", ext, mime_type),
+                ext => println!("Serving files with .{} extension as {}.", ext, mime_type),
             }
         }
 
