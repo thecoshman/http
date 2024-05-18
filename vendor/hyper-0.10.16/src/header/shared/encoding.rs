@@ -28,6 +28,8 @@ pub enum EncodingType {
     Brotli,
     /// The `bzip2` encoding.
     Bzip2,
+    /// The `zstd` encoding.
+    Zstd,
     /// See upper String.
     Custom,
 }
@@ -45,6 +47,7 @@ impl fmt::Display for Encoding {
             EncodingType::Identity => "identity",
             EncodingType::Brotli => "br",
             EncodingType::Bzip2 => "bzip2",
+            EncodingType::Zstd => "zstd",
             EncodingType::Custom => self.1.as_ref(),
         })
     }
@@ -66,6 +69,7 @@ impl str::FromStr for Encoding {
             "identity" => EncodingType::Identity,
             "br" => EncodingType::Brotli,
             "bzip2" => EncodingType::Bzip2,
+            "zstd" => EncodingType::Zstd,
             _ => {
                 custom = s.to_owned();
                 EncodingType::Custom
