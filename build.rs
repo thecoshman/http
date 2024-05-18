@@ -26,7 +26,7 @@ fn main() {
 fn assets() -> Vec<(&'static str, String)> {
     let mut assets = Vec::new();
     for (key, mime, file) in
-        [("favicon", "image/x-icon", "assets/favicon.ico"),
+        [("favicon", "image/png", "assets/favicon.png"),
          ("dir_icon", "image/gif", "assets/icons/directory.gif"),
          ("file_icon", "image/gif", "assets/icons/file.gif"),
          ("file_binary_icon", "image/gif", "assets/icons/file_binary.gif"),
