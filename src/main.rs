@@ -16,7 +16,6 @@ extern crate flate2;
 extern crate rfsapi;
 #[cfg(target_os = "windows")]
 extern crate winapi;
-extern crate bzip2;
 extern crate ctrlc;
 extern crate serde;
 extern crate cidr;

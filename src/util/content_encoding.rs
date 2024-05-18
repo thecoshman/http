@@ -4,7 +4,6 @@ use iron::headers::{QualityItem, EncodingType, Encoding};
 use brotli::enc::BrotliCompress as brotli_compress;
 use flate2::write::{DeflateEncoder, GzEncoder};
 use flate2::Compression as Flate2Compression;
-use bzip2::write::BzEncoder;
 use std::path::Path;
 use std::ffi::OsStr;
 use std::fs::File;
@@ -35,7 +34,7 @@ pub fn response_encoding(requested: &mut [QualityItem<Encoding>]) -> Option<Enco
 /// Encode a string slice using a specified encoding or `None` if encoding failed or is not recognised.
 pub fn encode_str(dt: &str, enc: &Encoding) -> Option<Vec<u8>> {
     type EncodeT = fn(&str) -> Option<Vec<u8>>;
-    const STR_ENCODING_FNS: &[EncodeT] = &[encode_str_gzip, encode_str_deflate, encode_str_brotli, encode_str_bzip2];
+    const STR_ENCODING_FNS: &[EncodeT] = &[encode_str_gzip, encode_str_deflate, encode_str_brotli];
 
     encoding_idx(enc).and_then(|fi| STR_ENCODING_FNS[fi](dt))
 }
@@ -44,7 +43,7 @@ pub fn encode_str(dt: &str, enc: &Encoding) -> Option<Vec<u8>> {
 /// `false` if encoding failed, is not recognised or an I/O error occurred.
 pub fn encode_file(p: &Path, op: &Path, enc: &Encoding) -> bool {
     type EncodeT = fn(File, File) -> bool;
-    const FILE_ENCODING_FNS: &[EncodeT] = &[encode_file_gzip, encode_file_deflate, encode_file_brotli, encode_file_bzip2];
+    const FILE_ENCODING_FNS: &[EncodeT] = &[encode_file_gzip, encode_file_deflate, encode_file_brotli];
 
     encoding_idx(enc)
         .map(|fi| {
@@ -58,7 +57,7 @@ pub fn encode_file(p: &Path, op: &Path, enc: &Encoding) -> bool {
 
 /// Encoding extension to use for encoded files, for example "gz" for gzip, or `None` if the encoding is not recognised.
 pub fn encoding_extension(enc: &Encoding) -> Option<&'static str> {
-    const ENCODING_EXTS: &[&str] = &["gz", "dflt", "br", "bz2"];
+    const ENCODING_EXTS: &[&str] = &["gz", "dflt", "br"];
 
     encoding_idx(enc).map(|ei| ENCODING_EXTS[ei])
 }
@@ -76,7 +75,6 @@ fn encoding_idx(enc: &Encoding) -> Option<usize> {
         EncodingType::Gzip => Some(0),
         EncodingType::Deflate => Some(1),
         EncodingType::Brotli => Some(2),
-        EncodingType::Bzip2 => Some(3),
         _ => None,
     }
 }
@@ -101,7 +99,6 @@ macro_rules! encode_fn {
 
 encode_fn!(encode_str_gzip, encode_file_gzip, GzEncoder, Flate2Compression::default());
 encode_fn!(encode_str_deflate, encode_file_deflate, DeflateEncoder, Flate2Compression::default());
-encode_fn!(encode_str_bzip2, encode_file_bzip2, BzEncoder, Default::default());
 
 /// This should just be a pub const, but the new and default functions aren't const
 pub fn brotli_params() -> BrotliEncoderParams {
