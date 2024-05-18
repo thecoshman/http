@@ -2,6 +2,7 @@
 //!
 //! This library is to enable both servers and clients to use the RFSAPI,
 //! see [D'Oh](https://github.com/thecoshman/doh) for usage example.
+#![allow(deprecated)]
 
 
 #[macro_use]
@@ -16,8 +17,8 @@ use mime::Mime;
 use util::parse_rfc3339;
 use std::fmt::{self, Write};
 use hyper::Error as HyperError;
+use hyper::header::{HeaderFormat, Header};
 use serde::ser::{SerializeMap, Serializer, Serialize};
-use hyper::header::{Formatter as HeaderFormatter, Raw as RawHeader, Header};
 use serde::de::{self, Deserializer, Deserialize, SeqAccess, MapAccess, Visitor};
 
 pub mod util;
@@ -38,9 +39,9 @@ impl Header for RawFsApiHeader {
         "X-Raw-Filesystem-API"
     }
 
-    fn parse_header(raw: &RawHeader) -> Result<RawFsApiHeader, HyperError> {
-        if let Some(line) = raw.one() {
-            match &line[..] {
+    fn parse_header<T: AsRef<[u8]>>(raw: &[T]) -> Result<RawFsApiHeader, HyperError> {
+        if raw.len() == 1 {
+            match unsafe { raw.get_unchecked(0) }.as_ref() {
                 b"0" => return Ok(RawFsApiHeader(false)),
                 b"1" => return Ok(RawFsApiHeader(true)),
                 _ => {}
@@ -48,15 +49,17 @@ impl Header for RawFsApiHeader {
         }
         Err(HyperError::Header)
     }
+}
 
-    fn fmt_header(&self, f: &mut HeaderFormatter) -> fmt::Result {
-        f.fmt_line(&self)
+impl HeaderFormat for RawFsApiHeader {
+    fn fmt_header(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        f.write_char(if self.0 { '1' } else { '0' })
     }
 }
 
 impl fmt::Display for RawFsApiHeader {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        f.write_char(if self.0 { '1' } else { '0' })
+        self.fmt_header(f)
     }
 }
 
