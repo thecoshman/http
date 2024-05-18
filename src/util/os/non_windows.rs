@@ -1,7 +1,6 @@
 use libc::{AT_SYMLINK_NOFOLLOW, UTIME_OMIT, AT_FDCWD, utimensat, timespec, umask};
 use std::os::unix::fs::{PermissionsExt, MetadataExt};
 use self::super::super::is_actually_file;
-use os_str_generic::OsStrGenericExt;
 use std::os::unix::ffi::OsStrExt;
 use std::fs::{self, Metadata};
 use std::path::Path;
@@ -23,7 +22,7 @@ pub fn win32_file_attributes(meta: &Metadata, path: &Path) -> u32 {
         attr |= FILE_ATTRIBUTE_READONLY;
     }
 
-    if path.file_name().map(|n| n.starts_with(".")).unwrap_or(false) {
+    if path.file_name().map(|n| n.as_bytes().starts_with(b".")).unwrap_or(false) {
         attr |= FILE_ATTRIBUTE_HIDDEN;
     }
 

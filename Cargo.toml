@@ -64,8 +64,6 @@ path = "vendor/hyper-0.10.16"
 version = "0.3"
 features = ["fileapi"]
 
-[target.'cfg(not(target_os = "windows"))'.dependencies.os-str-generic]
-version = "0.2"
 
 [build-dependencies]
 embed-resource = "1.3"
