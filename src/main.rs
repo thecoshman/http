@@ -178,7 +178,8 @@ fn result_main() -> Result<(), Error> {
 
     let end_handler: &_ = Box::leak(Box::new(Condvar::new()));
     ctrlc::set_handler(move || end_handler.notify_one()).unwrap();
-    if opts.encoded_prune.is_some() {
+    let Options { encoded_prune: opts_encoded_prune, temp_directory: opts_temp_directory, generate_tls: opts_generate_tls, .. } = opts;
+    if opts_encoded_prune.is_some() {
         loop {
             if !end_handler.wait_timeout(Mutex::new(()).lock().unwrap(), Duration::from_secs(handler.handler.prune_interval)).unwrap().1.timed_out() {
                 break;
@@ -191,6 +192,6 @@ fn result_main() -> Result<(), Error> {
     }
 
     responder.close().unwrap();
-    handler.handler.handler.clean_temp_dirs(&opts.temp_directory, opts.generate_tls);
+    handler.handler.handler.clean_temp_dirs(&opts_temp_directory, opts_generate_tls);
     Ok(())
 }
