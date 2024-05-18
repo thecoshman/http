@@ -236,7 +236,7 @@ impl HttpHandler {
     }
 }
 
-impl Handler for HttpHandler {
+impl Handler for &'static HttpHandler {
     fn handle(&self, req: &mut Request) -> IronResult<Response> {
         if self.global_auth_data.is_some() || !self.path_auth_data.is_empty() {
             if let Some(resp) = self.verify_auth(req)? {
@@ -268,9 +268,7 @@ impl Handler for HttpHandler {
         if self.webdav {
             resp.headers.set(Dav::LEVEL_1);
         }
-        // We really are 'static, but this is still valid if we outlive the request (we must do ex def)
-        let static_self = unsafe { mem::transmute::<_, &'static HttpHandler>(self) };
-        for (h, v) in &static_self.additional_headers {
+        for (h, v) in &self.additional_headers {
             resp.headers.append_raw(&h[..], v.clone());
         }
         Ok(resp)
@@ -1564,8 +1562,8 @@ impl<'r, 'p, 'ra, 'rb: 'ra> AddressWriter<'r, 'p, 'ra, 'rb> {
 /// # use iron::{status, Response};
 /// let server = try_ports(|req| Ok(Response::with((status::Ok, "Abolish the burgeoisie!"))), 8000, 8100, None).unwrap();
 /// ```
-pub fn try_ports<H: Handler>(hndlr: &'static H, addr: IpAddr, from: u16, up_to: u16, tls_data: &Option<((String, PathBuf), String)>)
-                             -> Result<Listening, Error> {
+pub fn try_ports<H: Handler + Copy>(hndlr: H, addr: IpAddr, from: u16, up_to: u16, tls_data: &Option<((String, PathBuf), String)>)
+                                    -> Result<Listening, Error> {
     for port in from..up_to + 1 {
         let ir = Iron::new(hndlr);
         match if let Some(&((_, ref id), ref pw)) = tls_data.as_ref() {

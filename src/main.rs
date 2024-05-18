@@ -72,7 +72,7 @@ fn result_main() -> Result<(), Error> {
         opts.path_auth_data.insert(path, Some(ops::generate_auth_data()));
     }
 
-    let handler: &_ = Box::leak(Box::new(ops::SimpleChain {
+    let handler: &_ = Box::leak(Box::new(ops::SimpleChain::<ops::PruneChain, _> {
         handler: ops::PruneChain::new(&opts),
         after: opts.request_bandwidth.map(ops::LimitBandwidthMiddleware::new),
     }));

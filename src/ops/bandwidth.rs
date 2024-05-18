@@ -10,14 +10,18 @@ pub const DEFAULT_SLEEP: Duration = Duration::from_millis(1);
 
 
 #[derive(Hash, PartialEq, Eq, PartialOrd, Ord)]
-pub struct SimpleChain<H: Handler, Am: AfterMiddleware> {
+pub struct SimpleChain<H: Send + Sync + 'static, Am: AfterMiddleware>
+    where &'static H: Handler
+{
     pub handler: H,
     pub after: Option<Am>,
 }
 
-impl<H: Handler, Am: AfterMiddleware> Handler for SimpleChain<H, Am> {
+impl<H: Send + Sync + 'static, Am: AfterMiddleware> Handler for &'static SimpleChain<H, Am>
+    where &'static H: Handler
+{
     fn handle(&self, req: &mut Request) -> IronResult<Response> {
-        let resp = self.handler.handle(req)?;
+        let resp = (&self.handler).handle(req)?;
         match self.after.as_ref() {
             Some(am) => am.after(req, resp),
             None => Ok(resp),

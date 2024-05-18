@@ -140,9 +140,9 @@ impl PruneChain {
     }
 }
 
-impl Handler for PruneChain {
+impl Handler for &'static PruneChain {
     fn handle(&self, req: &mut Request) -> IronResult<Response> {
-        let resp = self.handler.handle(req);
+        let resp = (&self.handler).handle(req);
         self.prune();
         resp
     }
