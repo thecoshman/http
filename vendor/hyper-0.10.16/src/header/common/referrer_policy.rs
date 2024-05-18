@@ -58,7 +58,7 @@ impl Header for ReferrerPolicy {
         NAME
     }
 
-    fn parse_header(raw: &[Vec<u8>]) -> ::Result<ReferrerPolicy> {
+    fn parse_header<T: AsRef<[u8]>>(raw: &[T]) -> ::Result<ReferrerPolicy> {
         use self::ReferrerPolicy::*;
         // See https://www.w3.org/TR/referrer-policy/#determine-policy-for-token
         let headers: Vec<String> = try!(parsing::from_comma_delimited(raw));

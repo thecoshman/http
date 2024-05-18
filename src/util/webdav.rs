@@ -85,7 +85,7 @@ impl Header for Dav {
     }
 
     /// We only ever send these
-    fn parse_header(_: &[Vec<u8>]) -> HyperResult<Dav> {
+    fn parse_header<T: AsRef<[u8]>>(_: &[T]) -> HyperResult<Dav> {
         unreachable!()
     }
 }
@@ -126,12 +126,12 @@ impl Header for Depth {
         "Depth"
     }
 
-    fn parse_header(raw: &[Vec<u8>]) -> HyperResult<Depth> {
+    fn parse_header<T: AsRef<[u8]>>(raw: &[T]) -> HyperResult<Depth> {
         if raw.len() != 1 {
             return Err(HyperError::Header);
         }
 
-        Ok(match &unsafe { raw.get_unchecked(0) }[..] {
+        Ok(match unsafe { raw.get_unchecked(0) }.as_ref() {
             b"0" => Depth::Zero,
             b"1" => Depth::One,
             b"infinity" => Depth::Infinity,
@@ -167,12 +167,12 @@ impl Header for Destination {
         "Destination"
     }
 
-    fn parse_header(raw: &[Vec<u8>]) -> HyperResult<Destination> {
+    fn parse_header<T: AsRef<[u8]>>(raw: &[T]) -> HyperResult<Destination> {
         if raw.len() != 1 {
             return Err(HyperError::Header);
         }
 
-        let url = str::from_utf8(&unsafe { raw.get_unchecked(0) }).map_err(|_| HyperError::Header)?;
+        let url = str::from_utf8(unsafe { raw.get_unchecked(0) }.as_ref()).map_err(|_| HyperError::Header)?;
         GenericUrl::parse(url).map(Destination).map_err(HyperError::Uri)
     }
 }
@@ -200,11 +200,11 @@ impl Header for Overwrite {
         "Overwrite"
     }
 
-    fn parse_header(raw: &[Vec<u8>]) -> HyperResult<Overwrite> {
+    fn parse_header<T: AsRef<[u8]>>(raw: &[T]) -> HyperResult<Overwrite> {
         if raw.len() != 1 {
             return Err(HyperError::Header);
         }
-        match &unsafe { raw.get_unchecked(0) }[..] {
+        match unsafe { raw.get_unchecked(0) }.as_ref() {
             b"T" => Ok(Overwrite(true)),
             b"F" => Ok(Overwrite(false)),
             _ => Err(HyperError::Header),

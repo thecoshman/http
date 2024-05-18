@@ -75,10 +75,10 @@ impl Header for SetCookie {
         "Set-Cookie"
     }
 
-    fn parse_header(raw: &[Vec<u8>]) -> ::Result<SetCookie> {
+    fn parse_header<T: AsRef<[u8]>>(raw: &[T]) -> ::Result<SetCookie> {
         let mut set_cookies = Vec::with_capacity(raw.len());
         for set_cookies_raw in raw {
-            if let Ok(s) = from_utf8(&set_cookies_raw[..]) {
+            if let Ok(s) = from_utf8(set_cookies_raw.as_ref()) {
                 set_cookies.push(s.trim().to_owned());
             }
         }

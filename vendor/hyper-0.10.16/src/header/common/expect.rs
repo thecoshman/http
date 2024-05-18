@@ -33,7 +33,7 @@ impl Header for Expect {
         "Expect"
     }
 
-    fn parse_header(raw: &[Vec<u8>]) -> ::Result<Expect> {
+    fn parse_header<T: AsRef<[u8]>>(raw: &[T]) -> ::Result<Expect> {
         if raw.len() == 1 {
             let text = unsafe {
                 // safe because:
@@ -42,7 +42,7 @@ impl Header for Expect {
                 //    compare the bytes with the "case" normalized. If it's not
                 //    utf8, then the byte comparison will fail, and we'll return
                 //    None. No big deal.
-                str::from_utf8_unchecked(raw.get_unchecked(0))
+                str::from_utf8_unchecked(raw.get_unchecked(0).as_ref())
             };
             if UniCase(text) == EXPECT_CONTINUE {
                 Ok(Expect::Continue)

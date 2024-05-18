@@ -179,7 +179,7 @@ impl Header for Range {
         "Range"
     }
 
-    fn parse_header(raw: &[Vec<u8>]) -> ::Result<Range> {
+    fn parse_header<T: AsRef<[u8]>>(raw: &[T]) -> ::Result<Range> {
         from_one_raw_str(raw)
     }
 }

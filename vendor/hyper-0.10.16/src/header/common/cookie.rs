@@ -37,10 +37,10 @@ impl Header for Cookie {
         "Cookie"
     }
 
-    fn parse_header(raw: &[Vec<u8>]) -> ::Result<Cookie> {
+    fn parse_header<T: AsRef<[u8]>>(raw: &[T]) -> ::Result<Cookie> {
         let mut cookies = Vec::with_capacity(raw.len());
         for cookies_raw in raw.iter() {
-            let cookies_str = try!(from_utf8(&cookies_raw[..]));
+            let cookies_str = try!(from_utf8(cookies_raw.as_ref()));
             for cookie_str in cookies_str.split(';') {
                 cookies.push(cookie_str.trim().to_owned())
             }

@@ -48,7 +48,7 @@ impl Header for Host {
         "Host"
     }
 
-    fn parse_header(raw: &[Vec<u8>]) -> ::Result<Host> {
+    fn parse_header<T: AsRef<[u8]>>(raw: &[T]) -> ::Result<Host> {
         from_one_raw_str(raw)
     }
 }

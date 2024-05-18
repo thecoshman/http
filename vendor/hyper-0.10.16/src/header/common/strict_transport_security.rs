@@ -124,7 +124,7 @@ impl Header for StrictTransportSecurity {
         "Strict-Transport-Security"
     }
 
-    fn parse_header(raw: &[Vec<u8>]) -> ::Result<StrictTransportSecurity> {
+    fn parse_header<T: AsRef<[u8]>>(raw: &[T]) -> ::Result<StrictTransportSecurity> {
         parsing::from_one_raw_str(raw)
     }
 }

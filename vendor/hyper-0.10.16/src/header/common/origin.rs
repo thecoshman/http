@@ -57,7 +57,7 @@ impl Header for Origin {
         NAME
     }
 
-    fn parse_header(raw: &[Vec<u8>]) -> ::Result<Origin> {
+    fn parse_header<T: AsRef<[u8]>>(raw: &[T]) -> ::Result<Origin> {
         from_one_raw_str(raw)
     }
 }

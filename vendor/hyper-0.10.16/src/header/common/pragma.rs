@@ -45,7 +45,7 @@ impl Header for Pragma {
         "Pragma"
     }
 
-    fn parse_header(raw: &[Vec<u8>]) -> ::Result<Pragma> {
+    fn parse_header<T: AsRef<[u8]>>(raw: &[T]) -> ::Result<Pragma> {
         parsing::from_one_raw_str(raw).and_then(|s: String| {
             let slice = &s.to_ascii_lowercase()[..];
             match slice {

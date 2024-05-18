@@ -48,7 +48,7 @@ impl ::header::Header for Allow {
     fn header_name() -> &'static str {
         "Allow"
     }
-    fn parse_header(raw: &[Vec<u8>]) -> ::Result<Self> {
+    fn parse_header<T: AsRef<[u8]>>(raw: &[T]) -> ::Result<Self> {
         ::header::parsing::from_comma_delimited(raw).map(std::borrow::Cow::Owned).map(Allow)
     }
 }

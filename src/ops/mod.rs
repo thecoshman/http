@@ -269,7 +269,7 @@ impl Handler for &'static HttpHandler {
             resp.headers.set(Dav::LEVEL_1);
         }
         for (h, v) in &self.additional_headers {
-            resp.headers.append_raw(&h[..], v.clone());
+            resp.headers.append_raw(&h[..], v[..].into());
         }
         Ok(resp)
     }

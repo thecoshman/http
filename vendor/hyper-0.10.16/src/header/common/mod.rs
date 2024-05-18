@@ -195,7 +195,7 @@ macro_rules! header {
             fn header_name() -> &'static str {
                 $n
             }
-            fn parse_header(raw: &[Vec<u8>]) -> $crate::Result<Self> {
+            fn parse_header<T: AsRef<[u8]>>(raw: &[T]) -> $crate::Result<Self> {
                 $crate::header::parsing::from_comma_delimited(raw).map($id)
             }
         }
@@ -221,7 +221,7 @@ macro_rules! header {
             fn header_name() -> &'static str {
                 $n
             }
-            fn parse_header(raw: &[Vec<u8>]) -> $crate::Result<Self> {
+            fn parse_header<T: AsRef<[u8]>>(raw: &[T]) -> $crate::Result<Self> {
                 $crate::header::parsing::from_comma_delimited(raw).map($id)
             }
         }
@@ -247,7 +247,7 @@ macro_rules! header {
             fn header_name() -> &'static str {
                 $n
             }
-            fn parse_header(raw: &[Vec<u8>]) -> $crate::Result<Self> {
+            fn parse_header<T: AsRef<[u8]>>(raw: &[T]) -> $crate::Result<Self> {
                 $crate::header::parsing::from_comma_delimited_small(raw).map($id)
             }
         }
@@ -273,7 +273,7 @@ macro_rules! header {
             fn header_name() -> &'static str {
                 $n
             }
-            fn parse_header(raw: &[Vec<u8>]) -> $crate::Result<Self> {
+            fn parse_header<T: AsRef<[u8]>>(raw: &[T]) -> $crate::Result<Self> {
                 $crate::header::parsing::from_one_raw_str(raw).map($id)
             }
         }
@@ -302,10 +302,10 @@ macro_rules! header {
             fn header_name() -> &'static str {
                 $n
             }
-            fn parse_header(raw: &[Vec<u8>]) -> $crate::Result<Self> {
+            fn parse_header<T: AsRef<[u8]>>(raw: &[T]) -> $crate::Result<Self> {
                 // FIXME: Return None if no item is in $id::Only
                 if raw.len() == 1 {
-                    if raw[0] == b"*" {
+                    if raw[0].as_ref() == b"*" {
                         return Ok($id::Any)
                     }
                 }

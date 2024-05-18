@@ -21,10 +21,10 @@ categories = ["web-programming"]
 license = "MIT"
 repository = "https://github.com/nabijaczleweli/rfsapi-rs"
 [dependencies.hyper]
-version = "0.11"
+path = "../hyper-0.10.16"
 
 [dependencies.mime]
-version = "0.3"
+version = "0.2"
 
 [dependencies.time]
 version = "0.1"

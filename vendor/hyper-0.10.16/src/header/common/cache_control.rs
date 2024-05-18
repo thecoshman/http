@@ -54,7 +54,7 @@ impl Header for CacheControl {
         "Cache-Control"
     }
 
-    fn parse_header(raw: &[Vec<u8>]) -> ::Result<CacheControl> {
+    fn parse_header<T: AsRef<[u8]>>(raw: &[T]) -> ::Result<CacheControl> {
         let directives = try!(from_comma_delimited(raw));
         if !directives.is_empty() {
             Ok(CacheControl(directives))

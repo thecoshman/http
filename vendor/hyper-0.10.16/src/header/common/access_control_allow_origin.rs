@@ -59,15 +59,15 @@ impl Header for AccessControlAllowOrigin {
         "Access-Control-Allow-Origin"
     }
 
-    fn parse_header(raw: &[Vec<u8>]) -> ::Result<AccessControlAllowOrigin> {
+    fn parse_header<T: AsRef<[u8]>>(raw: &[T]) -> ::Result<AccessControlAllowOrigin> {
         if raw.len() != 1 {
             return Err(::Error::Header)
         }
-        let value = unsafe { raw.get_unchecked(0) };
-        Ok(match &value[..] {
+        let value = unsafe { raw.get_unchecked(0) }.as_ref();
+        Ok(match value {
             b"*" => AccessControlAllowOrigin::Any,
             b"null" => AccessControlAllowOrigin::Null,
-            _ => AccessControlAllowOrigin::Value(try!(String::from_utf8(value.clone())))
+            _ => AccessControlAllowOrigin::Value(try!(String::from_utf8(value.to_owned())))
         })
     }
 }

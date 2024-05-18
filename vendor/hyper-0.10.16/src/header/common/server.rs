@@ -30,7 +30,7 @@ impl ::header::Header for Server {
     fn header_name() -> &'static str {
         "Server"
     }
-    fn parse_header(raw: &[Vec<u8>]) -> ::Result<Self> {
+    fn parse_header<T: AsRef<[u8]>>(raw: &[T]) -> ::Result<Self> {
         ::header::parsing::from_one_raw_str(raw).map(std::borrow::Cow::Owned).map(Server)
     }
 }

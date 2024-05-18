@@ -366,12 +366,12 @@ impl Header for Link {
         NAME
     }
 
-    fn parse_header(raw: &[Vec<u8>]) -> ::Result<Link> {
+    fn parse_header<T: AsRef<[u8]>>(raw: &[T]) -> ::Result<Link> {
         // If more that one `Link` headers are present in a request's
         // headers they are combined in a single `Link` header containing
         // all the `link-value`s present in each of those `Link` headers.
         raw.iter()
-            .map(|v| parsing::from_raw_str::<Link>(&v))
+            .map(|v| parsing::from_raw_str::<Link>(v.as_ref()))
             .fold(None, |p, c| match (p, c) {
                 (None, c) => Some(c),
                 (e @ Some(Err(_)), _) => e,

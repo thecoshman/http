@@ -12,10 +12,10 @@ extern crate hyper;
 extern crate time;
 extern crate mime;
 
+use std::fmt;
 use time::Tm;
 use mime::Mime;
 use util::parse_rfc3339;
-use std::fmt::{self, Write};
 use hyper::Error as HyperError;
 use hyper::header::{HeaderFormat, Header};
 use serde::ser::{SerializeMap, Serializer, Serialize};
@@ -53,7 +53,7 @@ impl Header for RawFsApiHeader {
 
 impl HeaderFormat for RawFsApiHeader {
     fn fmt_header(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        f.write_char(if self.0 { '1' } else { '0' })
+        f.write_str(if self.0 { "1" } else { "0" })
     }
 }
 

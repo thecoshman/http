@@ -53,7 +53,7 @@ impl Header for PreferenceApplied {
         "Preference-Applied"
     }
 
-    fn parse_header(raw: &[Vec<u8>]) -> ::Result<PreferenceApplied> {
+    fn parse_header<T: AsRef<[u8]>>(raw: &[T]) -> ::Result<PreferenceApplied> {
         let preferences = try!(from_comma_delimited(raw));
         if !preferences.is_empty() {
             Ok(PreferenceApplied(preferences))

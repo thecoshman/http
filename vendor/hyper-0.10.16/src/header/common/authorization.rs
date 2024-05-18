@@ -76,11 +76,11 @@ impl<S: Scheme + Any> Header for Authorization<S> where <S as FromStr>::Err: 'st
         "Authorization"
     }
 
-    fn parse_header(raw: &[Vec<u8>]) -> ::Result<Authorization<S>> {
+    fn parse_header<T: AsRef<[u8]>>(raw: &[T]) -> ::Result<Authorization<S>> {
         if raw.len() != 1 {
             return Err(::Error::Header);
         }
-        let header = try!(from_utf8(unsafe { &raw.get_unchecked(0)[..] }));
+        let header = try!(from_utf8(unsafe { raw.get_unchecked(0) }.as_ref()));
         if let Some(scheme) = <S as Scheme>::scheme() {
             if header.starts_with(scheme) && header.len() > scheme.len() + 1 {
                 match header[scheme.len() + 1..].parse::<S>().map(Authorization) {

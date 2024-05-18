@@ -56,7 +56,7 @@ impl Header for Prefer {
         "Prefer"
     }
 
-    fn parse_header(raw: &[Vec<u8>]) -> ::Result<Prefer> {
+    fn parse_header<T: AsRef<[u8]>>(raw: &[T]) -> ::Result<Prefer> {
         let preferences = try!(from_comma_delimited(raw));
         if !preferences.is_empty() {
             Ok(Prefer(preferences))

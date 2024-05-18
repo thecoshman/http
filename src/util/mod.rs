@@ -76,7 +76,7 @@ impl Header for WwwAuthenticate {
     }
 
     /// We only ever send these
-    fn parse_header(_: &[Vec<u8>]) -> HyperResult<WwwAuthenticate> {
+    fn parse_header<T: AsRef<[u8]>>(_: &[T]) -> HyperResult<WwwAuthenticate> {
         unreachable!()
     }
 }
@@ -100,11 +100,11 @@ impl Header for XLastModified {
         "X-Last-Modified"
     }
 
-    fn parse_header(data: &[Vec<u8>]) -> HyperResult<XLastModified> {
+    fn parse_header<T: AsRef<[u8]>>(data: &[T]) -> HyperResult<XLastModified> {
         if data.len() != 1 {
             return Err(HyperError::Header);
         }
-        Ok(XLastModified(str::from_utf8(data.last().ok_or(HyperError::Header)?).map_err(|_| HyperError::Header)?.parse().map_err(|_| HyperError::Header)?))
+        Ok(XLastModified(str::from_utf8(data.last().ok_or(HyperError::Header).map(|d| d.as_ref())?).map_err(|_| HyperError::Header)?.parse().map_err(|_| HyperError::Header)?))
     }
 }
 
@@ -128,11 +128,11 @@ impl Header for XOcMTime {
         "X-OC-MTime"
     }
 
-    fn parse_header(data: &[Vec<u8>]) -> HyperResult<XOcMTime> {
+    fn parse_header<T: AsRef<[u8]>>(data: &[T]) -> HyperResult<XOcMTime> {
         if data.len() != 1 {
             return Err(HyperError::Header);
         }
-        Ok(XOcMTime(str::from_utf8(data.last().ok_or(HyperError::Header)?).map_err(|_| HyperError::Header)?.parse().map_err(|_| HyperError::Header)?))
+        Ok(XOcMTime(str::from_utf8(data.last().ok_or(HyperError::Header).map(|d| d.as_ref())?).map_err(|_| HyperError::Header)?.parse().map_err(|_| HyperError::Header)?))
     }
 }
 

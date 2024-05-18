@@ -111,6 +111,7 @@ pub trait Header: Clone + Any + Send + Sync {
     ///
     /// This will become an associated constant once available.
     fn header_name() -> &'static str;
+
     /// Parse a header from a raw stream of bytes.
     ///
     /// It's possible that a request can include a header field more than once,
@@ -118,8 +119,7 @@ pub trait Header: Clone + Any + Send + Sync {
     /// it's not necessarily the case that a Header is *allowed* to have more
     /// than one field value. If that's the case, you **should** return `None`
     /// if `raw.len() > 1`.
-    fn parse_header(raw: &[Vec<u8>]) -> ::Result<Self>;
-
+    fn parse_header<T: AsRef<[u8]>>(raw: &[T]) -> ::Result<Self>;
 }
 
 /// A trait for any object that will represent a header field and value.
@@ -293,7 +293,7 @@ impl Headers {
             };
             let trim = header.value.iter().rev().take_while(|&&x| x == b' ').count();
             let value = &header.value[.. header.value.len() - trim];
-            item.raw_mut().push(value.to_vec());
+            item.raw_mut().push(value.to_vec().into());
         }
         Ok(headers)
     }
@@ -318,7 +318,7 @@ impl Headers {
     /// # let mut headers = Headers::new();
     /// let raw_content_type = headers.get_raw("content-type");
     /// ```
-    pub fn get_raw(&self, name: &str) -> Option<&[Vec<u8>]> {
+    pub fn get_raw(&self, name: &str) -> Option<&[Cow<'static, [u8]>]> {
         self.data
             .get(&UniCase(Cow::Borrowed(unsafe { mem::transmute::<&str, &str>(name) })))
             .map(Item::raw)
@@ -337,7 +337,7 @@ impl Headers {
     /// headers.set_raw("content-length", vec![b"5".to_vec()]);
     /// ```
     pub fn set_raw<K: Into<Cow<'static, str>>>(&mut self, name: K,
-            value: Vec<Vec<u8>>) {
+            value: Vec<Cow<'static, [u8]>>) {
         let name = name.into();
         trace!("Headers.set_raw( {:?}, {:?} )", name, value);
         self.data.insert(UniCase(name), Item::new_raw(value));
@@ -358,7 +358,7 @@ impl Headers {
     /// headers.append_raw("x-foo", b"bar".to_vec());
     /// headers.append_raw("x-foo", b"quux".to_vec());
     /// ```
-    pub fn append_raw<K: Into<Cow<'static, str>>>(&mut self, name: K, value: Vec<u8>) {
+    pub fn append_raw<K: Into<Cow<'static, str>>>(&mut self, name: K, value: Cow<'static, [u8]>) {
         let name = name.into();
         trace!("Headers.append_raw( {:?}, {:?} )", name, value);
         match self.data.entry(UniCase(name)) {

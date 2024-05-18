@@ -45,7 +45,7 @@ impl Header for AccessControlAllowCredentials {
         "Access-Control-Allow-Credentials"
     }
 
-    fn parse_header(raw: &[Vec<u8>]) -> ::Result<AccessControlAllowCredentials> {
+    fn parse_header<T: AsRef<[u8]>>(raw: &[T]) -> ::Result<AccessControlAllowCredentials> {
         if raw.len() == 1 {
             let text = unsafe {
                 // safe because:
@@ -54,7 +54,7 @@ impl Header for AccessControlAllowCredentials {
                 //    compare the bytes with the "case" normalized. If it's not
                 //    utf8, then the byte comparison will fail, and we'll return
                 //    None. No big deal.
-                str::from_utf8_unchecked(raw.get_unchecked(0))
+                str::from_utf8_unchecked(raw.get_unchecked(0).as_ref())
             };
             if UniCase(text) == ACCESS_CONTROL_ALLOW_CREDENTIALS_TRUE {
                 return Ok(AccessControlAllowCredentials);

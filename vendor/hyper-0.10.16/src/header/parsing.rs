@@ -8,10 +8,10 @@ use url::percent_encoding;
 use header::shared::Charset;
 
 /// Reads a single raw string when parsing a header.
-pub fn from_one_raw_str<T: str::FromStr>(raw: &[Vec<u8>]) -> ::Result<T> {
-    if raw.len() != 1 || unsafe { raw.get_unchecked(0) } == b"" { return Err(::Error::Header) }
+pub fn from_one_raw_str<T: str::FromStr, S: AsRef<[u8]>>(raw: &[S]) -> ::Result<T> {
+    if raw.len() != 1 || unsafe { raw.get_unchecked(0) }.as_ref() == b"" { return Err(::Error::Header) }
     // we JUST checked that raw.len() == 1, so raw[0] WILL exist.
-    from_raw_str(& unsafe { raw.get_unchecked(0) })
+    from_raw_str(unsafe { raw.get_unchecked(0) }.as_ref())
 }
 
 /// Reads a raw string into a value.
