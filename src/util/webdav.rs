@@ -84,9 +84,9 @@ impl Header for Dav {
         "DAV"
     }
 
-    /// Dummy impl returning an empty value, since we're only ever sending these
+    /// We only ever send these
     fn parse_header(_: &[Vec<u8>]) -> HyperResult<Dav> {
-        Ok(Dav(&[]))
+        unreachable!()
     }
 }
 
@@ -100,6 +100,7 @@ impl HeaderFormat for Dav {
         Ok(())
     }
 }
+
 
 /// The [Depth header](https://tools.ietf.org/html/rfc2518#section-9.2).
 #[derive(Debug, Copy, Clone, Hash, PartialOrd, Ord, PartialEq, Eq)]
@@ -156,6 +157,7 @@ impl fmt::Display for Depth {
     }
 }
 
+
 /// The [Destination header](https://tools.ietf.org/html/rfc2518#section-9.3).
 #[derive(Debug, Clone, Hash, PartialOrd, Ord, PartialEq, Eq)]
 pub struct Destination(pub GenericUrl);
@@ -188,6 +190,7 @@ impl fmt::Display for Destination {
     }
 }
 
+
 /// The [Overwrite header](https://tools.ietf.org/html/rfc2518#section-9.6).
 #[derive(Debug, Copy, Clone, Hash, PartialOrd, Ord, PartialEq, Eq)]
 pub struct Overwrite(pub bool);
@@ -201,14 +204,9 @@ impl Header for Overwrite {
         if raw.len() != 1 {
             return Err(HyperError::Header);
         }
-
-        let val = unsafe { raw.get_unchecked(0) };
-        if val.len() != 1 {
-            return Err(HyperError::Header);
-        }
-        match unsafe { val.get_unchecked(0) } {
-            b'T' => Ok(Overwrite(true)),
-            b'F' => Ok(Overwrite(false)),
+        match &unsafe { raw.get_unchecked(0) }[..] {
+            b"T" => Ok(Overwrite(true)),
+            b"F" => Ok(Overwrite(false)),
             _ => Err(HyperError::Header),
         }
     }

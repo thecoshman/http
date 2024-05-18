@@ -171,11 +171,10 @@ impl HttpHandler {
             }
         }
 
-        let allowed_methods = Some(&[method::Options, method::Get, method::Head, method::Trace][..])
-            .into_iter()
-            .chain(Some(dav_level_1_methods(opts.allow_writes)).filter(|_| opts.webdav))
-            .chain(Some(&[method::Put, method::Delete][..]).filter(|_| opts.allow_writes))
-            .flatten()
+        let allowed_methods = [method::Options, method::Get, method::Head, method::Trace]
+            .iter()
+            .chain(dav_level_1_methods(opts.allow_writes).iter().filter(|_| opts.webdav))
+            .chain([method::Put, method::Delete].iter().filter(|_| opts.allow_writes))
             .cloned()
             .collect::<Vec<_>>()
             .leak();
