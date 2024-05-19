@@ -1043,6 +1043,16 @@ impl HttpHandler {
             let fname = f.file_name().into_string().expect("Failed to get file name");
             let path = f.path();
             let len = file_length(&fmeta, &path);
+            struct FileSizeDisplay(bool, u64);
+            impl fmt::Display for FileSizeDisplay {
+                fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+                    if self.0 {
+                        write!(f, "<abbr title=\"{} B\">", self.1)
+                    } else {
+                        f.write_str("&nbsp;")
+                    }
+                }
+            }
 
             write!(&mut list_s,
                    "<tr><td><a href=\"{path}{fname}\" id=\"{}\" class=\"{}{}_icon\"></a></td> <td><a href=\"{path}{fname}\">{}{}</a></td> <td><a \
@@ -1053,11 +1063,7 @@ impl HttpHandler {
                    fname.replace('&', "&amp;").replace('<', "&lt;"),
                    if is_file { "" } else { "/" },
                    file_time_modified(&fmeta).strftime("%F %T").unwrap(),
-                   if is_file {
-                       DisplayThree("<abbr title=\"", len.to_string(), " B\">")
-                   } else {
-                       DisplayThree("&nbsp;", String::new(), "")
-                   },
+                   FileSizeDisplay(is_file, len),
                    if is_file {
                        human_readable_size(len)
                    } else {
