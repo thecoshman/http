@@ -128,7 +128,11 @@ impl Response {
 fn write_with_body(res: HttpResponse<Fresh>, mut body: Box<WriteBody>)
                    -> io::Result<()> {
     let mut raw_res = try!(res.start());
-    try!(body.write_body(&mut raw_res.writer()));
+    if let Err(e) = body.write_body(&mut raw_res.writer()) {
+        if e.kind() != std::io::ErrorKind::WriteZero {
+            try!(Err(e));
+        }
+    }
     raw_res.end()
 }
 
