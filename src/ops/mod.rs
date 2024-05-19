@@ -372,13 +372,13 @@ impl HttpHandler {
         }
 
         let is_file = is_actually_file(&req_p.metadata().expect("Failed to get file metadata").file_type(), &req_p);
-        let range = req.headers.get().map(|r: &headers::Range| (*r).clone());
+        let range = req.headers.get_mut().map(|r: &mut headers::Range| mem::replace(r, headers::Range::Bytes(vec![])));
         let raw_fs = req.headers.get().map(|r: &RawFsApiHeader| r.0).unwrap_or(false);
         if is_file {
             if raw_fs {
                 self.handle_get_raw_fs_file(req, req_p)
-            } else if range.is_some() {
-                self.handle_get_file_range(req, req_p, range.unwrap())
+            } else if let Some(range) = range {
+                self.handle_get_file_range(req, req_p, range)
             } else {
                 self.handle_get_file(req, req_p)
             }
