@@ -176,7 +176,7 @@ fn result_main() -> Result<(), Error> {
     let Options { encoded_prune: opts_encoded_prune, temp_directory: opts_temp_directory, generate_tls: opts_generate_tls, .. } = opts;
 
     static END_HANDLER: Condvar = Condvar::new();
-    ctrlc::set_handler(move || END_HANDLER.notify_one()).unwrap();
+    ctrlc::set_handler(|| END_HANDLER.notify_one()).unwrap();
     if opts_encoded_prune.is_some() {
         loop {
             if !END_HANDLER.wait_timeout(Mutex::new(()).lock().unwrap(), Duration::from_secs(handler.handler.prune_interval)).unwrap().1.timed_out() {
