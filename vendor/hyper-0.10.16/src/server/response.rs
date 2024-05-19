@@ -205,6 +205,9 @@ impl<'a, T: Any> Drop for Response<'a, T> {
         if TypeId::of::<T>() == TypeId::of::<Fresh>() {
             if thread::panicking() {
                 self.status = status::StatusCode::InternalServerError;
+                if self.headers.get::<header::ContentLength>().is_none() {
+                    self.headers.set(header::ContentLength(0));
+                }
             }
 
             let mut body = match self.write_head() {
