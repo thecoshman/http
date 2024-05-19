@@ -172,13 +172,16 @@ impl HttpHandler {
 
                 if !(!path.exists() || (symlink && !self.follow_symlinks) ||
                      (symlink && self.follow_symlinks && self.sandbox_symlinks && !is_descendant_of(&path, &self.hosted_directory.1))) {
+                    let metadata = path.metadata().expect("Failed to get requested file metadata");
                     self.handle_propfind_path(out,
                                               &root_url,
                                               &path,
-                                              &path.metadata().expect("Failed to get requested file metadata"),
+                                              &metadata,
                                               props,
                                               just_names)?;
-                    self.handle_webdav_propfind_path_recursive(req, out, root_url, &path, props, just_names, next_depth)?;
+                    if metadata.is_dir() {
+                        self.handle_webdav_propfind_path_recursive(req, out, root_url, &path, props, just_names, next_depth)?;
+                    }
                 }
             }
         }
