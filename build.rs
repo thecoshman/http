@@ -76,7 +76,9 @@ fn htmls() {
         writeln!(out, "&[").unwrap();
         let mut idx = 0;
         for (start, (len, argi)) in arguments {
-            writeln!(out, "PreparsedHtml::Literal({:?}),", &with_assets[idx..start]).unwrap();
+            if with_assets[idx..start].len() != 0 {
+                writeln!(out, "PreparsedHtml::Literal({:?}),", &with_assets[idx..start]).unwrap();
+            }
             writeln!(out, "PreparsedHtml::Argument({}),", argi).unwrap();
             idx = start + len;
         }
