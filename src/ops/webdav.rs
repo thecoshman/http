@@ -119,7 +119,7 @@ impl HttpHandler {
 
     /// Adapted from
     /// https://github.com/tylerwhall/hyperdav-server/blob/415f512ac030478593ad389a3267aeed7441d826/src/lib.rs#L459
-    fn handle_webdav_propfind_write_output<'n, N: BorrowXmlName<'n>>(&self, req: &mut Request, url: String, path: &Path, props: &[&'n [N]], just_names: bool,
+    fn handle_webdav_propfind_write_output<'n, N: BorrowXmlName<'n>>(&self, req: &mut Request, mut url: String, path: &Path, props: &[&'n [N]], just_names: bool,
                                                                      depth: Depth)
                                                                      -> Result<Result<Vec<u8>, IronResult<Response>>, XmlWError> {
         let mut out = intialise_xml_output()?;
@@ -129,7 +129,7 @@ impl HttpHandler {
         self.handle_propfind_path(&mut out, &url, &path, &meta, props, just_names)?;
 
         if meta.is_dir() {
-            if let Some(ir) = self.handle_webdav_propfind_path_recursive(req, &mut out, url, &path, props, just_names, depth)? {
+            if let Some(ir) = self.handle_webdav_propfind_path_recursive(req, &mut out, &mut url, &path, props, just_names, depth)? {
                 return Ok(Err(ir));
             }
         }
@@ -139,17 +139,19 @@ impl HttpHandler {
         Ok(Ok(out.into_inner()))
     }
 
-    fn handle_webdav_propfind_path_recursive<'n, W: Write, N: BorrowXmlName<'n>>(&self, req: &mut Request, out: &mut XmlWriter<W>, root_url: String,
+    fn handle_webdav_propfind_path_recursive<'n, W: Write, N: BorrowXmlName<'n>>(&self, req: &mut Request, out: &mut XmlWriter<W>, root_url: &mut String,
                                                                                  root_path: &Path, props: &[&'n [N]], just_names: bool, depth: Depth)
                                                                                  -> Result<Option<IronResult<Response>>, XmlWError> {
+        if !root_url.ends_with('/') {
+            root_url.push('/');
+        }
+        let root_url_orig_len = root_url.len();
+
         let mut links_left = MAX_SYMLINKS;
         if let Some(next_depth) = depth.lower() {
             for f in root_path.read_dir().expect("Failed to read requested directory").map(|p| p.expect("Failed to iterate over requested directory")) {
-                let mut url = root_url.clone();
-                if !url.ends_with('/') {
-                    url.push('/');
-                }
-                url.push_str(f.file_name().to_str().expect("Filename not UTF-8"));
+                root_url.truncate(root_url_orig_len);
+                root_url.push_str(&f.file_name().to_string_lossy()[..]);
 
                 let mut path = f.path();
                 let mut symlink = false;
@@ -171,12 +173,12 @@ impl HttpHandler {
                 if !(!path.exists() || (symlink && !self.follow_symlinks) ||
                      (symlink && self.follow_symlinks && self.sandbox_symlinks && !is_descendant_of(&path, &self.hosted_directory.1))) {
                     self.handle_propfind_path(out,
-                                              &url,
+                                              &root_url,
                                               &path,
                                               &path.metadata().expect("Failed to get requested file metadata"),
                                               props,
                                               just_names)?;
-                    self.handle_webdav_propfind_path_recursive(req, out, url, &path, props, just_names, next_depth)?;
+                    self.handle_webdav_propfind_path_recursive(req, out, root_url, &path, props, just_names, next_depth)?;
                 }
             }
         }
