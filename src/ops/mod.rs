@@ -513,10 +513,8 @@ impl HttpHandler {
              req_p.display(),
              mime_type);
 
-        let mut buf = vec![0; (to + 1 - from) as usize];
         let mut f = File::open(&req_p).expect("Failed to open requested file");
         f.seek(SeekFrom::Start(from)).expect("Failed to seek requested file");
-        f.read_exact(&mut buf).expect("Failed to read requested file");
 
         Ok(Response::with((status::PartialContent,
                            (Header(headers::Server(USER_AGENT.into())),
@@ -527,8 +525,9 @@ impl HttpHandler {
                             })),
                             Header(headers::ETag(headers::EntityTag::strong(etag))),
                             Header(headers::AcceptRanges(headers::RangeUnit::Bytes))),
-                           buf,
-                           mime_type)))
+                           f,
+                           mime_type,
+                           Header(headers::ContentLength(to + 1 - from)))))
     }
 
     fn handle_get_file_right_opened_range(&self, req: &mut Request, req_p: PathBuf, from: u64, etag: String) -> IronResult<Response> {
