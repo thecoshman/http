@@ -173,20 +173,20 @@ fn result_main() -> Result<(), Error> {
         println!("Ctrl-C to stop.");
         println!();
     }
-
-    let end_handler: &_ = Box::leak(Box::new(Condvar::new()));
-    ctrlc::set_handler(move || end_handler.notify_one()).unwrap();
     let Options { encoded_prune: opts_encoded_prune, temp_directory: opts_temp_directory, generate_tls: opts_generate_tls, .. } = opts;
+
+    static END_HANDLER: Condvar = Condvar::new();
+    ctrlc::set_handler(move || END_HANDLER.notify_one()).unwrap();
     if opts_encoded_prune.is_some() {
         loop {
-            if !end_handler.wait_timeout(Mutex::new(()).lock().unwrap(), Duration::from_secs(handler.handler.prune_interval)).unwrap().1.timed_out() {
+            if !END_HANDLER.wait_timeout(Mutex::new(()).lock().unwrap(), Duration::from_secs(handler.handler.prune_interval)).unwrap().1.timed_out() {
                 break;
             }
 
             handler.handler.prune();
         }
     } else {
-        drop(end_handler.wait(Mutex::new(()).lock().unwrap()).unwrap());
+        drop(END_HANDLER.wait(Mutex::new(()).lock().unwrap()).unwrap());
     }
 
     responder.close().unwrap();
