@@ -420,7 +420,9 @@ impl HttpHandler {
         self.handle_generated_response_encoding(req,
                                                 status,
                                                 html_response(ERROR_HTML,
-                                                              &[&status.to_string()[..], &format!("The requested entity \"{}\" doesn't exist.", url_p), ""]))
+                                                              &[&status.canonical_reason().unwrap()[..],
+                                                                &format!("The requested entity \"{}\" doesn't exist.", url_p),
+                                                                ""]))
     }
 
     fn handle_get_raw_fs_file(&self, req: &mut Request, req_p: PathBuf) -> IronResult<Response> {
@@ -1414,7 +1416,8 @@ impl HttpHandler {
         Ok(Response::with((st,
                            Header(headers::Server(USER_AGENT.into())),
                            Header(RawFsApiHeader(true)),
-                           Mime(MimeTopLevel::Application, MimeSubLevel::Json, vec![(MimeAttr::Charset, MimeAttrValue::Utf8)]), // application/json; charset=utf-8
+                           // application/json; charset=utf-8
+                           Mime(MimeTopLevel::Application, MimeSubLevel::Json, vec![(MimeAttr::Charset, MimeAttrValue::Utf8)]),
                            serde_json::to_string(&resp).unwrap())))
     }
 
