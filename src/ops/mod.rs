@@ -539,8 +539,7 @@ impl HttpHandler {
              from,
              mime_type);
 
-        let flen = file_length(&req_p.metadata().expect("Failed to get requested file metadata"), &req_p);
-        self.handle_get_file_opened_range(req_p, SeekFrom::Start(from), from, flen - from, mime_type, etag)
+        self.handle_get_file_opened_range(req_p, |flen| (SeekFrom::Start(from), from, flen - from), mime_type, etag)
     }
 
     fn handle_get_file_left_opened_range(&self, req: &mut Request, req_p: PathBuf, from: u64, etag: String) -> IronResult<Response> {
@@ -552,14 +551,14 @@ impl HttpHandler {
              req_p.display(),
              mime_type);
 
-        let flen = file_length(&req_p.metadata().expect("Failed to get requested file metadata"), &req_p);
-        self.handle_get_file_opened_range(req_p, SeekFrom::End(-(from as i64)), flen - from, from, mime_type, etag)
+        self.handle_get_file_opened_range(req_p, |flen| (SeekFrom::End(-(from as i64)), flen - from, from), mime_type, etag)
     }
 
-    fn handle_get_file_opened_range(&self, req_p: PathBuf, s: SeekFrom, b_from: u64, clen: u64, mt: Mime, etag: String) -> IronResult<Response> {
+    fn handle_get_file_opened_range<F: FnOnce(u64) -> (SeekFrom, u64, u64)>(&self, req_p: PathBuf, cb: F, mt: Mime, etag: String) -> IronResult<Response> {
         let mut f = File::open(&req_p).expect("Failed to open requested file");
         let fmeta = f.metadata().expect("Failed to get requested file metadata");
         let flen = file_length(&fmeta, &req_p);
+        let (s, b_from, clen) = cb(flen);
         f.seek(s).expect("Failed to seek requested file");
 
         Ok(Response::with((status::PartialContent,
