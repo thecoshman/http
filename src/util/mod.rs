@@ -10,12 +10,11 @@ use percent_encoding;
 use walkdir::WalkDir;
 use std::borrow::Cow;
 use rfsapi::RawFileData;
-use std::{cmp, f64, str};
 use std::time::SystemTime;
-use time::{self, Duration, Tm};
+use std::{cmp, fmt, f64, str};
 use iron::{mime, Headers, Url};
+use time::{self, Duration, Tm};
 use mime_guess::guess_mime_type_opt;
-use std::fmt::{self, Write as FmtWrite};
 use std::fs::{self, FileType, Metadata, File};
 use iron::headers::{HeaderFormat, UserAgent, Header};
 use xml::name::{OwnedName as OwnedXmlName, Name as XmlName};
@@ -148,16 +147,12 @@ pub struct CommaList<D: fmt::Display, I: Iterator<Item = D>>(pub I);
 
 impl<D: fmt::Display, I: Iterator<Item = D> + Clone> fmt::Display for CommaList<D, I> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        let mut itr = self.0.clone();
-        if let Some(item) = itr.next() {
-            item.fmt(f)?;
-
-            for item in itr {
+        for (i, item) in self.0.clone().enumerate() {
+            if i != 0 {
                 f.write_str(", ")?;
-                item.fmt(f)?;
             }
+            item.fmt(f)?;
         }
-
         Ok(())
     }
 }
@@ -200,7 +195,7 @@ pub struct Spaces(pub usize);
 impl fmt::Display for Spaces {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         for _ in 0..self.0 {
-            f.write_char(' ')?;
+            f.write_str(" ")?;
         }
         Ok(())
     }
