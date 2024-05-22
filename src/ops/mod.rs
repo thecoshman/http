@@ -7,12 +7,14 @@ use std::sync::RwLock;
 use std::{fmt, str, mem};
 use cidr::{Cidr, IpCidr};
 use time::precise_time_ns;
+use arrayvec::ArrayString;
 use std::fs::{self, File};
 use std::default::Default;
 use rand::{Rng, thread_rng};
 use iron::modifiers::Header;
 use std::path::{PathBuf, Path};
 use std::ffi::{OsString, OsStr};
+use std::fmt::Write as FmtWrite;
 use iron::headers::EncodingType;
 use iron::url::Url as GenericUrl;
 use mime_guess::get_mime_type_opt;
@@ -1541,7 +1543,11 @@ impl<'r, 'p, 'ra, 'rb: 'ra> fmt::Display for AddressWriter<'r, 'p, 'ra, 'rb> {
 
 impl<'r, 'p, 'ra, 'rb: 'ra> AddressWriter<'r, 'p, 'ra, 'rb> {
     fn width(&self) -> usize {
-        let mut len = self.request.remote_addr.to_string().len();
+        // per http://192.168.1.109:8000/target/doc/rust/src/core/net/socket_addr.rs.html#571
+        const LONGEST_IPV6_SOCKET_ADDR: &str = "[ffff:ffff:ffff:ffff:ffff:ffff:ffff:ffff%4294967296]:65536";
+        let mut widthbuf = ArrayString::<{ LONGEST_IPV6_SOCKET_ADDR.len() }>::new();
+        write!(&mut widthbuf, "{}", self.request.remote_addr).unwrap();
+        let mut len = widthbuf.len();
         for (network, header) in self.proxies {
             if network.contains(&self.request.remote_addr.ip()) {
                 if let Some(saddrs) = self.request.headers.get_raw(header) {
