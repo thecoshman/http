@@ -29,7 +29,7 @@ use rand::distributions::Alphanumeric as AlphanumericDistribution;
 use std::io::{self, ErrorKind as IoErrorKind, SeekFrom, Write, Error as IoError, Read, Seek};
 use iron::{headers, status, method, IronResult, Listening, Response, Headers, Request, Handler, Iron};
 use iron::mime::{Mime, Attr as MimeAttr, Value as MimeAttrValue, SubLevel as MimeSubLevel, TopLevel as MimeTopLevel};
-use self::super::util::{WwwAuthenticate, XLastModified, DisplayThree, CommaList, XOcMTime, Spaces, MsAsS, Maybe, Dav, url_path, file_etag, file_hash, set_mtime,
+use self::super::util::{WwwAuthenticate, XLastModified, DisplayThree, CommaList, XOcMTime, MsAsS, Maybe, Dav, url_path, file_etag, file_hash, set_mtime,
                         is_symlink, encode_str, encode_file, file_length, html_response, file_binary, client_mobile, percent_decode, escape_specials,
                         file_icon_suffix, is_actually_file, is_descendant_of, response_encoding, detect_file_as_dir, encoding_extension, file_time_modified,
                         file_time_modified_p, dav_level_1_methods, get_raw_fs_metadata, human_readable_size, encode_tail_if_trimmed, extension_is_blacklisted,
@@ -471,7 +471,7 @@ impl HttpHandler {
                     let _ = write!(&mut etag, "+{}", brs[0]);
                     let etag = unsafe { String::from_utf8_unchecked(etag) };
                     if HttpHandler::should_304_path(req, &req_p, &etag) {
-                        log!(self.log, "{} Not Modified", Spaces(self.remote_addresses(req).width()));
+                        log!(self.log, "{:w$} Not Modified", "", w = self.remote_addresses(req).width());
                         return Ok(Response::with((status::NotModified,
                                                   (Header(headers::Server(USER_AGENT.into())),
                                                    Header(headers::LastModified(headers::HttpDate(file_time_modified_p(&req_p)))),
@@ -622,7 +622,7 @@ impl HttpHandler {
                        Header(headers::LastModified(headers::HttpDate(file_time_modified(&metadata)))),
                        Header(headers::AcceptRanges(headers::RangeUnit::Bytes)));
         if HttpHandler::should_304_path(req, &req_p, &etag) {
-            log!(self.log, "{} Not Modified", Spaces(self.remote_addresses(req).width()));
+            log!(self.log, "{:w$} Not Modified", "", w = self.remote_addresses(req).width());
             return Ok(Response::with((status::NotModified, headers, Header(headers::ETag(headers::EntityTag::strong(etag))))));
         }
 
@@ -670,12 +670,13 @@ impl HttpHandler {
                     Some(&((ref resp_p, true, _), ref atime)) => {
                         atime.store(precise_time_ns(), AtomicOrdering::Relaxed);
                         log!(self.log,
-                             "{} encoded as {} for {:.1}% ratio (cached)",
-                             Spaces(self.remote_addresses(req).width()),
+                             "{:w$} encoded as {} for {:.1}% ratio (cached)",
+                             "",
                              encoding,
                              ((file_length(&req_p.metadata().expect("Failed to get requested file metadata"), &req_p) as f64) /
                               (file_length(&resp_p.metadata().expect("Failed to get encoded file metadata"), &resp_p) as f64)) *
-                             100f64);
+                             100f64,
+                             w = self.remote_addresses(req).width());
 
                         return Ok(Response::with((status::Ok,
                                                   headers,
@@ -716,10 +717,11 @@ impl HttpHandler {
                     fs::remove_file(resp_p).expect("Failed to remove too big encoded file");
                 } else {
                     log!(self.log,
-                         "{} encoded as {} for {:.1}% ratio",
-                         Spaces(self.remote_addresses(req).width()),
+                         "{:w$} encoded as {} for {:.1}% ratio",
+                         "",
                          encoding,
-                         gain * 100f64);
+                         gain * 100f64,
+                         w = self.remote_addresses(req).width());
 
                     let mut cache = self.cache_fs.write().expect("Filesystem cache write lock poisoned");
                     self.cache_fs_size.fetch_add(resp_p_len, AtomicOrdering::Relaxed);
@@ -734,9 +736,10 @@ impl HttpHandler {
                 }
             } else {
                 log!(self.log,
-                     "{} failed to encode as {}, sending identity",
-                     Spaces(self.remote_addresses(req).width()),
-                     encoding);
+                     "{:w$} failed to encode as {}, sending identity",
+                     "",
+                     encoding,
+                     w = self.remote_addresses(req).width());
             }
         }
 
@@ -806,9 +809,10 @@ impl HttpHandler {
                 if req.url.as_ref().path_segments().unwrap().next_back() == Some("") {
                     let r = self.handle_get_file(req, idx);
                     log!(self.log,
-                         "{} found index file for directory {magenta}{}{reset}",
-                         Spaces(self.remote_addresses(req).width()),
-                         req_p.display());
+                         "{:w$} found index file for directory {magenta}{}{reset}",
+                         "",
+                         req_p.display(),
+                         w = self.remote_addresses(req).width());
                     return r;
                 } else {
                     return self.handle_get_dir_index_no_slash(req, e);
@@ -1340,7 +1344,7 @@ impl HttpHandler {
         if st == status::Ok && (req.method == method::Get || req.method == method::Head) {
             if let Some(headers::IfNoneMatch::Items(inm)) = req.headers.get::<headers::IfNoneMatch>() {
                 if HttpHandler::etag_match(inm, &etag) {
-                    log!(self.log, "{} Not Modified", Spaces(self.remote_addresses(req).width()));
+                    log!(self.log, "{:w$} Not Modified", "", w = self.remote_addresses(req).width());
                     return Ok(Response::with((status::NotModified,
                                               Header(headers::Server(USER_AGENT.into())),
                                               Header(headers::ETag(headers::EntityTag::strong(etag))),
@@ -1356,10 +1360,11 @@ impl HttpHandler {
                 if let Some(enc_resp) = self.cache_gen.read().expect("Generated file cache read lock poisoned").get(&cache_key) {
                     enc_resp.1.store(precise_time_ns(), AtomicOrdering::Relaxed);
                     log!(self.log,
-                         "{} encoded as {} for {:.1}% ratio (cached)",
-                         Spaces(self.remote_addresses(req).width()),
+                         "{:w$} encoded as {} for {:.1}% ratio (cached)",
+                         "",
                          encoding,
-                         ((resp.len() as f64) / (enc_resp.0.len() as f64)) * 100f64);
+                         ((resp.len() as f64) / (enc_resp.0.len() as f64)) * 100f64,
+                         w = self.remote_addresses(req).width());
 
                     return Ok(Response::with((st,
                                               Header(headers::Server(USER_AGENT.into())),
@@ -1372,10 +1377,11 @@ impl HttpHandler {
 
             if let Some(enc_resp) = encode_str(&resp, &encoding) {
                 log!(self.log,
-                     "{} encoded as {} for {:.1}% ratio",
-                     Spaces(self.remote_addresses(req).width()),
+                     "{:w$} encoded as {} for {:.1}% ratio",
+                     "",
                      encoding,
-                     ((resp.len() as f64) / (enc_resp.len() as f64)) * 100f64);
+                     ((resp.len() as f64) / (enc_resp.len() as f64)) * 100f64,
+                     w = self.remote_addresses(req).width());
 
                 if enc_resp.len() as u64 <= self.encoded_generated_limit {
                     let mut cache = self.cache_gen.write().expect("Generated file cache write lock poisoned");
@@ -1398,9 +1404,10 @@ impl HttpHandler {
                 }
             } else {
                 log!(self.log,
-                     "{} failed to encode as {}, sending identity",
-                     Spaces(self.remote_addresses(req).width()),
-                     encoding);
+                     "{:w$} failed to encode as {}, sending identity",
+                     "",
+                     encoding,
+                     w = self.remote_addresses(req).width());
             }
         }
 

@@ -190,18 +190,6 @@ impl<'n> BorrowXmlName<'n> for OwnedXmlName {
 }
 
 #[derive(Debug, Copy, Clone, Hash, PartialOrd, Ord, PartialEq, Eq)]
-pub struct Spaces(pub usize);
-
-impl fmt::Display for Spaces {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        for _ in 0..self.0 {
-            f.write_str(" ")?;
-        }
-        Ok(())
-    }
-}
-
-#[derive(Debug, Copy, Clone, Hash, PartialOrd, Ord, PartialEq, Eq)]
 pub struct Maybe<T: fmt::Display>(pub Option<T>);
 
 impl<T: fmt::Display> fmt::Display for Maybe<T> {
