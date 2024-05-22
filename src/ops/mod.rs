@@ -26,8 +26,8 @@ use rfsapi::{RawFsApiHeader, FilesetData, RawFileData};
 use std::sync::atomic::{AtomicU64, Ordering as AtomicOrdering};
 use rand::distributions::uniform::Uniform as UniformDistribution;
 use rand::distributions::Alphanumeric as AlphanumericDistribution;
-use std::io::{self, ErrorKind as IoErrorKind, SeekFrom, Write, Error as IoError, Read, Seek};
 use iron::{headers, status, method, IronResult, Listening, Response, Headers, Request, Handler, Iron};
+use std::io::{self, ErrorKind as IoErrorKind, BufReader, SeekFrom, Write, Error as IoError, Read, Seek};
 use iron::mime::{Mime, Attr as MimeAttr, Value as MimeAttrValue, SubLevel as MimeSubLevel, TopLevel as MimeTopLevel};
 use self::super::util::{WwwAuthenticate, XLastModified, DisplayThree, CommaList, XOcMTime, MsAsS, Maybe, Dav, url_path, file_etag, file_hash, set_mtime_f,
                         is_symlink, encode_str, encode_file, file_length, html_response, file_binary, client_mobile, percent_decode,
@@ -1216,7 +1216,7 @@ impl HttpHandler {
 
         let file = match direct_output {
             Ok(mut file) => {
-                if let err @ Err(_) = io::copy(&mut req.body, &mut file) {
+                if let err @ Err(_) = io::copy(&mut BufReader::with_capacity(1024 * 1024, &mut req.body), &mut file) {
                     drop(file);
                     fs::remove_file(&req_p).expect("Failed to remove requested file after failure");
                     err.expect("Failed to write requested data to requested file");
@@ -1238,7 +1238,7 @@ impl HttpHandler {
 
                 let mut temp_file = File::options().read(true).write(true).create(true).truncate(true).open(&temp_file_p).expect("Failed to create temp file");
                 let _temp_file_p_destroyer = DropDelete(&temp_file_p);
-                io::copy(&mut req.body, &mut temp_file).expect("Failed to write requested data to temp file");
+                io::copy(&mut BufReader::with_capacity(1024 * 1024, &mut req.body), &mut temp_file).expect("Failed to write requested data to temp file");
 
                 temp_file.rewind().expect("Failed to rewind temp file");
                 let mut file = File::create(&req_p).expect("Failed to open requested file");
