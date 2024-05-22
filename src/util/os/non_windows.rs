@@ -1,9 +1,9 @@
 use libc::{AT_SYMLINK_NOFOLLOW, UTIME_OMIT, AT_FDCWD, futimens, utimensat, timespec, umask};
 use std::os::unix::fs::{PermissionsExt, MetadataExt};
 use self::super::super::is_actually_file;
+use std::fs::{self, Metadata, File};
 use std::os::unix::ffi::OsStrExt;
-use std::fs::{self, Metadata};
-use std::os::fd::AsFd;
+use std::os::fd::AsRawFd;
 use std::path::Path;
 
 
@@ -98,9 +98,8 @@ pub fn set_mtime_f(f: &File, ms: u64) {
 pub fn set_times_f(f: &File, mtime_ms: Option<u64>, atime_ms: Option<u64>, _: Option<u64>) {
     if mtime_ms.is_some() || atime_ms.is_some() {
         unsafe {
-            futimens(f.as_fd(),
-                     f.as_os_str().as_bytes().as_ptr() as *const _,
-                     [atime_ms.map(ms_to_timespec).unwrap_or(NO_TIMESPEC), mtime_ms.map(ms_to_timespec).unwrap_or(NO_TIMESPEC)].as_ptr();
+            futimens(f.as_raw_fd(),
+                     [atime_ms.map(ms_to_timespec).unwrap_or(NO_TIMESPEC), mtime_ms.map(ms_to_timespec).unwrap_or(NO_TIMESPEC)].as_ptr());
         }
     }
 }
