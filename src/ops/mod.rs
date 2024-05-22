@@ -1155,10 +1155,13 @@ impl HttpHandler {
         } else if req.headers.has::<headers::ContentRange>() {
             self.handle_put_partial_content(req)
         } else {
-            let legal = (symlink && !self.follow_symlinks) ||
-                        (symlink && self.follow_symlinks && self.sandbox_symlinks && !is_nonexistent_descendant_of(&req_p, &self.hosted_directory.1));
+            let illegal = (symlink && !self.follow_symlinks) ||
+                          (symlink && self.follow_symlinks && self.sandbox_symlinks && !is_nonexistent_descendant_of(&req_p, &self.hosted_directory.1));
+            if illegal {
+                return self.handle_nonexistent(req, req_p);
+            }
             self.create_temp_dir(&self.writes_temp_dir);
-            self.handle_put_file(req, req_p, !legal)
+            self.handle_put_file(req, req_p)
         }
     }
 
@@ -1197,22 +1200,20 @@ impl HttpHandler {
                                                                 ""]))
     }
 
-    fn handle_put_file(&self, req: &mut Request, req_p: PathBuf, legal: bool) -> IronResult<Response> {
-        let existent = !legal || req_p.exists();
+    fn handle_put_file(&self, req: &mut Request, req_p: PathBuf) -> IronResult<Response> {
+        let existent = req_p.exists();
         let mtime = req.headers.get::<XLastModified>().map(|xlm| xlm.0).or_else(|| req.headers.get::<XOcMTime>().map(|xocmt| xocmt.0 * 1000));
         log!(self.log,
              "{} {} {magenta}{}{reset}, size: {}B{}{}",
              self.remote_addresses(&req),
-             if !legal {
-                 "tried to illegally create"
-             } else if existent {
+             if existent {
                  "replaced"
              } else {
                  "created"
              },
              req_p.display(),
              *req.headers.get::<headers::ContentLength>().expect("No Content-Length header"),
-             mtime.map(|_| ". modified: ").unwrap_or(""),
+             mtime.map_or("", |_| ". modified: "),
              Maybe(mtime.map(MsAsS)));
 
         let &(_, ref temp_dir) = self.writes_temp_dir.as_ref().unwrap();
@@ -1228,15 +1229,14 @@ impl HttpHandler {
         let _temp_file_p_destroyer = DropDelete(&temp_file_p);
         io::copy(&mut req.body, &mut file).expect("Failed to write requested data to requested file");
         drop(file);
-        if legal {
-            let _ = fs::create_dir_all(req_p.parent().expect("Failed to get requested file's parent directory"));
-            fs::copy(&temp_file_p, &req_p).expect("Failed to copy temp file to requested file");
-            if let Some(ms) = mtime {
-                set_mtime(&req_p, ms);
-            }
+
+        let _ = fs::create_dir_all(req_p.parent().expect("Failed to get requested file's parent directory"));
+        fs::copy(&temp_file_p, &req_p).expect("Failed to copy temp file to requested file");
+        if let Some(ms) = mtime {
+            set_mtime(&req_p, ms);
         }
 
-        Ok(Response::with((if !legal || !existent {
+        Ok(Response::with((if !existent {
                                status::Created
                            } else {
                                status::NoContent
