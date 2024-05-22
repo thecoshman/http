@@ -696,9 +696,8 @@ impl HttpHandler {
             let mut resp_p = self.encoded_temp_dir.as_ref().unwrap().1.join(cache_key.0.to_hex().as_str());
             match (req_p.extension(), encoding_extension(&encoding)) {
                 (Some(ext), Some(enc)) => resp_p.set_extension(format!("{}.{}", ext.to_str().unwrap_or("ext"), enc)),
-                (Some(ext), None) => resp_p.set_extension(format!("{}.{}", ext.to_str().unwrap_or("ext"), encoding)),
                 (None, Some(enc)) => resp_p.set_extension(enc),
-                (None, None) => resp_p.set_extension(format!("{}", encoding)),
+                (_, None) => unsafe { std::hint::unreachable_unchecked() },
             };
 
             if encode_file(&req_p, &resp_p, &encoding) {
