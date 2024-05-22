@@ -697,7 +697,12 @@ impl HttpHandler {
 
             let mut resp_p = self.encoded_temp_dir.as_ref().unwrap().1.join(cache_key.0.to_hex().as_str());
             match (req_p.extension(), encoding_extension(&encoding)) {
-                (Some(ext), Some(enc)) => resp_p.set_extension(format!("{}.{}", ext.to_str().unwrap_or("ext"), enc)),
+                (Some(ext), Some(enc)) => {
+                    let mut new_ext = ext.as_encoded_bytes().to_vec();
+                    new_ext.push(b'.');
+                    new_ext.extend_from_slice(enc.as_bytes());
+                    resp_p.set_extension(unsafe { OsStr::from_encoded_bytes_unchecked(&new_ext) })
+                },
                 (None, Some(enc)) => resp_p.set_extension(enc),
                 (_, None) => unsafe { std::hint::unreachable_unchecked() },
             };
