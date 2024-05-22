@@ -29,12 +29,12 @@ use rand::distributions::Alphanumeric as AlphanumericDistribution;
 use std::io::{self, ErrorKind as IoErrorKind, SeekFrom, Write, Error as IoError, Read, Seek};
 use iron::{headers, status, method, IronResult, Listening, Response, Headers, Request, Handler, Iron};
 use iron::mime::{Mime, Attr as MimeAttr, Value as MimeAttrValue, SubLevel as MimeSubLevel, TopLevel as MimeTopLevel};
-use self::super::util::{WwwAuthenticate, XLastModified, DisplayThree, CommaList, XOcMTime, MsAsS, Maybe, Dav, url_path, file_etag, file_hash, set_mtime,
-                        is_symlink, encode_str, encode_file, file_length, html_response, file_binary, client_mobile, percent_decode, escape_specials,
-                        file_icon_suffix, is_actually_file, is_descendant_of, response_encoding, detect_file_as_dir, encoding_extension, file_time_modified,
-                        file_time_modified_p, dav_level_1_methods, get_raw_fs_metadata, human_readable_size, encode_tail_if_trimmed, extension_is_blacklisted,
-                        is_nonexistent_descendant_of, USER_AGENT, ERROR_HTML, MAX_SYMLINKS, INDEX_EXTENSIONS, MIN_ENCODING_GAIN, MAX_ENCODING_SIZE,
-                        MIN_ENCODING_SIZE, DIRECTORY_LISTING_HTML, MOBILE_DIRECTORY_LISTING_HTML};
+use self::super::util::{WwwAuthenticate, XLastModified, DisplayThree, CommaList, XOcMTime, MsAsS, Maybe, Dav, url_path, file_etag, file_hash, set_mtime_f,
+                        is_symlink, encode_str, encode_file, file_length, html_response, file_binary, client_mobile, percent_decode,
+                        escape_specials, file_icon_suffix, is_actually_file, is_descendant_of, response_encoding, detect_file_as_dir, encoding_extension,
+                        file_time_modified, file_time_modified_p, dav_level_1_methods, get_raw_fs_metadata, human_readable_size, encode_tail_if_trimmed,
+                        extension_is_blacklisted, is_nonexistent_descendant_of, USER_AGENT, ERROR_HTML, MAX_SYMLINKS, INDEX_EXTENSIONS, MIN_ENCODING_GAIN,
+                        MAX_ENCODING_SIZE, MIN_ENCODING_SIZE, DIRECTORY_LISTING_HTML, MOBILE_DIRECTORY_LISTING_HTML};
 
 
 macro_rules! log {
@@ -703,7 +703,7 @@ impl HttpHandler {
                     new_ext.push(b'.');
                     new_ext.extend_from_slice(enc.as_bytes());
                     resp_p.set_extension(unsafe { OsStr::from_encoded_bytes_unchecked(&new_ext) })
-                },
+                }
                 (None, Some(enc)) => resp_p.set_extension(enc),
                 (_, None) => unsafe { std::hint::unreachable_unchecked() },
             };
@@ -1160,7 +1160,6 @@ impl HttpHandler {
             if illegal {
                 return self.handle_nonexistent(req, req_p);
             }
-            self.create_temp_dir(&self.writes_temp_dir);
             self.handle_put_file(req, req_p)
         }
     }
@@ -1201,45 +1200,62 @@ impl HttpHandler {
     }
 
     fn handle_put_file(&self, req: &mut Request, req_p: PathBuf) -> IronResult<Response> {
-        let existent = req_p.exists();
+        let _ = fs::create_dir_all(req_p.parent().expect("Failed to get requested file's parent directory"));
+        let direct_output = File::create_new(&req_p);
+
+        let existent = direct_output.is_err();
         let mtime = req.headers.get::<XLastModified>().map(|xlm| xlm.0).or_else(|| req.headers.get::<XOcMTime>().map(|xocmt| xocmt.0 * 1000));
         log!(self.log,
              "{} {} {magenta}{}{reset}, size: {}B{}{}",
              self.remote_addresses(&req),
-             if existent {
-                 "replaced"
-             } else {
-                 "created"
-             },
+             if existent { "replaced" } else { "created" },
              req_p.display(),
              *req.headers.get::<headers::ContentLength>().expect("No Content-Length header"),
              mtime.map_or("", |_| ". modified: "),
              Maybe(mtime.map(MsAsS)));
 
-        let &(_, ref temp_dir) = self.writes_temp_dir.as_ref().unwrap();
-        let temp_file_p = temp_dir.join(req_p.file_name().expect("Failed to get requested file's filename"));
-        struct DropDelete<'a>(&'a Path);
-        impl<'a> Drop for DropDelete<'a> {
-            fn drop(&mut self) {
-                let _ = fs::remove_file(self.0);
+        let file = match direct_output {
+            Ok(mut file) => {
+                if let err @ Err(_) = io::copy(&mut req.body, &mut file) {
+                    drop(file);
+                    fs::remove_file(&req_p).expect("Failed to remove requested file after failure");
+                    err.expect("Failed to write requested data to requested file");
+                    unsafe { std::hint::unreachable_unchecked() };
+                }
+
+                file
             }
-        }
+            Err(_) => {
+                self.create_temp_dir(&self.writes_temp_dir);
+                let &(_, ref temp_dir) = self.writes_temp_dir.as_ref().unwrap();
+                let temp_file_p = temp_dir.join(req_p.file_name().expect("Failed to get requested file's filename"));
+                struct DropDelete<'a>(&'a Path);
+                impl<'a> Drop for DropDelete<'a> {
+                    fn drop(&mut self) {
+                        let _ = fs::remove_file(self.0);
+                    }
+                }
 
-        let mut file = File::create(&temp_file_p).expect("Failed to create temp file");
-        let _temp_file_p_destroyer = DropDelete(&temp_file_p);
-        io::copy(&mut req.body, &mut file).expect("Failed to write requested data to requested file");
-        drop(file);
+                let mut temp_file = File::options().read(true).write(true).create(true).truncate(true).open(&temp_file_p).expect("Failed to create temp file");
+                let _temp_file_p_destroyer = DropDelete(&temp_file_p);
+                io::copy(&mut req.body, &mut temp_file).expect("Failed to write requested data to temp file");
 
-        let _ = fs::create_dir_all(req_p.parent().expect("Failed to get requested file's parent directory"));
-        fs::copy(&temp_file_p, &req_p).expect("Failed to copy temp file to requested file");
+                temp_file.rewind().expect("Failed to rewind temp file");
+                let mut file = File::create(&req_p).expect("Failed to open requested file");
+                io::copy(&mut temp_file, &mut file).expect("Failed to copy temp file to requested file");
+
+                file
+            }
+        };
+
         if let Some(ms) = mtime {
-            set_mtime(&req_p, ms);
+            set_mtime_f(&file, ms);
         }
 
-        Ok(Response::with((if !existent {
-                               status::Created
-                           } else {
+        Ok(Response::with((if existent {
                                status::NoContent
+                           } else {
+                               status::Created
                            },
                            Header(headers::Server(USER_AGENT.into())))))
     }

@@ -41,21 +41,31 @@ pub fn set_mtime(f: &Path, ms: u64) {
     set_times(f, Some(ms), None, None)
 }
 
+pub fn set_mtime_f(f: &File, ms: u64) {
+    set_times_f(f, Some(ms), None, None)
+}
+
 
 const NO_FILETIME: FILETIME = FILETIME {
     dwLowDateTime: 0,
     dwHighDateTime: 0,
 };
 
+pub fn set_times_f(f: &File, mtime_ms: Option<u64>, atime_ms: Option<u64>, ctime_ms: Option<u64>) {
+    if mtime_ms.is_some() || atime_ms.is_some() || ctime_ms.is_some() {
+        unsafe {
+            SetFileTime(f.as_raw_handle(),
+                        &ctime_ms.map(ms_to_FILETIME).unwrap_or(NO_FILETIME),
+                        &atime_ms.map(ms_to_FILETIME).unwrap_or(NO_FILETIME),
+                        &mtime_ms.map(ms_to_FILETIME).unwrap_or(NO_FILETIME));
+        }
+    }
+}
+
 pub fn set_times(f: &Path, mtime_ms: Option<u64>, atime_ms: Option<u64>, ctime_ms: Option<u64>) {
     if mtime_ms.is_some() || atime_ms.is_some() || ctime_ms.is_some() {
         if let Ok(f) = File::options().write(true).open(f) {
-            unsafe {
-                SetFileTime(f.as_raw_handle(),
-                            &ctime_ms.map(ms_to_FILETIME).unwrap_or(NO_FILETIME),
-                            &atime_ms.map(ms_to_FILETIME).unwrap_or(NO_FILETIME),
-                            &mtime_ms.map(ms_to_FILETIME).unwrap_or(NO_FILETIME));
-            }
+            set_times_f(&f, mtime_ms, atime_ms, ctime_ms);
         }
     }
 }
