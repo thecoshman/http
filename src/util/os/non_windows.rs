@@ -1,4 +1,4 @@
-use libc::{AT_SYMLINK_NOFOLLOW, UTIME_OMIT, AT_FDCWD, futimens, utimensat, timespec, umask};
+use libc::{AT_SYMLINK_NOFOLLOW, UTIME_OMIT, AT_FDCWD, mode_t, futimens, utimensat, timespec, umask};
 use std::os::unix::fs::{PermissionsExt, MetadataExt};
 use self::super::super::is_actually_file;
 use std::fs::{self, Metadata, File};
@@ -66,8 +66,8 @@ static mut UMASK: u32 = 0;
 static LOAD_UMASK: unsafe extern "C" fn() = {
     #[cfg_attr(any(target_os = "linux", target_os = "android"), link_section = ".text.startup")]
     unsafe extern "C" fn load_umask() {
-        UMASK = umask(0o777);
-        umask(UMASK);
+        UMASK = umask(0o777) as u32;
+        umask(UMASK as mode_t);
     }
     load_umask
 };
