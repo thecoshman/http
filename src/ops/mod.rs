@@ -1242,7 +1242,10 @@ impl HttpHandler {
 
                 temp_file.rewind().expect("Failed to rewind temp file");
                 let mut file = File::create(&req_p).expect("Failed to open requested file");
+                #[cfg(any(target_os = "linux", target_os = "android"))] // matches std::io::copy() #[cfg]
                 io::copy(&mut temp_file, &mut file).expect("Failed to copy temp file to requested file");
+                #[cfg(not(any(target_os = "linux", target_os = "android")))]
+                io::copy(&mut BufReader::with_capacity(1024 * 1024, &mut temp_file), &mut file).expect("Failed to copy temp file to requested file");
 
                 file
             }
