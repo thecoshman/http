@@ -4,10 +4,10 @@ extern crate base64;
 extern crate cc;
 
 use std::env;
-use std::io::Write;
 use std::path::Path;
 use std::fs::{self, File};
 use base64::display::Base64Display;
+use std::io::{BufReader, BufRead, Write};
 use std::collections::{BTreeMap, BTreeSet};
 
 
@@ -25,6 +25,14 @@ fn main() {
 
 fn assets() -> Vec<(&'static str, String)> {
     let mut assets = Vec::new();
+    {
+        println!("cargo:rerun-if-changed=Cargo.toml");
+        assets.push(("generator",
+                     format!("http {}",
+                             BufReader::new(File::open("Cargo.toml").unwrap()).lines().flatten().find(|l| l.starts_with("version = ")).unwrap()
+                                 ["version = ".len()..]
+                                 .trim_matches('"'))));
+    }
     for (key, mime, file) in
         [("favicon", "image/png", "assets/favicon.png"),
          ("dir_icon", "image/gif", "assets/icons/directory.gif"),
@@ -102,7 +110,7 @@ fn htmls() {
             Err(_) => sz,
         });
         writeln!(&mut out,
-r#") -> String {{
+                 r#") -> String {{
     let mut ret = Vec::with_capacity({});  // {}"#,
                  if html == "error.html" {
                      raw_bytes.next_power_of_two()
@@ -119,10 +127,12 @@ r#") -> String {{
         }
         writeln!(&mut out, "    ret.extend({:?}.as_bytes());", &with_assets[idx..]).unwrap();
 
-        writeln!(&mut out, r#"
+        writeln!(&mut out,
+                 r#"
     ret.shrink_to_fit();
     unsafe {{ String::from_utf8_unchecked(ret) }}
-}}"#).unwrap();
+}}"#)
+            .unwrap();
     }
 }
 
