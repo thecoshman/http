@@ -887,10 +887,14 @@ impl HttpHandler {
             while parentpath.last() != Some(&b'/') {
                 parentpath = &parentpath[0..parentpath.len() - 1];
             }
+            let modified = file_time_modified_p(req_p.parent().unwrap_or(&req_p));
+            let modified_ts = modified.to_timespec();
             let _ = write!(out,
                            "<a href=\"{up_path}\" class=\"list entry top\"><span class=\"back_arrow_icon\">Parent directory</span></a> <a href=\"{up_path}\" \
-                            class=\"list entry bottom\"><span class=\"marker\">@</span><span class=\"datetime\">{} UTC</span></a>",
-                           file_time_modified_p(req_p.parent().unwrap_or(&req_p)).strftime("%F %T").unwrap(),
+                            class=\"list entry bottom\"><span class=\"marker\">@</span><time ms={}{:03}>{} UTC</time></a>",
+                           modified_ts.sec,
+                           modified_ts.nsec / 1000_000,
+                           modified.strftime("%F %T").unwrap(),
                            up_path = unsafe { str::from_utf8_unchecked(parentpath) });
         };
         let list_f = |out: &mut Vec<u8>| {
@@ -918,11 +922,12 @@ impl HttpHandler {
                 let fmeta = f.metadata().expect("Failed to get requested file metadata");
                 let fname = f.file_name().into_string().expect("Failed to get file name");
                 let path = f.path();
+                let modified = file_time_modified(&fmeta);
+                let modified_ts = modified.to_timespec();
 
                 let _ = write!(out,
                                "<a href=\"{path}{fname}\" class=\"list entry top\"><span class=\"{}{}_icon\" id=\"{}\">{}{}</span>{}</a> <a \
-                                href=\"{path}{fname}\" class=\"list entry bottom\"><span class=\"marker\">@</span><span class=\"datetime\">{} \
-                                UTC</span>{}</a>\n",
+                                href=\"{path}{fname}\" class=\"list entry bottom\"><span class=\"marker\">@</span><time ms={}{:03}>{} UTC</time>{}</a>\n",
                                if is_file { "file" } else { "dir" },
                                file_icon_suffix(&path, is_file),
                                path.file_name().map(|p| p.to_str().expect("Filename not UTF-8").replace('.', "_")).as_ref().unwrap_or(&fname),
@@ -939,7 +944,9 @@ impl HttpHandler {
                                } else {
                                    DisplayThree("", "", "")
                                },
-                               file_time_modified(&fmeta).strftime("%F %T").unwrap(),
+                               modified_ts.sec,
+                               modified_ts.nsec / 1000_000,
+                               modified.strftime("%F %T").unwrap(),
                                if is_file {
                                    DisplayThree("<span class=\"size\">", Maybe(Some(HumanReadableSize(file_length(&fmeta, &path)))), "</span>")
                                } else {
@@ -1005,11 +1012,15 @@ impl HttpHandler {
             while parentpath.last() != Some(&b'/') {
                 parentpath = &parentpath[0..parentpath.len() - 1];
             }
+            let modified = file_time_modified_p(req_p.parent().unwrap_or(&req_p));
+            let modified_ts = modified.to_timespec();
             let _ = write!(out,
                            "<tr><td><a href=\"{up_path}\" id=\"parent_dir\" class=\"back_arrow_icon\"></a></td> <td><a href=\"{up_path}\">Parent \
-                            directory</a></td> <td><a href=\"{up_path}\" class=\"datetime\">{}</a></td> <td><a href=\"{up_path}\">&nbsp;</a></td> <td><a \
+                            directory</a></td> <td><a href=\"{up_path}\"><time ms={}{:03}>{}</time></a></td> <td><a href=\"{up_path}\">&nbsp;</a></td> <td><a \
                             href=\"{up_path}\">&nbsp;</a></td></tr>",
-                           file_time_modified_p(req_p.parent().unwrap_or(&req_p)).strftime("%F %T").unwrap(),
+                           modified_ts.sec,
+                           modified_ts.nsec / 1000_000,
+                           modified.strftime("%F %T").unwrap(),
                            up_path = unsafe { str::from_utf8_unchecked(parentpath) });
         };
 
@@ -1041,6 +1052,8 @@ impl HttpHandler {
                 let fmeta = f.metadata().expect("Failed to get requested file metadata");
                 let fname = f.file_name().into_string().expect("Failed to get file name");
                 let len = file_length(&fmeta, &path);
+                let modified = file_time_modified(&fmeta);
+                let modified_ts = modified.to_timespec();
                 struct FileSizeDisplay(bool, u64);
                 impl fmt::Display for FileSizeDisplay {
                     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
@@ -1054,13 +1067,15 @@ impl HttpHandler {
 
                 let _ = write!(out,
                                "<tr><td><a href=\"{path}{fname}\" id=\"{}\" class=\"{}{}_icon\"></a></td> <td><a href=\"{path}{fname}\">{}{}</a></td> <td><a \
-                                href=\"{path}{fname}\" class=\"datetime\">{}</a></td> <td><a href=\"{path}{fname}\">{}{}{}</a></td> {}</tr>\n",
+                                href=\"{path}{fname}\"><time ms={}{:03}>{}</time></a></td> <td><a href=\"{path}{fname}\">{}{}{}</a></td> {}</tr>\n",
                                path.file_name().map(|p| p.to_str().expect("Filename not UTF-8").replace('.', "_")).as_ref().unwrap_or(&fname),
                                if is_file { "file" } else { "dir" },
                                file_icon_suffix(&path, is_file),
                                fname.replace('&', "&amp;").replace('<', "&lt;"),
                                if is_file { "" } else { "/" },
-                               file_time_modified(&fmeta).strftime("%F %T").unwrap(),
+                               modified_ts.sec,
+                               modified_ts.nsec / 1000_000,
+                               modified.strftime("%F %T").unwrap(),
                                FileSizeDisplay(is_file, len),
                                if is_file {
                                    Maybe(Some(HumanReadableSize(len)))

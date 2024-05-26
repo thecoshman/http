@@ -5,10 +5,10 @@ window.addEventListener("DOMContentLoaded", function() {
   if(modtime_h)
     modtime_h.innerText = modtime_h.innerText.replace(" (UTC)", "");
 
-  let timestamps = document.getElementsByClassName("datetime");
-  Array.from(timestamps).forEach(function(r) {
-    let dt = new Date(r.innerText.replace(" UTC", "").replace(" ", "T") + "Z")
+  let timestamps = document.getElementsByTagName("time");
+  for(let r of timestamps) {
+    let dt = new Date(parseInt(r.getAttribute("ms")));
     dt.setMinutes(dt.getMinutes() - dt.getTimezoneOffset())
-    r.innerText = dt.toISOString().replace("T", " ").replace(".000Z", " ");
-  });
+    r.innerText = dt.toISOString().slice(0, 19).replace("T", " ");
+  }
 });
