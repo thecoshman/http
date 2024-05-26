@@ -1011,9 +1011,9 @@ impl HttpHandler {
             let modified = file_time_modified_p(req_p.parent().unwrap_or(&req_p));
             let modified_ts = modified.to_timespec();
             let _ = write!(out,
-                           "<tr><td><a href=\"{up_path}\" id=\"parent_dir\" class=\"back_arrow_icon\"></a></td> <td><a href=\"{up_path}\">Parent \
-                            directory</a></td> <td><a href=\"{up_path}\"><time ms={}{:03}>{}</time></a></td> <td><a href=\"{up_path}\">&nbsp;</a></td> <td><a \
-                            href=\"{up_path}\">&nbsp;</a></td></tr>",
+                           "<tr><td><a href=\"{up_path}\" tabindex=\"-1\" id=\"parent_dir\" class=\"back_arrow_icon\"></a></td> <td><a href=\"{up_path}\">Parent \
+                            directory</a></td> <td><a href=\"{up_path}\" tabindex=\"-1\"><time ms={}{:03}>{}</time></a></td> <td><a href=\"{up_path}\" tabindex=\"-1\">&nbsp;</a></td> <td><a \
+                            href=\"{up_path}\" tabindex=\"-1\">&nbsp;</a></td></tr>",
                            modified_ts.sec,
                            modified_ts.nsec / 1000_000,
                            modified.strftime("%F %T").unwrap(),
@@ -1062,8 +1062,8 @@ impl HttpHandler {
                 }
 
                 let _ = write!(out,
-                               "<tr><td><a href=\"{path}{fname}\" id=\"{}\" class=\"{}{}_icon\"></a></td> <td><a href=\"{path}{fname}\">{}{}</a></td> <td><a \
-                                href=\"{path}{fname}\"><time ms={}{:03}>{}</time></a></td> <td><a href=\"{path}{fname}\">{}{}{}</a></td> {}</tr>\n",
+                               "<tr><td><a href=\"{path}{fname}\" tabindex=\"-1\" id=\"{}\" class=\"{}{}_icon\"></a></td> <td><a href=\"{path}{fname}\">{}{}</a></td> <td><a \
+                                href=\"{path}{fname}\" tabindex=\"-1\"><time ms={}{:03}>{}</time></a></td> <td><a href=\"{path}{fname}\" tabindex=\"-1\">{}{}{}</a></td> {}</tr>\n",
                                path.file_name().map(|p| p.to_str().expect("Filename not UTF-8").replace('.', "_")).as_ref().unwrap_or(&fname),
                                if is_file { "file" } else { "dir" },
                                file_icon_suffix(&path, is_file),
@@ -1128,11 +1128,11 @@ impl HttpHandler {
                                                                            ""
                                                                        },
                                                                        if show_file_management_controls && self.webdav {
-                                                                           "<tr id=\"new_directory\"><td><a href class=\"new_dir_icon\"></a></td> \
-                                                                                                     <td><a href>Create directory</a></td> \
-                                                                                                     <td><a href>&nbsp;</a></td> \
-                                                                                                     <td><a href>&nbsp;</a></td> \
-                                                                                                     <td><a href>&nbsp;</a></td></tr>"
+                                                                           "<tr id=\"new_directory\"><td><a tabindex=\"-1\" href class=\"new_dir_icon\"></a></td> \
+                                                                                                     <td><a                 href>Create directory</a></td> \
+                                                                                                     <td><a tabindex=\"-1\" href>&nbsp;</a></td> \
+                                                                                                     <td><a tabindex=\"-1\" href>&nbsp;</a></td> \
+                                                                                                     <td><a tabindex=\"-1\" href>&nbsp;</a></td></tr>"
                                                                        } else {
                                                                            ""
                                                                        }))
