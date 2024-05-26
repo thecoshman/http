@@ -887,18 +887,18 @@ impl HttpHandler {
         let parent_s = if is_root {
             String::new()
         } else {
-            let mut parentpath = &relpath_escaped[..];
-            while parentpath.as_bytes().last() == Some(&b'/') {
+            let mut parentpath = relpath_escaped.as_bytes();
+            while parentpath.last() == Some(&b'/') {
                 parentpath = &parentpath[0..parentpath.len() - 1];
             }
-            while parentpath.as_bytes().last() != Some(&b'/') {
+            while parentpath.last() != Some(&b'/') {
                 parentpath = &parentpath[0..parentpath.len() - 1];
             }
             format!("<a href=\"{up_path}\" class=\"list entry top\"><span class=\"back_arrow_icon\">Parent directory</span></a> \
                      <a href=\"{up_path}\" class=\"list entry bottom\"><span class=\"marker\">@</span>\
                        <span class=\"datetime\">{} UTC</span></a>",
                     file_time_modified_p(req_p.parent().unwrap_or(&req_p)).strftime("%F %T").unwrap(),
-                    up_path = parentpath)
+                    up_path = unsafe { str::from_utf8_unchecked(parentpath) })
         };
         let mut list = req_p.read_dir()
             .expect("Failed to read requested directory")
@@ -1008,18 +1008,18 @@ impl HttpHandler {
         let parent_s = if is_root {
             String::new()
         } else {
-            let mut parentpath = &relpath_escaped[..];
-            while parentpath.as_bytes().last() == Some(&b'/') {
+            let mut parentpath = relpath_escaped.as_bytes();
+            while parentpath.last() == Some(&b'/') {
                 parentpath = &parentpath[0..parentpath.len() - 1];
             }
-            while parentpath.as_bytes().last() != Some(&b'/') {
+            while parentpath.last() != Some(&b'/') {
                 parentpath = &parentpath[0..parentpath.len() - 1];
             }
             format!("<tr><td><a href=\"{up_path}\" id=\"parent_dir\" class=\"back_arrow_icon\"></a></td> <td><a href=\"{up_path}\">Parent directory</a></td> \
                      <td><a href=\"{up_path}\" class=\"datetime\">{}</a></td> <td><a href=\"{up_path}\">&nbsp;</a></td> <td><a \
                      href=\"{up_path}\">&nbsp;</a></td></tr>",
                     file_time_modified_p(req_p.parent().unwrap_or(&req_p)).strftime("%F %T").unwrap(),
-                    up_path = parentpath)
+                    up_path = unsafe { str::from_utf8_unchecked(parentpath) })
         };
 
 
