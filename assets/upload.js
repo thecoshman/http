@@ -1,6 +1,6 @@
 "use strict";
 
-window.addEventListener("load", function() {
+window.addEventListener("DOMContentLoaded", function() {
   const SUPPORTED_TYPES = ["Files", "application/x-moz-file"];
 
   let body = document.getElementsByTagName("body")[0];

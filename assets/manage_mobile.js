@@ -1,6 +1,6 @@
 "use strict";
 
-window.addEventListener("load", function() {
+window.addEventListener("DOMContentLoaded", function() {
   let new_directory_line = document.getElementById("new_directory");
 
   if(new_directory_line) {
