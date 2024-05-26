@@ -39,15 +39,13 @@ function rename(fname_from, fname_to, status_out) {
   if(fname_from.endsWith("/"))
     fname_from = fname_from.substr(0, fname_from.length - 1);
   if(fname_to.endsWith("/"))
-    fname_to = fname_to.substr(0, fname_to.length - 1);
+    fname_to   = fname_to.substr(0, fname_to.length - 1);
 
-  let from = root_url + encodeURI(fname_from);
-  let to = root_url + encodeURI(fname_to);
-  if(from == to)  // 403 Forbidden nominally
+  if(fname_from == fname_to)  // 403 Forbidden nominally
     window.location.reload();
   else
-    make_request("MOVE", from, status_out, function(request) {
-      request.setRequestHeader("Destination", to);
+    make_request("MOVE", root_url + encodeURI(fname_from), status_out, function(request) {
+      request.setRequestHeader("Destination", root_url + encodeURI(fname_to));
     });
 }
 
