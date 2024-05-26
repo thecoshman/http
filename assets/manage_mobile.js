@@ -40,7 +40,7 @@ window.addEventListener("DOMContentLoaded", function() {
 
 
 function get_href_for_line(line) {
-  return line.href;
+  return line.parentElement.href;
 }
 
 function get_filename_cell_for_line(line) {
