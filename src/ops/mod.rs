@@ -961,7 +961,7 @@ impl HttpHandler {
                                                 html_response(MOBILE_DIRECTORY_LISTING_HTML,
                                                               &[&relpath_escaped[!is_root as usize..],
                                                                 if show_file_management_controls {
-                                                                    concat!(r#"<script type="text/javascript">"#, include_str!("../../assets/upload.js"))
+                                                                    concat!(r#"<script>"#, include_str!("../../assets/upload.js"))
                                                                 } else {
                                                                     ""
                                                                 },
@@ -985,7 +985,7 @@ impl HttpHandler {
                                                                     ""
                                                                 },
                                                                 if show_file_management_controls && self.webdav {
-                                                                    "<a id=\"new_directory\" href=\"#new_directory\" class=\"list entry top bottom\">
+                                                                    "<a id=\"new_directory\" href class=\"list entry top bottom\">
                                                                          <span class=\"new_dir_icon\">Create directory</span></a>"
                                                                 } else {
                                                                     ""
@@ -1079,9 +1079,9 @@ impl HttpHandler {
                    },
                    if is_file { "</abbr>" } else { "" },
                    if show_file_management_controls {
-                       DisplayThree("<td><a href=\"#delete_file\" class=\"delete_file_icon\">Delete</a>",
+                       DisplayThree("<td><a href class=\"delete_file_icon\">Delete</a>",
                                     if self.webdav {
-                                        " <a href=\"#rename\" class=\"rename_icon\">Rename</a>"
+                                        " <a href class=\"rename_icon\">Rename</a>"
                                     } else {
                                         ""
                                     },
@@ -1099,7 +1099,7 @@ impl HttpHandler {
                                                 html_response(DIRECTORY_LISTING_HTML,
                                                               &[&relpath_escaped[!is_root as usize..],
                                                                 if show_file_management_controls {
-                                                                    concat!(r#"<script type="text/javascript">"#, include_str!("../../assets/upload.js"))
+                                                                    concat!(r#"<script>"#, include_str!("../../assets/upload.js"))
                                                                 } else {
                                                                     ""
                                                                 },
@@ -1129,11 +1129,11 @@ impl HttpHandler {
                                                                     ""
                                                                 },
                                                                 if show_file_management_controls && self.webdav {
-                                                                    "<tr id=\"new_directory\"><td><a href=\"#new_directory\" class=\"new_dir_icon\"></a></td> \
-                                                                                              <td><a href=\"#new_directory\">Create directory</a></td> \
-                                                                                              <td><a href=\"#new_directory\">&nbsp;</a></td> \
-                                                                                              <td><a href=\"#new_directory\">&nbsp;</a></td> \
-                                                                                              <td><a href=\"#new_directory\">&nbsp;</a></td></tr>"
+                                                                    "<tr id=\"new_directory\"><td><a href class=\"new_dir_icon\"></a></td> \
+                                                                                              <td><a href>Create directory</a></td> \
+                                                                                              <td><a href>&nbsp;</a></td> \
+                                                                                              <td><a href>&nbsp;</a></td> \
+                                                                                              <td><a href>&nbsp;</a></td></tr>"
                                                                 } else {
                                                                     ""
                                                                 }]))
