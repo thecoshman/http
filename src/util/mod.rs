@@ -467,26 +467,32 @@ pub fn is_nonexistent_descendant_of<Pw: AsRef<Path>, Po: AsRef<Path>>(who: Pw, o
     false
 }
 
-/// Construct string representing a human-readable size.
+/// Write a representation as a human-readable size.
 ///
-/// Stolen, adapted and inlined from [fielsize.js](http://filesizejs.com).
-pub fn human_readable_size(s: u64) -> String {
-    const LN_KIB: f64 = 6.931471805599453; // 1024f64.ln()
+/// Stolen, adapted and inlined from [filesize.js](http://filesizejs.com).
+pub struct HumanReadableSize(pub u64);
 
-    if s == 0 {
-        "0 B".to_string()
-    } else {
-        let num = s as f64;
-        let exp = cmp::min(cmp::max((num.ln() / LN_KIB) as i32, 0), 8);
+impl fmt::Display for HumanReadableSize {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        const LN_KIB: f64 = 6.931471805599453; // 1024f64.ln()
 
-        let val = num / 2f64.powi(exp * 10);
+        if self.0 == 0 {
+            f.write_str("0 B")
+        } else {
+            let num = self.0 as f64;
+            let exp = cmp::min(cmp::max((num.ln() / LN_KIB) as i32, 0), 8);
 
-        if exp > 0 {
-                (val * 10f64).round() / 10f64
-            } else {
-                val.round()
-            }
-            .to_string() + " " + ["B", "KiB", "MiB", "GiB", "TiB", "PiB", "EiB", "ZiB", "YiB"][cmp::max(exp, 0) as usize]
+            let val = num / 2f64.powi(exp * 10);
+
+            write!(f,
+                   "{} {}",
+                   if exp > 0 {
+                       (val * 10f64).round() / 10f64
+                   } else {
+                       val.round()
+                   },
+                   ["B", "KiB", "MiB", "GiB", "TiB", "PiB", "EiB", "ZiB", "YiB"][cmp::max(exp, 0) as usize])
+        }
     }
 }
 

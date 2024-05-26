@@ -29,10 +29,10 @@ use rand::distributions::Alphanumeric as AlphanumericDistribution;
 use iron::{headers, status, method, IronResult, Listening, Response, Headers, Request, Handler, Iron};
 use std::io::{self, ErrorKind as IoErrorKind, BufReader, SeekFrom, Write, Error as IoError, Read, Seek};
 use iron::mime::{Mime, Attr as MimeAttr, Value as MimeAttrValue, SubLevel as MimeSubLevel, TopLevel as MimeTopLevel};
-use self::super::util::{WwwAuthenticate, XLastModified, DisplayThree, CommaList, XOcMTime, MsAsS, Maybe, Dav, url_path, file_etag, file_hash, set_mtime_f,
-                        is_symlink, encode_str, encode_file, file_length, html_response, file_binary, client_mobile, percent_decode,
+use self::super::util::{HumanReadableSize, WwwAuthenticate, XLastModified, DisplayThree, CommaList, XOcMTime, MsAsS, Maybe, Dav, url_path, file_etag,
+                        file_hash, set_mtime_f, is_symlink, encode_str, encode_file, file_length, html_response, file_binary, client_mobile, percent_decode,
                         escape_specials, file_icon_suffix, is_actually_file, is_descendant_of, response_encoding, detect_file_as_dir, encoding_extension,
-                        file_time_modified, file_time_modified_p, dav_level_1_methods, get_raw_fs_metadata, human_readable_size, encode_tail_if_trimmed,
+                        file_time_modified, file_time_modified_p, dav_level_1_methods, get_raw_fs_metadata, encode_tail_if_trimmed,
                         extension_is_blacklisted, is_nonexistent_descendant_of, USER_AGENT, ERROR_HTML, MAX_SYMLINKS, INDEX_EXTENSIONS, MIN_ENCODING_GAIN,
                         MAX_ENCODING_SIZE, MIN_ENCODING_SIZE, DIRECTORY_LISTING_HTML, MOBILE_DIRECTORY_LISTING_HTML};
 
@@ -947,9 +947,9 @@ impl HttpHandler {
                    },
                    file_time_modified(&fmeta).strftime("%F %T").unwrap(),
                    if is_file {
-                       DisplayThree("<span class=\"size\">", human_readable_size(file_length(&fmeta, &path)), "</span>")
+                       DisplayThree("<span class=\"size\">", Maybe(Some(HumanReadableSize(file_length(&fmeta, &path)))), "</span>")
                    } else {
-                       DisplayThree("", String::new(), "")
+                       DisplayThree("", Maybe(None), "")
                    },
                    path = relpath_escaped,
                    fname = encode_tail_if_trimmed(escape_specials(&fname)))
@@ -1073,9 +1073,9 @@ impl HttpHandler {
                    file_time_modified(&fmeta).strftime("%F %T").unwrap(),
                    FileSizeDisplay(is_file, len),
                    if is_file {
-                       human_readable_size(len)
+                       Maybe(Some(HumanReadableSize(len)))
                    } else {
-                       String::new()
+                       Maybe(None)
                    },
                    if is_file { "</abbr>" } else { "" },
                    if show_file_management_controls {

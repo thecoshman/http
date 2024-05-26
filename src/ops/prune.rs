@@ -1,6 +1,6 @@
 use std::sync::atomic::{AtomicU64, Ordering as AtomicOrdering};
 use iron::{IronResult, Response, Handler, Request};
-use self::super::super::util::human_readable_size;
+use self::super::super::util::HumanReadableSize;
 use self::super::super::Options;
 use std::collections::HashSet;
 use self::super::HttpHandler;
@@ -131,11 +131,11 @@ impl PruneChain {
             let end = precise_time_ns();
             log!(self.handler.log,
                  "Pruned {} + {} in {}ns; used: {} + {}",
-                 human_readable_size(freed_fs),
-                 human_readable_size(freed_gen),
+                 HumanReadableSize(freed_fs),
+                 HumanReadableSize(freed_gen),
                  end - start,
-                 human_readable_size(self.handler.cache_fs_size.load(AtomicOrdering::Relaxed)),
-                 human_readable_size(self.handler.cache_gen_size.load(AtomicOrdering::Relaxed)));
+                 HumanReadableSize(self.handler.cache_fs_size.load(AtomicOrdering::Relaxed)),
+                 HumanReadableSize(self.handler.cache_gen_size.load(AtomicOrdering::Relaxed)));
         }
     }
 }
