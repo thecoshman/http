@@ -8,9 +8,9 @@
 
 use self::super::super::util::{BorrowXmlName, Destination, DisplayThree, CommaList, Overwrite, Depth, win32_file_attributes, file_time_accessed,
                                file_time_modified, file_time_created, client_microsoft, is_actually_file, is_descendant_of, file_executable, set_executable,
-                               html_response, file_length, set_times, copy_dir, WEBDAV_ALLPROP_PROPERTIES_NON_WINDOWS, WEBDAV_ALLPROP_PROPERTIES_WINDOWS,
+                               error_html, file_length, set_times, copy_dir, WEBDAV_ALLPROP_PROPERTIES_NON_WINDOWS, WEBDAV_ALLPROP_PROPERTIES_WINDOWS,
                                WEBDAV_XML_NAMESPACE_MICROSOFT, WEBDAV_XML_NAMESPACE_APACHE, WEBDAV_PROPNAME_PROPERTIES, WEBDAV_XML_NAMESPACE_DAV,
-                               WEBDAV_XML_NAMESPACES, MAX_SYMLINKS, ERROR_HTML};
+                               WEBDAV_XML_NAMESPACES, MAX_SYMLINKS};
 use iron::mime::{Mime, Attr as MimeAttr, Value as MimeAttrValue, SubLevel as MimeSubLevel, TopLevel as MimeTopLevel};
 use std::io::{ErrorKind as IoErrorKind, Result as IoResult, Error as IoError, Write, Read};
 use xml::reader::{EventReader as XmlReader, XmlEvent as XmlREvent, Error as XmlRError};
@@ -59,32 +59,33 @@ impl HttpHandler {
 
         let depth = req.headers.get::<Depth>().copied().unwrap_or(Depth::Zero);
 
-        let props = match parse_propfind(req) {
-            Ok(props) => props,
-            Err(e) => {
-                match match e {
-                    Ok(pe) => Ok(pe),
-                    Err(xre) => {
-                        if xre.position() == XmlTextPosition::new() && xre.msg().contains("no root element") {
-                            Err(PropfindVariant::AllProp)
-                        } else {
-                            Ok(xre.to_string())
+        let props =
+            match parse_propfind(req) {
+                Ok(props) => props,
+                Err(e) => {
+                    match match e {
+                        Ok(pe) => Ok(pe),
+                        Err(xre) => {
+                            if xre.position() == XmlTextPosition::new() && xre.msg().contains("no root element") {
+                                Err(PropfindVariant::AllProp)
+                            } else {
+                                Ok(xre.to_string())
+                            }
                         }
+                    } {
+                        Ok(e) => {
+                            log!(self.log,
+                                 "{} tried to {red}PROPFIND{reset} {yellow}{}{reset} with invalid XML",
+                                 self.remote_addresses(&req),
+                                 req_p.display());
+                            return self.handle_generated_response_encoding(req,
+                                                                           status::BadRequest,
+                                                                           error_html("400 Bad Request", format_args!("Invalid XML: {}", e), ""));
+                        }
+                        Err(props) => props,
                     }
-                } {
-                    Ok(e) => {
-                        log!(self.log,
-                             "{} tried to {red}PROPFIND{reset} {yellow}{}{reset} with invalid XML",
-                             self.remote_addresses(&req),
-                             req_p.display());
-                        return self.handle_generated_response_encoding(req,
-                                                                       status::BadRequest,
-                                                                       html_response(ERROR_HTML, &["400 Bad Request", &format!("Invalid XML: {}", e), ""]));
-                    }
-                    Err(props) => props,
                 }
-            }
-        };
+            };
 
         log!(self.log,
              "{} requested {red}PROPFIND{reset} of {} on {yellow}{}{reset} at depth {}",
@@ -213,9 +214,7 @@ impl HttpHandler {
                      "{} tried to {red}PROPPATCH{reset} {yellow}{}{reset} with invalid XML",
                      self.remote_addresses(&req),
                      req_p.display());
-                return self.handle_generated_response_encoding(req,
-                                                               status::BadRequest,
-                                                               html_response(ERROR_HTML, &["400 Bad Request", &format!("Invalid XML: {}", e), ""]));
+                return self.handle_generated_response_encoding(req, status::BadRequest, error_html("400 Bad Request", format_args!("Invalid XML: {}", e), ""));
             }
         };
 
@@ -396,7 +395,7 @@ impl HttpHandler {
                 _ => {
                     self.handle_generated_response_encoding(req,
                                                             status::BadRequest,
-                                                            html_response(ERROR_HTML, &["400 Bad Request", &format!("Invalid depth: {}", depth), ""]))
+                                                            error_html("400 Bad Request", format_args!("Invalid depth: {}", depth), ""))
                 }
             }
         }

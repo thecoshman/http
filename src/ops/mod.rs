@@ -29,13 +29,12 @@ use rand::distributions::Alphanumeric as AlphanumericDistribution;
 use iron::{headers, status, method, IronResult, Listening, Response, Headers, Request, Handler, Iron};
 use std::io::{self, ErrorKind as IoErrorKind, BufReader, SeekFrom, Write, Error as IoError, Read, Seek};
 use iron::mime::{Mime, Attr as MimeAttr, Value as MimeAttrValue, SubLevel as MimeSubLevel, TopLevel as MimeTopLevel};
-use self::super::util::{HumanReadableSize, WwwAuthenticate, XLastModified, DisplayThree, CommaList, XOcMTime, MsAsS, Maybe, Dav, url_path, file_etag,
-                        file_hash, set_mtime_f, is_symlink, encode_str, encode_file, file_length, html_response, file_binary, client_mobile, percent_decode,
-                        escape_specials, file_icon_suffix, is_actually_file, is_descendant_of, response_encoding, detect_file_as_dir, encoding_extension,
-                        file_time_modified, file_time_modified_p, dav_level_1_methods, get_raw_fs_metadata, encode_tail_if_trimmed,
-                        extension_is_blacklisted, is_nonexistent_descendant_of, USER_AGENT, ERROR_HTML, MAX_SYMLINKS, INDEX_EXTENSIONS, MIN_ENCODING_GAIN,
-                        MAX_ENCODING_SIZE, MIN_ENCODING_SIZE, DIRECTORY_LISTING_HTML, MOBILE_DIRECTORY_LISTING_HTML};
-
+use self::super::util::{HumanReadableSize, WwwAuthenticate, XLastModified, DisplayThree, CommaList, XOcMTime, MsAsS, Maybe, Dav, url_path, file_etag, file_hash,
+                        set_mtime_f, is_symlink, encode_str, error_html, encode_file, file_length, file_binary, client_mobile, percent_decode, escape_specials,
+                        file_icon_suffix, is_actually_file, is_descendant_of, response_encoding, detect_file_as_dir, encoding_extension, file_time_modified,
+                        file_time_modified_p, dav_level_1_methods, get_raw_fs_metadata, encode_tail_if_trimmed, extension_is_blacklisted,
+                        directory_listing_html, directory_listing_mobile_html, is_nonexistent_descendant_of, USER_AGENT, MAX_SYMLINKS, INDEX_EXTENSIONS,
+                        MIN_ENCODING_GAIN, MAX_ENCODING_SIZE, MIN_ENCODING_SIZE};
 
 macro_rules! log {
     ($logcfg:expr, $fmt:expr) => {
@@ -401,9 +400,7 @@ impl HttpHandler {
              req.url,
              &cause[3..cause.len() - 4]); // Strip <p> tags
 
-        self.handle_generated_response_encoding(req,
-                                                status::BadRequest,
-                                                html_response(ERROR_HTML, &["400 Bad Request", "The request URL was invalid.", cause]))
+        self.handle_generated_response_encoding(req, status::BadRequest, error_html("400 Bad Request", "The request URL was invalid.", cause))
     }
 
     #[inline(always)]
@@ -421,10 +418,9 @@ impl HttpHandler {
         let url_p = url_path(&req.url);
         self.handle_generated_response_encoding(req,
                                                 status,
-                                                html_response(ERROR_HTML,
-                                                              &[&status.canonical_reason().unwrap()[..],
-                                                                &format!("The requested entity \"{}\" doesn't exist.", url_p),
-                                                                ""]))
+                                                error_html(&status.canonical_reason().unwrap()[..],
+                                                           format_args!("The requested entity \"{}\" doesn't exist.", url_p),
+                                                           ""))
     }
 
     fn handle_get_raw_fs_file(&self, req: &mut Request, req_p: PathBuf) -> IronResult<Response> {
@@ -580,12 +576,11 @@ impl HttpHandler {
     fn handle_invalid_range(&self, req: &mut Request, req_p: PathBuf, range: &headers::Range, reason: &str) -> IronResult<Response> {
         self.handle_generated_response_encoding(req,
                                                 status::RangeNotSatisfiable,
-                                                html_response(ERROR_HTML,
-                                                              &["416 Range Not Satisfiable",
-                                                                &format!("Requested range <samp>{}</samp> could not be fulfilled for file {}.",
-                                                                         range,
-                                                                         req_p.display()),
-                                                                reason]))
+                                                error_html("416 Range Not Satisfiable",
+                                                           format_args!("Requested range <samp>{}</samp> could not be fulfilled for file {}.",
+                                                                        range,
+                                                                        req_p.display()),
+                                                           reason))
     }
 
     fn handle_get_file_empty_range(&self, req: &mut Request, req_p: PathBuf, from: u64, to: u64, etag: String) -> IronResult<Response> {
@@ -884,9 +879,7 @@ impl HttpHandler {
              self.remote_addresses(&req),
              req_p.display());
 
-        let parent_s = if is_root {
-            String::new()
-        } else {
+        let parent_f = |out: &mut Vec<u8>| if !is_root {
             let mut parentpath = relpath_escaped.as_bytes();
             while parentpath.last() == Some(&b'/') {
                 parentpath = &parentpath[0..parentpath.len() - 1];
@@ -894,102 +887,101 @@ impl HttpHandler {
             while parentpath.last() != Some(&b'/') {
                 parentpath = &parentpath[0..parentpath.len() - 1];
             }
-            format!("<a href=\"{up_path}\" class=\"list entry top\"><span class=\"back_arrow_icon\">Parent directory</span></a> \
-                     <a href=\"{up_path}\" class=\"list entry bottom\"><span class=\"marker\">@</span>\
-                       <span class=\"datetime\">{} UTC</span></a>",
-                    file_time_modified_p(req_p.parent().unwrap_or(&req_p)).strftime("%F %T").unwrap(),
-                    up_path = unsafe { str::from_utf8_unchecked(parentpath) })
+            let _ = write!(out,
+                           "<a href=\"{up_path}\" class=\"list entry top\"><span class=\"back_arrow_icon\">Parent directory</span></a> <a href=\"{up_path}\" \
+                            class=\"list entry bottom\"><span class=\"marker\">@</span><span class=\"datetime\">{} UTC</span></a>",
+                           file_time_modified_p(req_p.parent().unwrap_or(&req_p)).strftime("%F %T").unwrap(),
+                           up_path = unsafe { str::from_utf8_unchecked(parentpath) });
         };
-        let mut list = req_p.read_dir()
-            .expect("Failed to read requested directory")
-            .map(|p| p.expect("Failed to iterate over requested directory"))
-            .filter(|f| {
-                let fp = f.path();
-                let mut symlink = false;
-                !((!self.follow_symlinks &&
-                   {
-                    symlink = is_symlink(&fp);
-                    symlink
-                }) || (self.follow_symlinks && self.sandbox_symlinks && symlink && !is_descendant_of(fp, &self.hosted_directory.1)))
-            })
-            .collect::<Vec<_>>();
-        list.sort_by(|lhs, rhs| {
-            (is_actually_file(&lhs.file_type().expect("Failed to get file type"), &lhs.path()),
-             lhs.file_name().to_str().expect("Failed to get file name").to_lowercase())
-                .cmp(&(is_actually_file(&rhs.file_type().expect("Failed to get file type"), &rhs.path()),
-                       rhs.file_name().to_str().expect("Failed to get file name").to_lowercase()))
-        });
-        let mut list_s = vec![];
-        for f in list {
-            let is_file = is_actually_file(&f.file_type().expect("Failed to get file type"), &f.path());
-            let fmeta = f.metadata().expect("Failed to get requested file metadata");
-            let fname = f.file_name().into_string().expect("Failed to get file name");
-            let path = f.path();
+        let list_f = |out: &mut Vec<u8>| {
+            let mut list = req_p.read_dir()
+                .expect("Failed to read requested directory")
+                .map(|p| p.expect("Failed to iterate over requested directory"))
+                .filter(|f| {
+                    let fp = f.path();
+                    let mut symlink = false;
+                    !((!self.follow_symlinks &&
+                       {
+                        symlink = is_symlink(&fp);
+                        symlink
+                    }) || (self.follow_symlinks && self.sandbox_symlinks && symlink && !is_descendant_of(fp, &self.hosted_directory.1)))
+                })
+                .collect::<Vec<_>>();
+            list.sort_by(|lhs, rhs| {
+                (is_actually_file(&lhs.file_type().expect("Failed to get file type"), &lhs.path()),
+                 lhs.file_name().to_str().expect("Failed to get file name").to_lowercase())
+                    .cmp(&(is_actually_file(&rhs.file_type().expect("Failed to get file type"), &rhs.path()),
+                           rhs.file_name().to_str().expect("Failed to get file name").to_lowercase()))
+            });
+            for f in list {
+                let is_file = is_actually_file(&f.file_type().expect("Failed to get file type"), &f.path());
+                let fmeta = f.metadata().expect("Failed to get requested file metadata");
+                let fname = f.file_name().into_string().expect("Failed to get file name");
+                let path = f.path();
 
-            write!(&mut list_s,
-                   "<a href=\"{path}{fname}\" class=\"list entry top\"><span class=\"{}{}_icon\" id=\"{}\">{}{}</span>{}</a> <a href=\"{path}{fname}\" \
-                    class=\"list entry bottom\"><span class=\"marker\">@</span><span class=\"datetime\">{} UTC</span>{}</a>\n",
-                   if is_file { "file" } else { "dir" },
-                   file_icon_suffix(&path, is_file),
-                   path.file_name().map(|p| p.to_str().expect("Filename not UTF-8").replace('.', "_")).as_ref().unwrap_or(&fname),
-                   fname.replace('&', "&amp;").replace('<', "&lt;"),
-                   if is_file { "" } else { "/" },
-                   if show_file_management_controls {
-                       DisplayThree("<span class=\"manage\"><span class=\"delete_file_icon\">Delete</span>",
-                                    if self.webdav {
-                                        " <span class=\"rename_icon\">Rename</span>"
-                                    } else {
-                                        ""
-                                    },
-                                    "</span>")
-                   } else {
-                       DisplayThree("", "", "")
-                   },
-                   file_time_modified(&fmeta).strftime("%F %T").unwrap(),
-                   if is_file {
-                       DisplayThree("<span class=\"size\">", Maybe(Some(HumanReadableSize(file_length(&fmeta, &path)))), "</span>")
-                   } else {
-                       DisplayThree("", Maybe(None), "")
-                   },
-                   path = relpath_escaped,
-                   fname = encode_tail_if_trimmed(escape_specials(&fname)))
-                .unwrap();
-        }
+                let _ = write!(out,
+                               "<a href=\"{path}{fname}\" class=\"list entry top\"><span class=\"{}{}_icon\" id=\"{}\">{}{}</span>{}</a> <a \
+                                href=\"{path}{fname}\" class=\"list entry bottom\"><span class=\"marker\">@</span><span class=\"datetime\">{} \
+                                UTC</span>{}</a>\n",
+                               if is_file { "file" } else { "dir" },
+                               file_icon_suffix(&path, is_file),
+                               path.file_name().map(|p| p.to_str().expect("Filename not UTF-8").replace('.', "_")).as_ref().unwrap_or(&fname),
+                               fname.replace('&', "&amp;").replace('<', "&lt;"),
+                               if is_file { "" } else { "/" },
+                               if show_file_management_controls {
+                                   DisplayThree("<span class=\"manage\"><span class=\"delete_file_icon\">Delete</span>",
+                                                if self.webdav {
+                                                    " <span class=\"rename_icon\">Rename</span>"
+                                                } else {
+                                                    ""
+                                                },
+                                                "</span>")
+                               } else {
+                                   DisplayThree("", "", "")
+                               },
+                               file_time_modified(&fmeta).strftime("%F %T").unwrap(),
+                               if is_file {
+                                   DisplayThree("<span class=\"size\">", Maybe(Some(HumanReadableSize(file_length(&fmeta, &path)))), "</span>")
+                               } else {
+                                   DisplayThree("", Maybe(None), "")
+                               },
+                               path = relpath_escaped,
+                               fname = encode_tail_if_trimmed(escape_specials(&fname)));
+            }
+        };
 
         self.handle_generated_response_encoding(req,
                                                 status::Ok,
-                                                html_response(MOBILE_DIRECTORY_LISTING_HTML,
-                                                              &[&relpath_escaped[!is_root as usize..],
-                                                                if show_file_management_controls {
-                                                                    concat!(r#"<script>"#, include_str!("../../assets/upload.js"))
-                                                                } else {
-                                                                    ""
-                                                                },
-                                                                if show_file_management_controls {
-                                                                    include_str!("../../assets/manage_mobile.js")
-                                                                } else {
-                                                                    ""
-                                                                },
-                                                                if show_file_management_controls {
-                                                                    concat!(include_str!("../../assets/manage.js"), r#"</script>"#)
-                                                                } else {
-                                                                    ""
-                                                                },
-                                                                &parent_s[..],
-                                                                unsafe { str::from_utf8_unchecked(&list_s[..]) },
-                                                                if show_file_management_controls {
-                                                                    "<span class=\"list heading top top-border bottom\"> \
-                                                                       Upload files: <input id=\"file_upload\" type=\"file\" multiple /> \
-                                                                     </span>"
-                                                                } else {
-                                                                    ""
-                                                                },
-                                                                if show_file_management_controls && self.webdav {
-                                                                    "<a id=\"new_directory\" href class=\"list entry top bottom\">
-                                                                         <span class=\"new_dir_icon\">Create directory</span></a>"
-                                                                } else {
-                                                                    ""
-                                                                }]))
+                                                directory_listing_mobile_html(&relpath_escaped[!is_root as usize..],
+                                                                              if show_file_management_controls {
+                                                                                  concat!(r#"<script>"#, include_str!("../../assets/upload.js"))
+                                                                              } else {
+                                                                                  ""
+                                                                              },
+                                                                              if show_file_management_controls {
+                                                                                  include_str!("../../assets/manage_mobile.js")
+                                                                              } else {
+                                                                                  ""
+                                                                              },
+                                                                              if show_file_management_controls {
+                                                                                  concat!(include_str!("../../assets/manage.js"), r#"</script>"#)
+                                                                              } else {
+                                                                                  ""
+                                                                              },
+                                                                              parent_f,
+                                                                              list_f,
+                                                                              if show_file_management_controls {
+                                                                                  "<span class=\"list heading top top-border bottom\"> Upload files: <input \
+                                                                                   id=\"file_upload\" type=\"file\" multiple /> </span>"
+                                                                              } else {
+                                                                                  ""
+                                                                              },
+                                                                              if show_file_management_controls && self.webdav {
+                                                                                  "<a id=\"new_directory\" href class=\"list entry top bottom\">
+                                                                                   <span class=\"new_dir_icon\">Create directory</span></a>"
+                                                                              } else {
+                                                                                  ""
+                                                                              }))
     }
 
     fn handle_get_dir_listing(&self, req: &mut Request, req_p: PathBuf) -> IronResult<Response> {
@@ -1005,9 +997,7 @@ impl HttpHandler {
              self.remote_addresses(&req),
              req_p.display());
 
-        let parent_s = if is_root {
-            String::new()
-        } else {
+        let parent_f = |out: &mut Vec<u8>| if !is_root {
             let mut parentpath = relpath_escaped.as_bytes();
             while parentpath.last() == Some(&b'/') {
                 parentpath = &parentpath[0..parentpath.len() - 1];
@@ -1015,128 +1005,126 @@ impl HttpHandler {
             while parentpath.last() != Some(&b'/') {
                 parentpath = &parentpath[0..parentpath.len() - 1];
             }
-            format!("<tr><td><a href=\"{up_path}\" id=\"parent_dir\" class=\"back_arrow_icon\"></a></td> <td><a href=\"{up_path}\">Parent directory</a></td> \
-                     <td><a href=\"{up_path}\" class=\"datetime\">{}</a></td> <td><a href=\"{up_path}\">&nbsp;</a></td> <td><a \
-                     href=\"{up_path}\">&nbsp;</a></td></tr>",
-                    file_time_modified_p(req_p.parent().unwrap_or(&req_p)).strftime("%F %T").unwrap(),
-                    up_path = unsafe { str::from_utf8_unchecked(parentpath) })
+            let _ = write!(out,
+                           "<tr><td><a href=\"{up_path}\" id=\"parent_dir\" class=\"back_arrow_icon\"></a></td> <td><a href=\"{up_path}\">Parent \
+                            directory</a></td> <td><a href=\"{up_path}\" class=\"datetime\">{}</a></td> <td><a href=\"{up_path}\">&nbsp;</a></td> <td><a \
+                            href=\"{up_path}\">&nbsp;</a></td></tr>",
+                           file_time_modified_p(req_p.parent().unwrap_or(&req_p)).strftime("%F %T").unwrap(),
+                           up_path = unsafe { str::from_utf8_unchecked(parentpath) });
         };
-
 
         let rd = match req_p.read_dir() {
             Ok(rd) => rd,
             Err(err) => return self.handle_requested_entity_unopenable(req, err, "directory"),
         };
-        let mut list = rd.map(|p| p.expect("Failed to iterate over requested directory"))
-            .filter(|f| {
-                let fp = f.path();
-                let mut symlink = false;
-                !((!self.follow_symlinks &&
-                   {
-                    symlink = is_symlink(&fp);
-                    symlink
-                }) || (self.follow_symlinks && self.sandbox_symlinks && symlink && !is_descendant_of(fp, &self.hosted_directory.1)))
-            })
-            .collect::<Vec<_>>();
-        list.sort_by(|lhs, rhs| {
-            (is_actually_file(&lhs.file_type().expect("Failed to get file type"), &lhs.path()),
-             lhs.file_name().to_str().expect("Failed to get file name").to_lowercase())
-                .cmp(&(is_actually_file(&rhs.file_type().expect("Failed to get file type"), &rhs.path()),
-                       rhs.file_name().to_str().expect("Failed to get file name").to_lowercase()))
-        });
-        let mut list_s = vec![];
-        for f in list {
-            let is_file = is_actually_file(&f.file_type().expect("Failed to get file type"), &f.path());
-            let fmeta = f.metadata().expect("Failed to get requested file metadata");
-            let fname = f.file_name().into_string().expect("Failed to get file name");
-            let path = f.path();
-            let len = file_length(&fmeta, &path);
-            struct FileSizeDisplay(bool, u64);
-            impl fmt::Display for FileSizeDisplay {
-                fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-                    if self.0 {
-                        write!(f, "<abbr title=\"{} B\">", self.1)
-                    } else {
-                        f.write_str("&nbsp;")
+        let list_f = |out: &mut Vec<u8>| {
+            let mut list = rd.map(|p| p.expect("Failed to iterate over requested directory"))
+                .filter(|f| {
+                    let fp = f.path();
+                    let mut symlink = false;
+                    !((!self.follow_symlinks &&
+                       {
+                        symlink = is_symlink(&fp);
+                        symlink
+                    }) || (self.follow_symlinks && self.sandbox_symlinks && symlink && !is_descendant_of(fp, &self.hosted_directory.1)))
+                })
+                .collect::<Vec<_>>();
+            list.sort_by(|lhs, rhs| {
+                (is_actually_file(&lhs.file_type().expect("Failed to get file type"), &lhs.path()),
+                 lhs.file_name().to_str().expect("Failed to get file name").to_lowercase())
+                    .cmp(&(is_actually_file(&rhs.file_type().expect("Failed to get file type"), &rhs.path()),
+                           rhs.file_name().to_str().expect("Failed to get file name").to_lowercase()))
+            });
+            for f in list {
+                let path = f.path();
+                let is_file = is_actually_file(&f.file_type().expect("Failed to get file type"), &path);
+                let fmeta = f.metadata().expect("Failed to get requested file metadata");
+                let fname = f.file_name().into_string().expect("Failed to get file name");
+                let len = file_length(&fmeta, &path);
+                struct FileSizeDisplay(bool, u64);
+                impl fmt::Display for FileSizeDisplay {
+                    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+                        if self.0 {
+                            write!(f, "<abbr title=\"{} B\">", self.1)
+                        } else {
+                            f.write_str("&nbsp;")
+                        }
                     }
                 }
-            }
 
-            write!(&mut list_s,
-                   "<tr><td><a href=\"{path}{fname}\" id=\"{}\" class=\"{}{}_icon\"></a></td> <td><a href=\"{path}{fname}\">{}{}</a></td> <td><a \
-                    href=\"{path}{fname}\" class=\"datetime\">{}</a></td> <td><a href=\"{path}{fname}\">{}{}{}</a></td> {}</tr>\n",
-                   path.file_name().map(|p| p.to_str().expect("Filename not UTF-8").replace('.', "_")).as_ref().unwrap_or(&fname),
-                   if is_file { "file" } else { "dir" },
-                   file_icon_suffix(&path, is_file),
-                   fname.replace('&', "&amp;").replace('<', "&lt;"),
-                   if is_file { "" } else { "/" },
-                   file_time_modified(&fmeta).strftime("%F %T").unwrap(),
-                   FileSizeDisplay(is_file, len),
-                   if is_file {
-                       Maybe(Some(HumanReadableSize(len)))
-                   } else {
-                       Maybe(None)
-                   },
-                   if is_file { "</abbr>" } else { "" },
-                   if show_file_management_controls {
-                       DisplayThree("<td><a href class=\"delete_file_icon\">Delete</a>",
-                                    if self.webdav {
-                                        " <a href class=\"rename_icon\">Rename</a>"
-                                    } else {
-                                        ""
-                                    },
-                                    "</td>")
-                   } else {
-                       DisplayThree("", "", "")
-                   },
-                   path = relpath_escaped,
-                   fname = encode_tail_if_trimmed(escape_specials(&fname)))
-                .unwrap()
-        }
+                let _ = write!(out,
+                               "<tr><td><a href=\"{path}{fname}\" id=\"{}\" class=\"{}{}_icon\"></a></td> <td><a href=\"{path}{fname}\">{}{}</a></td> <td><a \
+                                href=\"{path}{fname}\" class=\"datetime\">{}</a></td> <td><a href=\"{path}{fname}\">{}{}{}</a></td> {}</tr>\n",
+                               path.file_name().map(|p| p.to_str().expect("Filename not UTF-8").replace('.', "_")).as_ref().unwrap_or(&fname),
+                               if is_file { "file" } else { "dir" },
+                               file_icon_suffix(&path, is_file),
+                               fname.replace('&', "&amp;").replace('<', "&lt;"),
+                               if is_file { "" } else { "/" },
+                               file_time_modified(&fmeta).strftime("%F %T").unwrap(),
+                               FileSizeDisplay(is_file, len),
+                               if is_file {
+                                   Maybe(Some(HumanReadableSize(len)))
+                               } else {
+                                   Maybe(None)
+                               },
+                               if is_file { "</abbr>" } else { "" },
+                               if show_file_management_controls {
+                                   DisplayThree("<td><a href class=\"delete_file_icon\">Delete</a>",
+                                                if self.webdav {
+                                                    " <a href class=\"rename_icon\">Rename</a>"
+                                                } else {
+                                                    ""
+                                                },
+                                                "</td>")
+                               } else {
+                                   DisplayThree("", "", "")
+                               },
+                               path = relpath_escaped,
+                               fname = encode_tail_if_trimmed(escape_specials(&fname)));
+            }
+        };
 
         self.handle_generated_response_encoding(req,
                                                 status::Ok,
-                                                html_response(DIRECTORY_LISTING_HTML,
-                                                              &[&relpath_escaped[!is_root as usize..],
-                                                                if show_file_management_controls {
-                                                                    concat!(r#"<script>"#, include_str!("../../assets/upload.js"))
-                                                                } else {
-                                                                    ""
-                                                                },
-                                                                if show_file_management_controls {
-                                                                    include_str!("../../assets/manage_desktop.js")
-                                                                } else {
-                                                                    ""
-                                                                },
-                                                                if show_file_management_controls {
-                                                                    concat!(include_str!("../../assets/manage.js"), r#"</script>"#)
-                                                                } else {
-                                                                    ""
-                                                                },
-                                                                &parent_s[..],
-                                                                unsafe { str::from_utf8_unchecked(&list_s[..]) },
-                                                                if show_file_management_controls {
-                                                                    "<hr /> \
-                                                                     <p> \
-                                                                       Drag&amp;Drop to upload or <input id=\"file_upload\" type=\"file\" multiple />. \
-                                                                     </p>"
-                                                                } else {
-                                                                    ""
-                                                                },
-                                                                if show_file_management_controls {
-                                                                    "<th>Manage</th>"
-                                                                } else {
-                                                                    ""
-                                                                },
-                                                                if show_file_management_controls && self.webdav {
-                                                                    "<tr id=\"new_directory\"><td><a href class=\"new_dir_icon\"></a></td> \
-                                                                                              <td><a href>Create directory</a></td> \
-                                                                                              <td><a href>&nbsp;</a></td> \
-                                                                                              <td><a href>&nbsp;</a></td> \
-                                                                                              <td><a href>&nbsp;</a></td></tr>"
-                                                                } else {
-                                                                    ""
-                                                                }]))
+                                                directory_listing_html(&relpath_escaped[!is_root as usize..],
+                                                                       if show_file_management_controls {
+                                                                           concat!(r#"<script>"#, include_str!("../../assets/upload.js"))
+                                                                       } else {
+                                                                           ""
+                                                                       },
+                                                                       if show_file_management_controls {
+                                                                           include_str!("../../assets/manage_desktop.js")
+                                                                       } else {
+                                                                           ""
+                                                                       },
+                                                                       if show_file_management_controls {
+                                                                           concat!(include_str!("../../assets/manage.js"), r#"</script>"#)
+                                                                       } else {
+                                                                           ""
+                                                                       },
+                                                                       parent_f,
+                                                                       list_f,
+                                                                       if show_file_management_controls {
+                                                                           "<hr /> <p> Drag&amp;Drop to upload or <input id=\"file_upload\" type=\"file\" \
+                                                                            multiple />. </p>"
+
+                                                                       } else {
+                                                                           ""
+                                                                       },
+                                                                       if show_file_management_controls {
+                                                                           "<th>Manage</th>"
+                                                                       } else {
+                                                                           ""
+                                                                       },
+                                                                       if show_file_management_controls && self.webdav {
+                                                                           "<tr id=\"new_directory\"><td><a href class=\"new_dir_icon\"></a></td> \
+                                                                                                     <td><a href>Create directory</a></td> \
+                                                                                                     <td><a href>&nbsp;</a></td> \
+                                                                                                     <td><a href>&nbsp;</a></td> \
+                                                                                                     <td><a href>&nbsp;</a></td></tr>"
+                                                                       } else {
+                                                                           ""
+                                                                       }))
     }
 
     fn handle_put(&self, req: &mut Request) -> IronResult<Response> {
@@ -1173,10 +1161,9 @@ impl HttpHandler {
              tpe,
              CommaList(self.allowed_methods.iter()));
 
-        let resp_text = html_response(ERROR_HTML,
-                                      &["405 Method Not Allowed",
-                                        &format!("Can't {} on a {}.", req.method, tpe),
-                                        &format!("<p>Allowed methods: {}</p>", CommaList(self.allowed_methods.iter()))]);
+        let resp_text = error_html("405 Method Not Allowed",
+                                   format_args!("Can't {} on a {}.", req.method, tpe),
+                                   format_args!("<p>Allowed methods: {}</p>", CommaList(self.allowed_methods.iter())));
         self.handle_generated_response_encoding(req, status::MethodNotAllowed, resp_text)
             .map(|mut r| {
                 r.headers.set(headers::Allow(self.allowed_methods.into()));
@@ -1192,11 +1179,10 @@ impl HttpHandler {
 
         self.handle_generated_response_encoding(req,
                                                 status::BadRequest,
-                                                html_response(ERROR_HTML,
-                                                              &["400 Bad Request",
-                                                                "<a href=\"https://tools.ietf.org/html/rfc7231#section-4.3.3\">RFC7231 forbids \
-                                                                 partial-content PUT requests.</a>",
-                                                                ""]))
+                                                error_html("400 Bad Request",
+                                                           "<a href=\"https://tools.ietf.org/html/rfc7231#section-4.3.3\">RFC7231 forbids partial-content \
+                                                            PUT requests.</a>",
+                                                           ""))
     }
 
     fn handle_put_file(&self, req: &mut Request, req_p: PathBuf) -> IronResult<Response> {
@@ -1333,13 +1319,12 @@ impl HttpHandler {
 
         self.handle_generated_response_encoding(req,
                                                 status::Forbidden,
-                                                html_response(ERROR_HTML,
-                                                              &["403 Forbidden",
-                                                                "This feature is currently disabled.",
-                                                                &format!("<p>Ask the server administrator to pass <samp>{}</samp> to the executable to \
-                                                                          enable support for {}.</p>",
-                                                                         switch,
-                                                                         desc)]))
+                                                error_html("403 Forbidden",
+                                                           "This feature is currently disabled.",
+                                                           format_args!("<p>Ask the server administrator to pass <samp>{}</samp> to the executable to \
+                                                                         enable support for {}.</p>",
+                                                                        switch,
+                                                                        desc)))
     }
 
     fn handle_bad_method(&self, req: &mut Request) -> IronResult<Response> {
@@ -1348,12 +1333,13 @@ impl HttpHandler {
              self.remote_addresses(&req),
              req.method);
 
-        let last_p = format!("<p>Unsupported request method: {}.<br />\nSupported methods: {}.</p>",
-                             req.method,
-                             CommaList(self.allowed_methods.iter()));
         self.handle_generated_response_encoding(req,
                                                 status::NotImplemented,
-                                                html_response(ERROR_HTML, &["501 Not Implemented", "This operation was not implemented.", &last_p]))
+                                                error_html("501 Not Implemented",
+                                                           "This operation was not implemented.",
+                                                           format_args!("<p>Unsupported request method: {}.<br />\nSupported methods: {}.</p>",
+                                                                        req.method,
+                                                                        CommaList(self.allowed_methods.iter()))))
     }
 
     fn handle_generated_response_encoding(&self, req: &mut Request, st: status::Status, resp: String) -> IronResult<Response> {
@@ -1441,7 +1427,7 @@ impl HttpHandler {
         if e.kind() == IoErrorKind::PermissionDenied {
             self.handle_generated_response_encoding(req,
                                                     status::Forbidden,
-                                                    html_response(ERROR_HTML, &["403 Forbidden", &format!("Can't access {}.", url_path(&req.url)), ""]))
+                                                    error_html("403 Forbidden", format_args!("Can't access {}.", url_path(&req.url)), ""))
         } else {
             // The ops that get here (File::open(), fs::read_dir()) can't return any other errors by the time they're run
             // (and even if it could, there isn't much we can do about them)

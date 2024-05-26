@@ -11,9 +11,9 @@ use walkdir::WalkDir;
 use std::borrow::Cow;
 use rfsapi::RawFileData;
 use std::time::SystemTime;
-use std::{cmp, fmt, f64, str};
 use iron::{mime, Headers, Url};
 use time::{self, Duration, Tm};
+use std::{cmp, fmt, f64, mem, str};
 use mime_guess::guess_mime_type_opt;
 use std::fs::{self, FileType, Metadata, File};
 use iron::headers::{HeaderFormat, UserAgent, Header};
@@ -27,22 +27,38 @@ pub use self::webdav::*;
 pub use self::content_encoding::*;
 
 
-pub enum PreparsedHtml {
-    Literal(&'static str),
-    Argument(usize),
+pub trait HtmlResponseElement {
+    fn commit(self, data: &mut Vec<u8>);
+}
+impl<'s> HtmlResponseElement for &'s str {
+    fn commit(self, data: &mut Vec<u8>) {
+        data.extend(self.as_bytes());
+    }
+}
+impl<'s> HtmlResponseElement for fmt::Arguments<'s> {
+    fn commit(self, data: &mut Vec<u8>) {
+        let mut orig = unsafe { String::from_utf8_unchecked(mem::replace(data, Vec::new())) };
+        let _ = fmt::write(&mut orig, self);
+        let _ = mem::replace(data, orig.into_bytes());
+    }
+}
+impl<F: FnOnce(&mut Vec<u8>)> HtmlResponseElement for F {
+    fn commit(self, data: &mut Vec<u8>) {
+        self(data)
+    }
 }
 
 // The generic HTML page to use as response to errors.
-// pub const ERROR_HTML: &str = include_str!(concat!(env!("OUT_DIR"), "/error.html"));
-pub const ERROR_HTML: &[PreparsedHtml] = include!(concat!(env!("OUT_DIR"), "/error.html.rs"));
+// pub fn error_html<T0: ...>(a0: ...) -> String
+include!(concat!(env!("OUT_DIR"), "/error.html.rs"));
 
 // The HTML page to use as template for a requested directory's listing.
-// pub const DIRECTORY_LISTING_HTML: &str = include_str!(concat!(env!("OUT_DIR"), "/directory_listing.html"));
-pub const DIRECTORY_LISTING_HTML: &[PreparsedHtml] = include!(concat!(env!("OUT_DIR"), "/directory_listing.html.rs"));
+// pub fn directory_listing_html<T0: ...>(a0: ...) -> String
+include!(concat!(env!("OUT_DIR"), "/directory_listing.html.rs"));
 
 // The HTML page to use as template for a requested directory's listing for mobile devices.
-// pub const MOBILE_DIRECTORY_LISTING_HTML: &str = include_str!(concat!(env!("OUT_DIR"), "/directory_listing_mobile.html"));
-pub const MOBILE_DIRECTORY_LISTING_HTML: &[PreparsedHtml] = include!(concat!(env!("OUT_DIR"), "/directory_listing_mobile.html.rs"));
+// pub fn directory_listing_mobile_html<T0: ...>(a0: ...) -> String
+include!(concat!(env!("OUT_DIR"), "/directory_listing_mobile.html.rs"));
 
 
 /// The port to start scanning from if no ports were given.
@@ -288,25 +304,6 @@ fn file_binary_impl(path: &Path) -> bool {
     path.metadata()
         .map(|m| is_device(&m.file_type()) || File::open(path).and_then(|f| BufReader::new(f).read_line(&mut String::new())).is_err())
         .unwrap_or(true)
-}
-
-/// Fill out an HTML template.
-///
-/// All fields must be addressed even if formatted to be empty.
-///
-/// # Examples
-///
-/// ```
-/// # use https::util::{html_response, NOT_IMPLEMENTED_HTML};
-/// println!(html_response(NOT_IMPLEMENTED_HTML, &["<p>Abolish the burgeoisie!</p>"]));
-/// ```
-pub fn html_response<S: AsRef<str>>(data: &[PreparsedHtml], format_strings: &[S]) -> String {
-    data.iter()
-        .map(|ph| match ph {
-            PreparsedHtml::Literal(lit) => lit,
-            PreparsedHtml::Argument(arg) => format_strings[*arg].as_ref(),
-        })
-        .collect()
 }
 
 /// Return the path part of the URL.

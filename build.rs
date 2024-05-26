@@ -72,18 +72,51 @@ fn htmls() {
             }
         }
 
-        let mut out = File::create(Path::new(&env::var("OUT_DIR").unwrap()).join(format!("{}.rs", html))).unwrap();
-        writeln!(out, "&[").unwrap();
+        let mut data = Vec::new();
+        let mut argsused = BTreeMap::<u32, u8>::new();
         let mut idx = 0;
         for (start, (len, argi)) in arguments {
             if with_assets[idx..start].len() != 0 {
-                writeln!(out, "PreparsedHtml::Literal({:?}),", &with_assets[idx..start]).unwrap();
+                data.push(Ok(&with_assets[idx..start]));
             }
-            writeln!(out, "PreparsedHtml::Argument({}),", argi).unwrap();
+            data.push(Err(argi));
+            *argsused.entry(argi).or_default() += 1;
             idx = start + len;
         }
-        writeln!(out, "PreparsedHtml::Literal({:?}),", &with_assets[idx..]).unwrap();
-        writeln!(out, "]").unwrap();
+
+
+        let mut out = File::create(Path::new(&env::var("OUT_DIR").unwrap()).join(format!("{}.rs", html))).unwrap();
+        write!(&mut out, "pub fn {}<", html.replace('.', "_")).unwrap();
+        for (arg, nused) in &argsused {
+            if *nused == 1 {
+                write!(&mut out, "T{}: HtmlResponseElement, ", arg).unwrap();
+            } else {
+                write!(&mut out, "T{}: HtmlResponseElement + Copy, ", arg).unwrap();
+            }
+        }
+        write!(&mut out, ">(").unwrap();
+        for (arg, _) in &argsused {
+            write!(&mut out, "a{}: T{}, ", arg, arg).unwrap();
+        }
+        let raw_bytes = data.iter().fold(0, |sz, dt| match dt {
+            Ok(s) => sz + s.len(),
+            Err(_) => sz,
+        });
+        writeln!(&mut out,
+r#") -> String {{
+    let mut ret = Vec::with_capacity({});  // {}"#, raw_bytes.next_power_of_two(), raw_bytes).unwrap();
+        for dt in data {
+            match dt {
+                Ok(s) => writeln!(&mut out, "    ret.extend({:?}.as_bytes());", s).unwrap(),
+                Err(i) => writeln!(&mut out, "    a{}.commit(&mut ret);", i).unwrap(),
+            }
+        }
+        writeln!(&mut out, "    ret.extend({:?}.as_bytes());", &with_assets[idx..]).unwrap();
+
+        writeln!(&mut out, r#"
+    ret.shrink_to_fit();
+    unsafe {{ String::from_utf8_unchecked(ret) }}
+}}"#).unwrap();
     }
 }
 
