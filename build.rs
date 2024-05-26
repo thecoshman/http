@@ -43,8 +43,7 @@ fn assets() -> Vec<(&'static str, String)> {
                              mime,
                              Base64Display::with_config(&fs::read(file).unwrap()[..], base64::STANDARD))));
     }
-    for (key, file) in [("date", "assets/date.js"),
-                        ("manage", "assets/manage.js"),
+    for (key, file) in [("manage", "assets/manage.js"),
                         ("manage_mobile", "assets/manage_mobile.js"),
                         ("manage_desktop", "assets/manage_desktop.js"),
                         ("upload", "assets/upload.js"),
@@ -104,7 +103,14 @@ fn htmls() {
         });
         writeln!(&mut out,
 r#") -> String {{
-    let mut ret = Vec::with_capacity({});  // {}"#, raw_bytes.next_power_of_two(), raw_bytes).unwrap();
+    let mut ret = Vec::with_capacity({});  // {}"#,
+                 if html == "error.html" {
+                     raw_bytes.next_power_of_two()
+                 } else {
+                     32 * 1024
+                 },
+                 raw_bytes)
+            .unwrap();
         for dt in data {
             match dt {
                 Ok(s) => writeln!(&mut out, "    ret.extend({:?}.as_bytes());", s).unwrap(),
