@@ -934,9 +934,9 @@ impl HttpHandler {
                                fname.replace('&', "&amp;").replace('<', "&lt;"),
                                if is_file { "" } else { "/" },
                                if show_file_management_controls {
-                                   DisplayThree("<span class=\"manage\"><span class=\"delete_file_icon\">Delete</span>",
+                                   DisplayThree("<span class=\"manage\"><span class=\"delete_file_icon\" onclick=\"delete_onclick(arguments[0])\">Delete</span>",
                                                 if self.webdav {
-                                                    " <span class=\"rename_icon\">Rename</span>"
+                                                    " <span class=\"rename_icon\" onclick=\"rename_onclick(arguments[0])\">Rename</span>"
                                                 } else {
                                                     ""
                                                 },
@@ -1084,9 +1084,9 @@ impl HttpHandler {
                                },
                                if is_file { "</abbr>" } else { "" },
                                if show_file_management_controls {
-                                   DisplayThree("<td><a href class=\"delete_file_icon\">Delete</a>",
+                                   DisplayThree("<td><a href class=\"delete_file_icon\" onclick=\"delete_onclick(arguments[0])\">Delete</a>",
                                                 if self.webdav {
-                                                    " <a href class=\"rename_icon\">Rename</a>"
+                                                    " <a href class=\"rename_icon\" onclick=\"rename_onclick(arguments[0])\">Rename</a>"
                                                 } else {
                                                     ""
                                                 },
