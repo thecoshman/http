@@ -29,10 +29,10 @@ use rand::distributions::Alphanumeric as AlphanumericDistribution;
 use iron::{headers, status, method, IronResult, Listening, Response, Headers, Request, Handler, Iron};
 use std::io::{self, ErrorKind as IoErrorKind, BufReader, SeekFrom, Write, Error as IoError, Read, Seek};
 use iron::mime::{Mime, Attr as MimeAttr, Value as MimeAttrValue, SubLevel as MimeSubLevel, TopLevel as MimeTopLevel};
-use self::super::util::{HumanReadableSize, WwwAuthenticate, XLastModified, DisplayThree, CommaList, XOcMTime, MsAsS, Maybe, Dav, url_path, file_etag, file_hash,
-                        set_mtime_f, is_symlink, encode_str, error_html, encode_file, file_length, file_binary, client_mobile, percent_decode, escape_specials,
-                        file_icon_suffix, is_actually_file, is_descendant_of, response_encoding, detect_file_as_dir, encoding_extension, file_time_modified,
-                        file_time_modified_p, dav_level_1_methods, get_raw_fs_metadata, encode_tail_if_trimmed, extension_is_blacklisted,
+use self::super::util::{HumanReadableSize, WwwAuthenticate, NoDoubleQuotes, XLastModified, DisplayThree, CommaList, XOcMTime, MsAsS, Maybe, Dav, url_path,
+                        file_etag, file_hash, set_mtime_f, is_symlink, encode_str, error_html, encode_file, file_length, file_binary, client_mobile, percent_decode,
+                        escape_specials, file_icon_suffix, is_actually_file, is_descendant_of, response_encoding, detect_file_as_dir, encoding_extension,
+                        file_time_modified, file_time_modified_p, dav_level_1_methods, get_raw_fs_metadata, encode_tail_if_trimmed, extension_is_blacklisted,
                         directory_listing_html, directory_listing_mobile_html, is_nonexistent_descendant_of, USER_AGENT, MAX_SYMLINKS, INDEX_EXTENSIONS,
                         MIN_ENCODING_GAIN, MAX_ENCODING_SIZE, MIN_ENCODING_SIZE};
 
@@ -928,7 +928,7 @@ impl HttpHandler {
                                r#"<a href="{path}{fname}"><div><span class="{}{}_icon" id="{}">{}{}</span>{}</div><div><time ms={}{:03}>{} UTC</time>{}</div></a>"#,
                                if is_file { "file" } else { "dir" },
                                file_icon_suffix(&path, is_file),
-                               path.file_name().map(|p| p.to_str().expect("Filename not UTF-8").replace('.', "_")).as_ref().unwrap_or(&fname),
+                               NoDoubleQuotes(&fname),
                                fname.replace('&', "&amp;").replace('<', "&lt;"),
                                if is_file { "" } else { "/" },
                                if show_file_management_controls {
@@ -1064,7 +1064,7 @@ impl HttpHandler {
                 let _ = write!(out,
                                "<tr><td><a href=\"{path}{fname}\" tabindex=\"-1\" id=\"{}\" class=\"{}{}_icon\"></a></td> <td><a href=\"{path}{fname}\">{}{}</a></td> <td><a \
                                 href=\"{path}{fname}\" tabindex=\"-1\"><time ms={}{:03}>{}</time></a></td> <td><a href=\"{path}{fname}\" tabindex=\"-1\">{}{}{}</a></td> {}</tr>\n",
-                               path.file_name().map(|p| p.to_str().expect("Filename not UTF-8").replace('.', "_")).as_ref().unwrap_or(&fname),
+                               NoDoubleQuotes(&fname),
                                if is_file { "file" } else { "dir" },
                                file_icon_suffix(&path, is_file),
                                fname.replace('&', "&amp;").replace('<', "&lt;"),

@@ -497,6 +497,21 @@ impl fmt::Display for HumanReadableSize {
     }
 }
 
+/// Replace `"` with `_`
+pub struct NoDoubleQuotes<'s>(pub &'s str);
+
+impl<'s> fmt::Display for NoDoubleQuotes<'s> {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        for (i, s) in self.0.split('"').enumerate() {
+            if i != 0 {
+                f.write_str("_")?;
+            }
+            f.write_str(s)?
+        }
+        Ok(())
+    }
+}
+
 /// Check if, given the request headers, the client should be considered a mobile device.
 pub fn client_mobile(hdr: &Headers) -> bool {
     hdr.get::<UserAgent>().map(|s| s.contains("Mobi") || s.contains("mobi")).unwrap_or(false)
