@@ -1211,13 +1211,14 @@ impl HttpHandler {
              mtime.map_or("", |_| ". modified: "),
              Maybe(mtime.map(MsAsS)));
 
+        let mut ibuf = BufReader::with_capacity(1024 * 1024, &mut req.body);
         let file = match direct_output {
             Ok(mut file) => {
-                if let err @ Err(_) = io::copy(&mut BufReader::with_capacity(1024 * 1024, &mut req.body), &mut file) {
+                if let Err(err) = io::copy(&mut ibuf, &mut file) {
                     drop(file);
                     fs::remove_file(&req_p).expect("Failed to remove requested file after failure");
-                    err.expect("Failed to write requested data to requested file");
-                    unsafe { std::hint::unreachable_unchecked() };
+                    let _ = io::copy(&mut ibuf, &mut io::sink());
+                    return self.handle_put_error(req, "File not created.", err);
                 }
 
                 file
@@ -1235,14 +1236,21 @@ impl HttpHandler {
 
                 let mut temp_file = File::options().read(true).write(true).create(true).truncate(true).open(&temp_file_p).expect("Failed to create temp file");
                 let _temp_file_p_destroyer = DropDelete(&temp_file_p);
-                io::copy(&mut BufReader::with_capacity(1024 * 1024, &mut req.body), &mut temp_file).expect("Failed to write requested data to temp file");
+                if let Err(err) = io::copy(&mut ibuf, &mut temp_file) {
+                    let _ = io::copy(&mut ibuf, &mut io::sink());
+                    return self.handle_put_error(req, "File not created.", err);
+                }
 
+                let _temp_file_p_destroyer = DropDelete(&temp_file_p);
                 temp_file.rewind().expect("Failed to rewind temp file");
                 let mut file = File::create(&req_p).expect("Failed to open requested file");
                 #[cfg(any(target_os = "linux", target_os = "android"))] // matches std::io::copy() #[cfg]
-                io::copy(&mut temp_file, &mut file).expect("Failed to copy temp file to requested file");
+                let err = io::copy(&mut temp_file, &mut file);
                 #[cfg(not(any(target_os = "linux", target_os = "android")))]
-                io::copy(&mut BufReader::with_capacity(1024 * 1024, &mut temp_file), &mut file).expect("Failed to copy temp file to requested file");
+                let err = io::copy(&mut BufReader::with_capacity(1024 * 1024, &mut temp_file), &mut file);
+                if let Err(err) = err {
+                    return self.handle_put_error(req, "File truncated.", err);
+                }
 
                 file
             }
@@ -1258,6 +1266,11 @@ impl HttpHandler {
                                status::Created
                            },
                            Header(headers::Server(USER_AGENT.into())))))
+    }
+
+    fn handle_put_error(&self, req: &mut Request, res: &str, err: IoError) -> IronResult<Response> {
+        log!(self.log, "{:w$} {} {}", "", res, err, w = self.remote_addresses(req).width());
+        return self.handle_generated_response_encoding(req, status::ServiceUnavailable, error_html("503 Service Unavailable", res, format_args!("{}", err)));
     }
 
     fn handle_delete(&self, req: &mut Request) -> IronResult<Response> {

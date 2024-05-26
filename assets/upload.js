@@ -51,9 +51,12 @@ window.addEventListener("DOMContentLoaded", function() {
 
     let request = new XMLHttpRequest();
     request.addEventListener("loadend", function(e) {
-      if(!--remaining_files)
-        window.location.reload();
-      file_upload_text.data = remaining_files;
+      if(request.status >= 200 && request.status < 300) {
+        if(!--remaining_files)
+         window.location.reload();
+        file_upload_text.data = remaining_files;
+      } else
+        file_upload.outerHTML = req_url + "<br />" + request.response;
     });
     request.open("PUT", req_url);
     if(file.lastModified)
