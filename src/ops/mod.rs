@@ -890,8 +890,7 @@ impl HttpHandler {
             let modified = file_time_modified_p(req_p.parent().unwrap_or(&req_p));
             let modified_ts = modified.to_timespec();
             let _ = write!(out,
-                           "<a href=\"{up_path}\" class=\"list entry top\"><span class=\"back_arrow_icon\">Parent directory</span></a> <a href=\"{up_path}\" \
-                            class=\"list entry bottom\"><span class=\"marker\">@</span><time ms={}{:03}>{} UTC</time></a>",
+                           r#"<a href="{up_path}"><div><span class="back_arrow_icon">Parent directory</span></div><div><time ms={}{:03}>{} UTC</time></div></a>"#,
                            modified_ts.sec,
                            modified_ts.nsec / 1000_000,
                            modified.strftime("%F %T").unwrap(),
@@ -926,17 +925,16 @@ impl HttpHandler {
                 let modified_ts = modified.to_timespec();
 
                 let _ = write!(out,
-                               "<a href=\"{path}{fname}\" class=\"list entry top\"><span class=\"{}{}_icon\" id=\"{}\">{}{}</span>{}</a> <a \
-                                href=\"{path}{fname}\" class=\"list entry bottom\"><span class=\"marker\">@</span><time ms={}{:03}>{} UTC</time>{}</a>\n",
+                               r#"<a href="{path}{fname}"><div><span class="{}{}_icon" id="{}">{}{}</span>{}</div><div><time ms={}{:03}>{} UTC</time>{}</div></a>"#,
                                if is_file { "file" } else { "dir" },
                                file_icon_suffix(&path, is_file),
                                path.file_name().map(|p| p.to_str().expect("Filename not UTF-8").replace('.', "_")).as_ref().unwrap_or(&fname),
                                fname.replace('&', "&amp;").replace('<', "&lt;"),
                                if is_file { "" } else { "/" },
                                if show_file_management_controls {
-                                   DisplayThree("<span class=\"manage\"><span class=\"delete_file_icon\" onclick=\"delete_onclick(arguments[0])\">Delete</span>",
+                                   DisplayThree(r#"<span class="manage"><span class="delete_file_icon" onclick="delete_onclick(arguments[0])">Delete</span>"#,
                                                 if self.webdav {
-                                                    " <span class=\"rename_icon\" onclick=\"rename_onclick(arguments[0])\">Rename</span>"
+                                                    r#" <span class="rename_icon" onclick="rename_onclick(arguments[0])">Rename</span>"#
                                                 } else {
                                                     ""
                                                 },
@@ -978,14 +976,12 @@ impl HttpHandler {
                                                                               parent_f,
                                                                               list_f,
                                                                               if show_file_management_controls {
-                                                                                  "<span class=\"list heading top top-border bottom\"> Upload files: <input \
-                                                                                   id=\"file_upload\" type=\"file\" multiple /> </span>"
+                                                                                  r#"<span class="heading">Upload files: <input id="file_upload" type="file" multiple /></span>"#
                                                                               } else {
                                                                                   ""
                                                                               },
                                                                               if show_file_management_controls && self.webdav {
-                                                                                  "<a id=\"new_directory\" href class=\"list entry top bottom\">
-                                                                                   <span class=\"new_dir_icon\">Create directory</span></a>"
+                                                                                  r#"<a id="new_directory" href><span class="new_dir_icon">Create directory</span></a>"#
                                                                               } else {
                                                                                   ""
                                                                               }))

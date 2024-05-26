@@ -11,34 +11,21 @@
     {1}{2}{3}
     <title>Directory listing — {0}</title>
     <style>
-      .list {
+      body > * {
         display: block;
-        padding-left: 15px;
-        padding-right: 15px;
+        padding: 7px 15px;
+        border-bottom: solid 1px #00000050;
       }
 
       .heading {
         background-color: #0000000F;
       }
 
-      .entry.top, .heading.top-border {
-        border-top: solid 1px #00000050;
-      }
-
-      .top {
-        padding-top: 7px;
-      }
-
       .manage {
         float: right;
       }
 
-      .bottom {
-        padding-bottom: 7px;
-      }
-
       time {
-        float: left;
         font-size: 75%;
       }
 
@@ -123,15 +110,11 @@
     </style>
   </head>
   <body>
-    <div>
-      <a href="{0}" class="list heading top bottom">{0}</a>
-      {4}
-      {7}
-      {5}
-    </div>
+    <a href="{0}" class="heading">{0}</a>
+    {4}
+    {7}
+    {5}
     {6}
-    <a href="https://github.com/thecoshman/http" class="list heading top top-border bottom">
-      Host These Things Please — a basic HTTP server for hosting a folder fast and simply
-    </a>
+    <a href="//github.com/thecoshman/http" class="heading">Host These Things Please — a basic HTTP server for hosting a folder fast and simply</a>
   </body>
 </html>
