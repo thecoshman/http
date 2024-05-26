@@ -267,7 +267,7 @@ pub fn encode_tail_if_trimmed(mut s: Cow<str>) -> Cow<str> {
 
 /// %-escape special characters in an URL
 pub fn escape_specials(s: &str) -> Cow<str> {
-    let replacements = s.bytes().filter(|b| matches!(b, b'%' | b'#' | b'?' | b'[' | b']')).count();
+    let replacements = s.bytes().filter(|b| matches!(b, b'%' | b'#' | b'?' | b'[' | b']' | b'"')).count();
     if replacements == 0 {
         return s.into();
     }
@@ -280,6 +280,7 @@ pub fn escape_specials(s: &str) -> Cow<str> {
             b'?' => ret.extend(b"%3F"),
             b'[' => ret.extend(b"%5B"),
             b']' => ret.extend(b"%5D"),
+            b'"' => ret.extend(b"%22"),
             _ => ret.push(b),
         }
     }
