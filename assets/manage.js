@@ -22,11 +22,16 @@ function rename_onclick(ev) {
   };
   let new_name_input = make_filename_input(filename_cell, original_name, submit_callback);
 
-  link.classList.add("confirm_icon");
-  link.innerText = "Confirm";
-  link.onclick = function(ev) {
+  make_confirm_icon(link, submit_callback);
+}
+
+function make_confirm_icon(element, callback) {
+  element.classList.add("confirm_icon");
+  element.innerText = "Confirm";
+  element.onclick = function(ev) {
     ev.preventDefault();
-    submit_callback();
+    ev.stopImmediatePropagation();
+    callback();
   };
 }
 
