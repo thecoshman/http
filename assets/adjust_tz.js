@@ -1,8 +1,6 @@
 "use strict";
 
 window.addEventListener("load", function() {
-  const FORMAT = "yyyy-MM-dd HH:mm:ss";
-
   let modtime_h = document.getElementsByTagName("th")[2];
   if(modtime_h)
     modtime_h.innerText = modtime_h.innerText.replace(" (UTC)", "");
