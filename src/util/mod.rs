@@ -512,6 +512,27 @@ impl<'s> fmt::Display for NoDoubleQuotes<'s> {
     }
 }
 
+/// Replace `&` with `&amp;` and `<` with `&lt;`
+pub struct NoHtmlLiteral<'s>(pub &'s str);
+
+impl<'s> fmt::Display for NoHtmlLiteral<'s> {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        for mut s in self.0.split_inclusive(&['&', '<']) {
+            let last = s.as_bytes().last();
+            if matches!(last, Some(b'&' | b'<')) {
+                s = &s[..s.len() - 1];
+            }
+            f.write_str(s)?;
+            match last {
+                Some(b'&') => f.write_str("&amp;")?,
+                Some(b'<') => f.write_str("&lt;")?,
+                _ => {},
+            }
+        }
+        Ok(())
+    }
+}
+
 /// Check if, given the request headers, the client should be considered a mobile device.
 pub fn client_mobile(hdr: &Headers) -> bool {
     hdr.get::<UserAgent>().map(|s| s.contains("Mobi") || s.contains("mobi")).unwrap_or(false)
