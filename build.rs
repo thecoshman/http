@@ -67,8 +67,12 @@ fn htmls() {
     for html in ["error.html", "directory_listing.html", "directory_listing_mobile.html"] {
         println!("cargo:rerun-if-changed=assets/{}", html);
 
-        let with_assets = assets.iter().fold(fs::read_to_string(format!("assets/{}", html)).unwrap(),
-                                             |d, (k, v)| d.replace(&format!("{{{}}}", k), v));
+        let with_assets = assets.iter()
+            .fold(fs::read_to_string(format!("assets/{}", html)).unwrap(),
+                  |d, (k, v)| d.replace(&format!("{{{}}}", k), v))
+            .lines()
+            .flat_map(|l| [l.trim(), "\n"])
+            .collect::<String>();
 
         let mut arguments = BTreeMap::new();
         for i in 0.. {
