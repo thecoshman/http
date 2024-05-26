@@ -120,8 +120,8 @@ impl HttpHandler {
 
     /// Adapted from
     /// https://github.com/tylerwhall/hyperdav-server/blob/415f512ac030478593ad389a3267aeed7441d826/src/lib.rs#L459
-    fn handle_webdav_propfind_write_output<'n, N: BorrowXmlName<'n>>(&self, req: &mut Request, mut url: String, path: &Path, props: &[&'n [N]], just_names: bool,
-                                                                     depth: Depth)
+    fn handle_webdav_propfind_write_output<'n, N: BorrowXmlName<'n>>(&self, req: &mut Request, mut url: String, path: &Path, props: &[&'n [N]],
+                                                                     just_names: bool, depth: Depth)
                                                                      -> Result<Result<Vec<u8>, IronResult<Response>>, XmlWError> {
         let mut out = intialise_xml_output()?;
         out.write(namespaces_for_props("D:multistatus", props.iter().flat_map(|pp| pp.iter())))?;
@@ -174,12 +174,7 @@ impl HttpHandler {
                 if !(!path.exists() || (symlink && !self.follow_symlinks) ||
                      (symlink && self.follow_symlinks && self.sandbox_symlinks && !is_descendant_of(&path, &self.hosted_directory.1))) {
                     let metadata = path.metadata().expect("Failed to get requested file metadata");
-                    self.handle_propfind_path(out,
-                                              &root_url,
-                                              &path,
-                                              &metadata,
-                                              props,
-                                              just_names)?;
+                    self.handle_propfind_path(out, &root_url, &path, &metadata, props, just_names)?;
                     if metadata.is_dir() {
                         self.handle_webdav_propfind_path_recursive(req, out, root_url, &path, props, just_names, next_depth)?;
                     }

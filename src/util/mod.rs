@@ -119,7 +119,9 @@ impl Header for XLastModified {
         if data.len() != 1 {
             return Err(HyperError::Header);
         }
-        Ok(XLastModified(str::from_utf8(data.last().ok_or(HyperError::Header).map(|d| d.as_ref())?).map_err(|_| HyperError::Header)?.parse().map_err(|_| HyperError::Header)?))
+        Ok(XLastModified(str::from_utf8(data.last().ok_or(HyperError::Header).map(|d| d.as_ref())?).map_err(|_| HyperError::Header)?
+            .parse()
+            .map_err(|_| HyperError::Header)?))
     }
 }
 
@@ -147,7 +149,9 @@ impl Header for XOcMTime {
         if data.len() != 1 {
             return Err(HyperError::Header);
         }
-        Ok(XOcMTime(str::from_utf8(data.last().ok_or(HyperError::Header).map(|d| d.as_ref())?).map_err(|_| HyperError::Header)?.parse().map_err(|_| HyperError::Header)?))
+        Ok(XOcMTime(str::from_utf8(data.last().ok_or(HyperError::Header).map(|d| d.as_ref())?).map_err(|_| HyperError::Header)?
+            .parse()
+            .map_err(|_| HyperError::Header)?))
     }
 }
 
