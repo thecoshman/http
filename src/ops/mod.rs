@@ -924,34 +924,34 @@ impl HttpHandler {
                 let modified = file_time_modified(&fmeta);
                 let modified_ts = modified.to_timespec();
 
-                let _ = write!(out,
-                               r#"<a href="{path}{fname}"><div><span class="{}{}_icon" id="{}">{}{}</span>{}</div><div><time ms={}{:03}>{} UTC</time>{}</div></a>"#,
-                               if is_file { "file" } else { "dir" },
-                               file_icon_suffix(&path, is_file),
-                               NoDoubleQuotes(&fname),
-                               NoHtmlLiteral(&fname),
-                               if is_file { "" } else { "/" },
-                               if show_file_management_controls {
-                                   DisplayThree(r#"<span class="manage"><span class="delete_file_icon" onclick="delete_onclick(arguments[0])">Delete</span>"#,
-                                                if self.webdav {
-                                                    r#" <span class="rename_icon" onclick="rename_onclick(arguments[0])">Rename</span>"#
-                                                } else {
-                                                    ""
-                                                },
-                                                "</span>")
-                               } else {
-                                   DisplayThree("", "", "")
-                               },
-                               modified_ts.sec,
-                               modified_ts.nsec / 1000_000,
-                               modified.strftime("%F %T").unwrap(),
-                               if is_file {
-                                   DisplayThree("<span class=\"size\">", Maybe(Some(HumanReadableSize(file_length(&fmeta, &path)))), "</span>")
-                               } else {
-                                   DisplayThree("", Maybe(None), "")
-                               },
-                               path = relpath_escaped,
-                               fname = encode_tail_if_trimmed(escape_specials(&fname)));
+                let _ = writeln!(out,
+                                 r#"<a href="{path}{fname}"><div><span class="{}{}_icon" id="{}">{}{}</span>{}</div><div><time ms={}{:03}>{} UTC</time>{}</div></a>"#,
+                                 if is_file { "file" } else { "dir" },
+                                 file_icon_suffix(&path, is_file),
+                                 NoDoubleQuotes(&fname),
+                                 NoHtmlLiteral(&fname),
+                                 if is_file { "" } else { "/" },
+                                 if show_file_management_controls {
+                                     DisplayThree(r#"<span class="manage"><span class="delete_file_icon" onclick="delete_onclick(arguments[0])">Delete</span>"#,
+                                                  if self.webdav {
+                                                      r#" <span class="rename_icon" onclick="rename_onclick(arguments[0])">Rename</span>"#
+                                                  } else {
+                                                      ""
+                                                  },
+                                                  "</span>")
+                                 } else {
+                                     DisplayThree("", "", "")
+                                 },
+                                 modified_ts.sec,
+                                 modified_ts.nsec / 1000_000,
+                                 modified.strftime("%F %T").unwrap(),
+                                 if is_file {
+                                     DisplayThree("<span class=\"size\">", Maybe(Some(HumanReadableSize(file_length(&fmeta, &path)))), "</span>")
+                                 } else {
+                                     DisplayThree("", Maybe(None), "")
+                                 },
+                                 path = relpath_escaped,
+                                 fname = encode_tail_if_trimmed(escape_specials(&fname)));
             }
         };
 
