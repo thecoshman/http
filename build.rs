@@ -51,13 +51,19 @@ fn assets() -> Vec<(&'static str, String)> {
                              mime,
                              Base64Display::with_config(&fs::read(file).unwrap()[..], base64::STANDARD))));
     }
+    let outd = env::var("OUT_DIR").unwrap();
+    fs::create_dir_all(format!("{}/{}", outd, "assets")).unwrap();
     for (key, file) in [("manage", "assets/manage.js"),
                         ("manage_mobile", "assets/manage_mobile.js"),
                         ("manage_desktop", "assets/manage_desktop.js"),
                         ("upload", "assets/upload.js"),
                         ("adjust_tz", "assets/adjust_tz.js")] {
         println!("cargo:rerun-if-changed={}", file);
-        assets.push((key, fs::read_to_string(file).unwrap()));
+        let data = fs::read_to_string(file).unwrap();
+        fs::write(format!("{}/{}", outd, file),
+                  data.lines().flat_map(|l| [l.trim(), "\n"]).collect::<String>().as_bytes())
+            .unwrap();
+        assets.push((key, data));
     }
     assets
 }

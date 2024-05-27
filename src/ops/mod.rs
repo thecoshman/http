@@ -960,17 +960,17 @@ impl HttpHandler {
                                                 status::Ok,
                                                 directory_listing_mobile_html(&relpath_escaped[!is_root as usize..],
                                                                               if show_file_management_controls {
-                                                                                  concat!(r#"<script>"#, include_str!("../../assets/upload.js"))
+                                                                                  concat!(r#"<script>"#, include_str!(concat!(env!("OUT_DIR"), "/assets/upload.js")))
                                                                               } else {
                                                                                   ""
                                                                               },
                                                                               if show_file_management_controls {
-                                                                                  include_str!("../../assets/manage_mobile.js")
+                                                                                  include_str!(concat!(env!("OUT_DIR"), "/assets/manage_mobile.js"))
                                                                               } else {
                                                                                   ""
                                                                               },
                                                                               if show_file_management_controls {
-                                                                                  concat!(include_str!("../../assets/manage.js"), r#"</script>"#)
+                                                                                  concat!(include_str!(concat!(env!("OUT_DIR"), "/assets/manage.js")), r#"</script>"#)
                                                                               } else {
                                                                                   ""
                                                                               },
@@ -1102,17 +1102,17 @@ impl HttpHandler {
                                                 status::Ok,
                                                 directory_listing_html(&relpath_escaped[!is_root as usize..],
                                                                        if show_file_management_controls {
-                                                                           concat!(r#"<script>"#, include_str!("../../assets/upload.js"))
+                                                                           concat!(r#"<script>"#, include_str!(concat!(env!("OUT_DIR"), "/assets/upload.js")))
                                                                        } else {
                                                                            ""
                                                                        },
                                                                        if show_file_management_controls {
-                                                                           include_str!("../../assets/manage_desktop.js")
+                                                                           include_str!(concat!(env!("OUT_DIR"), "/assets/manage_desktop.js"))
                                                                        } else {
                                                                            ""
                                                                        },
                                                                        if show_file_management_controls {
-                                                                           concat!(include_str!("../../assets/manage.js"), r#"</script>"#)
+                                                                           concat!(include_str!(concat!(env!("OUT_DIR"), "/assets/manage.js")), r#"</script>"#)
                                                                        } else {
                                                                            ""
                                                                        },
