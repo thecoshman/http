@@ -66,6 +66,9 @@ function make_filename_input(input_container, initial, callback) {
       callback();
     }
   });
+  input_container.addEventListener("click", function(ev) {
+    ev.preventDefault();
+  });
 
   input_elem.focus();
   return input_elem;

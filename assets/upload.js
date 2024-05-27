@@ -4,7 +4,6 @@ window.addEventListener("DOMContentLoaded", function() {
   const SUPPORTED_TYPES = ["Files", "application/x-moz-file"];
 
   let body = document.getElementsByTagName("body")[0];
-  let file_upload = document.getElementById("file_upload");
   let file_upload_text = null;
   let remaining_files = 0;
   let url = document.location.pathname;

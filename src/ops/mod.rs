@@ -983,7 +983,7 @@ impl HttpHandler {
                                                                                   ""
                                                                               },
                                                                               if show_file_management_controls && self.webdav {
-                                                                                  r#"<a id="new_directory" href class="new_dir_icon">Create directory</a>"#
+                                                                                  r#"<a id="new_directory" href><span class="new_dir_icon">Create directory</span></a>"#
                                                                               } else {
                                                                                   ""
                                                                               }))
