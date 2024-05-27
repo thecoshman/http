@@ -77,7 +77,7 @@ fn result_main() -> Result<(), Error> {
     let mut responder = if let Some(p) = opts.port {
         if let Some(&((_, ref id), ref pw)) = opts.tls_data.as_ref() {
                 Iron::new(handler).https((opts.bind_address, p),
-                                                 NativeTlsServer::new(id, pw).map_err(|err| {
+                                         NativeTlsServer::new(id, pw).map_err(|err| {
                         Error {
                             desc: "TLS certificate",
                             op: "open",
@@ -95,11 +95,7 @@ fn result_main() -> Result<(), Error> {
                 }
             })
     } else {
-        ops::try_ports(handler,
-                       opts.bind_address,
-                       util::PORT_SCAN_LOWEST,
-                       util::PORT_SCAN_HIGHEST,
-                       &opts.tls_data)
+        ops::try_ports(handler, opts.bind_address, util::PORT_SCAN_LOWEST, util::PORT_SCAN_HIGHEST, &opts.tls_data)
     }?;
 
     if opts.loglevel < options::LogLevel::NoStartup {

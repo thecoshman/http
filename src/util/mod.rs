@@ -527,7 +527,7 @@ impl<'s> fmt::Display for NoHtmlLiteral<'s> {
             match last {
                 Some(b'&') => f.write_str("&amp;")?,
                 Some(b'<') => f.write_str("&lt;")?,
-                _ => {},
+                _ => {}
             }
         }
         Ok(())

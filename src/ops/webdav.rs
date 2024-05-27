@@ -59,33 +59,32 @@ impl HttpHandler {
 
         let depth = req.headers.get::<Depth>().copied().unwrap_or(Depth::Zero);
 
-        let props =
-            match parse_propfind(req) {
-                Ok(props) => props,
-                Err(e) => {
-                    match match e {
-                        Ok(pe) => Ok(pe),
-                        Err(xre) => {
-                            if xre.position() == XmlTextPosition::new() && xre.msg().contains("no root element") {
-                                Err(PropfindVariant::AllProp)
-                            } else {
-                                Ok(xre.to_string())
-                            }
+        let props = match parse_propfind(req) {
+            Ok(props) => props,
+            Err(e) => {
+                match match e {
+                    Ok(pe) => Ok(pe),
+                    Err(xre) => {
+                        if xre.position() == XmlTextPosition::new() && xre.msg().contains("no root element") {
+                            Err(PropfindVariant::AllProp)
+                        } else {
+                            Ok(xre.to_string())
                         }
-                    } {
-                        Ok(e) => {
-                            log!(self.log,
-                                 "{} tried to {red}PROPFIND{reset} {yellow}{}{reset} with invalid XML",
-                                 self.remote_addresses(&req),
-                                 req_p.display());
-                            return self.handle_generated_response_encoding(req,
+                    }
+                } {
+                    Ok(e) => {
+                        log!(self.log,
+                             "{} tried to {red}PROPFIND{reset} {yellow}{}{reset} with invalid XML",
+                             self.remote_addresses(&req),
+                             req_p.display());
+                        return self.handle_generated_response_encoding(req,
                                                                            status::BadRequest,
                                                                            error_html("400 Bad Request", format_args!("Invalid XML: {}", e), ""));
-                        }
-                        Err(props) => props,
                     }
+                    Err(props) => props,
                 }
-            };
+            }
+        };
 
         log!(self.log,
              "{} requested {red}PROPFIND{reset} of {} on {yellow}{}{reset} at depth {}",
