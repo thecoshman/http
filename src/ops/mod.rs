@@ -1119,9 +1119,8 @@ impl HttpHandler {
                                                                        parent_f,
                                                                        list_f,
                                                                        if show_file_management_controls {
-                                                                           "<hr /> <p> Drag&amp;Drop to upload or <input id=\"file_upload\" type=\"file\" \
-                                                                            multiple />. </p>"
-
+                                                                           "<hr />\
+                                                                            <p>Drag&amp;Drop to upload or <input id=\"file_upload\" type=\"file\" multiple />.</p>"
                                                                        } else {
                                                                            ""
                                                                        },
@@ -1131,10 +1130,10 @@ impl HttpHandler {
                                                                            ""
                                                                        },
                                                                        if show_file_management_controls && self.webdav {
-                                                                           "<tr id=\"new_directory\"><td><a tabindex=\"-1\" href class=\"new_dir_icon\"></a></td> \
-                                                                                                     <td><a                 href>Create directory</a></td> \
-                                                                                                     <td><a tabindex=\"-1\" href>&nbsp;</a></td> \
-                                                                                                     <td><a tabindex=\"-1\" href>&nbsp;</a></td> \
+                                                                           "<tr id=\"new_directory\"><td><a tabindex=\"-1\" href class=\"new_dir_icon\"></a></td>\
+                                                                                                     <td><a                 href>Create directory</a></td>\
+                                                                                                     <td><a tabindex=\"-1\" href>&nbsp;</a></td>\
+                                                                                                     <td><a tabindex=\"-1\" href>&nbsp;</a></td>\
                                                                                                      <td><a tabindex=\"-1\" href>&nbsp;</a></td></tr>"
                                                                        } else {
                                                                            ""
