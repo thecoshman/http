@@ -1,11 +1,11 @@
 "use strict";
 
 window.addEventListener("DOMContentLoaded", function() {
-  let new_directory_filename_cell = new_directory_line.children[1];
-  let new_directory_status_output = new_directory_line.children[4].children[0];
+  let new_directory_filename_cell = new_directory.children[1];
+  let new_directory_status_output = new_directory.children[4].children[0];
   let new_directory_filename_input = null;
 
-  new_directory_line.addEventListener("click", function(ev) {
+  new_directory.addEventListener("click", function(ev) {
     if(new_directory_filename_input === null)
       ev.preventDefault();
     else if(ev.target === new_directory_status_output)
