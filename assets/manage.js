@@ -83,6 +83,7 @@ function create_new_directory(fname, status_out) {
   make_request("MKCOL", req_url, status_out);
 }
 
+let make_request_error = false;
 function make_request(verb, url, status_out, request_modifier) {
   let request = new XMLHttpRequest();
   request.addEventListener("loadend", function() {
@@ -91,6 +92,7 @@ function make_request(verb, url, status_out, request_modifier) {
     else {
       status_out.innerHTML = request.status + " " + request.statusText + (request.response ? " — " : "") + request.response;
       status_out.classList.add("has-log");
+      make_request_error = true;
     }
   });
   request.open(verb, url);

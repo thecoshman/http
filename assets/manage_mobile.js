@@ -3,6 +3,10 @@
 window.addEventListener("DOMContentLoaded", function() {
   let first_onclick = true, input;
   let submit_callback = function() {
+    if(make_request_error) {
+      first_onclick = true;
+      make_request_error = false;
+    }
     if(first_onclick) {
       first_onclick = false;
       create_new_directory(input.value, new_directory.firstChild);
