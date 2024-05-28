@@ -14,8 +14,9 @@ window.addEventListener("DOMContentLoaded", function() {
 
     if(!input) {
       make_confirm_icon(new_directory.firstChild, submit_callback);
-      input = make_filename_input(document.createElement("span"), "", submit_callback);
-      new_directory.appendChild(input.parentElement);
+      let c = document.createElement("span");
+      new_directory.appendChild(c);
+      input = make_filename_input(c, "", submit_callback);
     } else
       input.focus();
   };
