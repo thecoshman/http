@@ -20,6 +20,7 @@ window.addEventListener("DOMContentLoaded", function() {
         create_new_directory(new_directory_filename_input.value, new_directory_status_output);
       };
 
+      ev.stopImmediatePropagation();
       new_directory_filename_input = make_filename_input(new_directory_filename_cell, "", submit_callback);
       make_confirm_icon(new_directory_status_output, submit_callback);
     }
