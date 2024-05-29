@@ -1131,7 +1131,8 @@ impl HttpHandler {
                                                                        },
                                                                        if show_file_management_controls && self.webdav {
                                                                            "<tr id=\"new_directory\"><td><a tabindex=\"-1\" href class=\"new_dir_icon\"></a></td>\
-                                                                                                     <td colspan=4><a href>Create directory</a></td></tr>"
+                                                                                                     <td colspan=3><a href>Create directory</a></td>\
+                                                                                                     <td><a tabindex=\"-1\" href>&nbsp;</a></td></tr>"
                                                                        } else {
                                                                            ""
                                                                        }))
