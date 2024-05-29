@@ -26,13 +26,12 @@ extern crate rand;
 extern crate time;
 extern crate xml;
 
-mod error;
 mod options;
 
 pub mod ops;
 pub mod util;
 
-pub use error::Error;
+pub struct Error(pub String);
 pub use options::{LogLevel, Options};
 
 use std::mem;
@@ -54,7 +53,7 @@ fn main() {
 
 fn actual_main() -> i32 {
     if let Err(err) = result_main() {
-        eprintln!("{}", err);
+        eprintln!("{}", err.0);
         1
     } else {
         0
@@ -77,23 +76,11 @@ fn result_main() -> Result<(), Error> {
     let mut responder = if let Some(p) = opts.port {
         if let Some(&((_, ref id), ref pw)) = opts.tls_data.as_ref() {
                 Iron::new(handler).https((opts.bind_address, p),
-                                         NativeTlsServer::new(id, pw).map_err(|err| {
-                        Error {
-                            desc: "TLS certificate",
-                            op: "open",
-                            more: err.to_string().into(),
-                        }
-                    })?)
+                                         NativeTlsServer::new(id, pw).map_err(|err| Error(format!("Opening TLS certificate: {}", err)))?)
             } else {
                 Iron::new(handler).http((opts.bind_address, p))
             }
-            .map_err(|_| {
-                Error {
-                    desc: "server",
-                    op: "start",
-                    more: "port taken".into(),
-                }
-            })
+            .map_err(|_| Error(format!("Starting server: port taken")))
     } else {
         ops::try_ports(handler, opts.bind_address, util::PORT_SCAN_LOWEST, util::PORT_SCAN_HIGHEST, &opts.tls_data)
     }?;
