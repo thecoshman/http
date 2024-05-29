@@ -660,25 +660,34 @@ impl HttpHandler {
             };
             let cache_key = (hash, encoding.0);
 
-            {
+            let forgor = {
                 match self.cache_fs.read().expect("Filesystem cache read lock poisoned").get(&cache_key) {
                     Some(&((ref resp_p, true, _), ref atime)) => {
-                        atime.store(precise_time_ns(), AtomicOrdering::Relaxed);
-                        log!(self.log,
-                             "{:w$} encoded as {} for {:.1}% ratio (cached)",
-                             "",
-                             encoding,
-                             ((file_length(&req_p.metadata().expect("Failed to get requested file metadata"), &req_p) as f64) /
-                              (file_length(&resp_p.metadata().expect("Failed to get encoded file metadata"), &resp_p) as f64)) *
-                             100f64,
-                             w = self.remote_addresses(req).width());
+                        match File::open(resp_p) {
+                            Ok(resp) => {
+                                atime.store(precise_time_ns(), AtomicOrdering::Relaxed);
+                                log!(self.log,
+                                     "{:w$} encoded as {} for {:.1}% ratio (cached)",
+                                     "",
+                                     encoding,
+                                     ((file_length(&req_p.metadata().expect("Failed to get requested file metadata"), &req_p) as f64) /
+                                      (file_length(&resp.metadata().expect("Failed to get encoded file metadata"), &resp_p) as f64)) *
+                                     100f64,
+                                     w = self.remote_addresses(req).width());
 
-                        return Ok(Response::with((status::Ok,
-                                                  headers,
-                                                  Header(headers::ETag(headers::EntityTag::strong(etag))),
-                                                  Header(headers::ContentEncoding([encoding].into())),
-                                                  resp_p.as_path(),
-                                                  mt)));
+                                return Ok(Response::with((status::Ok,
+                                                          headers,
+                                                          Header(headers::ETag(headers::EntityTag::strong(etag))),
+                                                          Header(headers::ContentEncoding([encoding].into())),
+                                                          resp,
+                                                          mt)));
+                            },
+                            Err(err) if err.kind() == IoErrorKind::NotFound => true,
+                            e @ Err(_) => {
+                                e.expect("Failed to get encoded file metadata");
+                                unsafe { std::hint::unreachable_unchecked() }
+                            },
+                        }
                     }
                     Some(&((_, false, _), _)) => {
                         let file = match File::open(&req_p) {
@@ -687,8 +696,13 @@ impl HttpHandler {
                         };
                         return Ok(Response::with((status::Ok, headers, Header(headers::ETag(headers::EntityTag::strong(etag))), file, mt)));
                     }
-                    None => (),
+                    None => false,
                 }
+            };
+            if forgor {
+                self.cache_fs_files.write().expect("Filesystem file cache write lock poisoned").retain(|_, v| *v == hash);
+                self.cache_fs.write().expect("Filesystem cache write lock poisoned").remove(&cache_key);
+                return self.handle_get_file_encoded(req, req_p, mt, headers, etag)
             }
 
             let mut resp_p = self.encoded_temp_dir.as_ref().unwrap().1.join(cache_key.0.to_hex().as_str());
