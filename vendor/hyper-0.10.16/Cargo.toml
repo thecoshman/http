@@ -39,7 +39,8 @@ version = "1.0"
 version = "0.1"
 
 [dependencies.traitobject]
-version = "0.1"
+git = "https://github.com/reem/rust-traitobject"
+rev = "b3471a15917b2caf5a8b27debb0b4b390fc6634f"
 
 [dependencies.typeable]
 version = "0.1"
