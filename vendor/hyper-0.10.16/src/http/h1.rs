@@ -197,15 +197,15 @@ fn read_chunk_size<R: Read>(rdr: &mut R) -> io::Result<u64> {
     loop {
         match byte!(rdr) {
             b@b'0'...b'9' if in_chunk_size => {
-                size *= radix;
+                size = size.checked_mul(radix).ok_or_else(|| io::Error::new(io::ErrorKind::InvalidInput, "too long"))?;
                 size += (b - b'0') as u64;
             },
             b@b'a'...b'f' if in_chunk_size => {
-                size *= radix;
+                size = size.checked_mul(radix).ok_or_else(|| io::Error::new(io::ErrorKind::InvalidInput, "too long"))?;
                 size += (b + 10 - b'a') as u64;
             },
             b@b'A'...b'F' if in_chunk_size => {
-                size *= radix;
+                size = size.checked_mul(radix).ok_or_else(|| io::Error::new(io::ErrorKind::InvalidInput, "too long"))?;
                 size += (b + 10 - b'A') as u64;
             },
             CR => {
@@ -502,6 +502,8 @@ mod tests {
         read_err("1 invalid extension\r\n");
         read_err("1 A\r\n");
         read_err("1;no CRLF");
+        // https://github.com/hyperium/hyper/security/advisories/GHSA-5h46-h7hh-c6x9
+        read_err("f0000000000000003");
     }
 
     #[test]
