@@ -43,7 +43,7 @@ impl Header for ContentLength {
         // correctly. If not, then it's an error.
         raw.iter()
             .map(|b| b.as_ref())
-            .map(parsing::from_raw_str)
+            .map(|b| if b.iter().all(|b| matches!(b, b'0'..=b'9')) { parsing::from_raw_str(b) } else { Err(::Error::Header) })
             .fold(None, |prev, x| {
                 match (prev, x) {
                     (None, x) => Some(x),

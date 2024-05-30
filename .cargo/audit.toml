@@ -1,0 +1,3 @@
+# https://github.com/thecoshman/http/issues/140
+[advisories]
+ignore = ["RUSTSEC-2021-0078"]
