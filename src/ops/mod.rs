@@ -938,11 +938,11 @@ impl HttpHandler {
                 let modified_ts = modified.to_timespec();
 
                 let _ = writeln!(out,
-                                 concat!(r#"<a href="{path}{fname}"><div><span class="{}{}_icon" id="{}">{}{}</span>{}</div>"#,
+                                 concat!(r#"<a href="{path}{fname}" id="{}"><div><span class="{}{}_icon">{}{}</span>{}</div>"#,
                                          r#"<div><time ms={}{:03}>{} UTC</time>{}</div></a>"#),
+                                 NoDoubleQuotes(&fname),
                                  if is_file { "file" } else { "dir" },
                                  file_icon_suffix(&path, is_file),
-                                 NoDoubleQuotes(&fname),
                                  NoHtmlLiteral(&fname),
                                  if is_file { "" } else { "/" },
                                  if show_file_management_controls {
@@ -1077,7 +1077,7 @@ impl HttpHandler {
                 }
 
                 let _ = write!(out,
-                               "<tr><td><a href=\"{path}{fname}\" tabindex=\"-1\" id=\"{}\" class=\"{}{}_icon\"></a></td> <td><a \
+                               "<tr id=\"{}\"><td><a href=\"{path}{fname}\" tabindex=\"-1\" class=\"{}{}_icon\"></a></td> <td><a \
                                 href=\"{path}{fname}\">{}{}</a></td> <td><a href=\"{path}{fname}\" tabindex=\"-1\"><time ms={}{:03}>{}</time></a></td> \
                                 <td><a href=\"{path}{fname}\" tabindex=\"-1\">{}{}{}</a></td> {}</tr>\n",
                                NoDoubleQuotes(&fname),
