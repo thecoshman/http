@@ -33,6 +33,7 @@ window.addEventListener("DOMContentLoaded", function() {
     }
   });
 
+  let file_upload = document.querySelector("input[type=file]");
   file_upload.addEventListener("change", function() {
     for(let i = file_upload.files.length - 1; i >= 0; --i) {
       let file = file_upload.files[i];

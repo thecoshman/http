@@ -991,7 +991,7 @@ impl HttpHandler {
                                                                               list_f,
                                                                               if show_file_management_controls {
                                                                                   concat!(r#"<span class="heading">Upload files: "#,
-                                                                                          r#"<input id="file_upload" type="file" multiple /></span>"#)
+                                                                                          r#"<input type="file" multiple /></span>"#)
                                                                               } else {
                                                                                   ""
                                                                               },
@@ -1133,7 +1133,7 @@ impl HttpHandler {
                                                                        list_f,
                                                                        if show_file_management_controls {
                                                                            "<hr />\
-                                                                            <p>Drag&amp;Drop to upload or <input id=\"file_upload\" type=\"file\" multiple />.</p>"
+                                                                            <p>Drag&amp;Drop to upload or <input type=\"file\" multiple />.</p>"
                                                                        } else {
                                                                            ""
                                                                        },
