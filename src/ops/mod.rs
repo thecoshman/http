@@ -903,7 +903,7 @@ impl HttpHandler {
             let modified = file_time_modified_p(req_p.parent().unwrap_or(&req_p));
             let modified_ts = modified.to_timespec();
             let _ = write!(out,
-                       r#"<a href="{up_path}"><div><span class="back_arrow_icon">Parent directory</span></div><div><time ms={}{:03}>{} UTC</time></div></a>"#,
+                       r#"<a href="{up_path}" id=".."><div><span class="back_arrow_icon">Parent directory</span></div><div><time ms={}{:03}>{} UTC</time></div></a>"#,
                        modified_ts.sec,
                        modified_ts.nsec / 1000_000,
                        modified.strftime("%F %T").unwrap(),
@@ -1026,7 +1026,7 @@ impl HttpHandler {
             let modified = file_time_modified_p(req_p.parent().unwrap_or(&req_p));
             let modified_ts = modified.to_timespec();
             let _ = write!(out,
-                           "<tr><td><a href=\"{up_path}\" tabindex=\"-1\" id=\"parent_dir\" class=\"back_arrow_icon\"></a></td> <td><a \
+                           "<tr id=\"..\"><td><a href=\"{up_path}\" tabindex=\"-1\" class=\"back_arrow_icon\"></a></td> <td><a \
                             href=\"{up_path}\">Parent directory</a></td> <td><a href=\"{up_path}\" tabindex=\"-1\"><time ms={}{:03}>{}</time></a></td> \
                             <td><a href=\"{up_path}\" tabindex=\"-1\">&nbsp;</a></td> <td><a href=\"{up_path}\" tabindex=\"-1\">&nbsp;</a></td></tr>",
                            modified_ts.sec,
