@@ -1,6 +1,8 @@
 "use strict";
 
 window.addEventListener("DOMContentLoaded", function() {
+  let new_directory = document.getElementById('new"directory');
+
   let first_onclick = true, input;
   let submit_callback = function() {
     if(make_request_error) {
