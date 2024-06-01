@@ -15,10 +15,6 @@
         text-decoration: none;
       }
 
-      .pre-list {
-        margin-bottom: 0;
-      }
-
       table {
         border-collapse: collapse;
       }
@@ -114,15 +110,13 @@
     </style>
   </head>
   <body>
-    <div>
-      <p class="pre-list">The requested directory {0} contains the following files:</p>
-      <table>
-        <tr><th></th> <th>Name</th> <th>Last modified (UTC)</th> <th>Size</th> {7}</tr>
-        {4}
-        {8}
-        {5}
-      </table>
-    </div>
+    <p style="margin-bottom: 0;">The requested directory {0} contains the following files:</p>
+    <table>
+      <tr><th></th> <th>Name</th> <th>Last modified (UTC)</th> <th>Size</th> {7}</tr>
+      {4}
+      {8}
+      {5}
+    </table>
     <p></p>
     {6}
     <hr />
