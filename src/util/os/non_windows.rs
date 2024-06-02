@@ -121,7 +121,7 @@ pub fn set_times(f: &Path, mtime_ms: Option<u64>, atime_ms: Option<u64>, _: Opti
 
 fn ms_to_timespec(ms: u64) -> timespec {
     timespec {
-        tv_sec: (ms / 1000) as i64,
-        tv_nsec: ((ms % 1000) * 1000_000) as i64,
+        tv_sec: (ms / 1000) as _,
+        tv_nsec: ((ms % 1000) * 1000_000) as _,
     }
 }
