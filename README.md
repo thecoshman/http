@@ -35,9 +35,32 @@ If you have `cargo` installed (you're a Rust developer) all you need to do is:
 ```sh
 cargo install --git https://github.com/thecoshman/http
 ```
-(the `https` crates.io package *was* http, but [is now unpublishable](//github.com/thecoshman/http/pull/160#issuecomment-2143877822))
+(the `https` crates.io package *was* http, but [is now unpublishable](//github.com/thecoshman/http/pull/160#issuecomment-2143877822)).
 
 Which will install `http` and `httplz` (identical, disable one or another if they clash) in the folder where all other binaries go.
+
+#### From Debian repository
+
+The following line in `/etc/apt/sources.list` or equivalent:
+```apt
+deb [signed-by=/etc/apt/keyrings/nabijaczleweli.asc] https://debian.nabijaczleweli.xyz sid main
+```
+
+With [my PGP key](//nabijaczleweli.xyz/pgp.txt) (the two URLs are interchangeable):
+```sh
+sudo wget -O/etc/apt/keyrings/nabijaczleweli.asc https://debian.nabijaczleweli.xyz/nabijaczleweli.gpg.key
+sudo wget -O/etc/apt/keyrings/nabijaczleweli.asc https://nabijaczleweli.xyz/pgp.txt
+```
+(you may need to create /etc/apt/keyrings on apt <2.4.0 (<=bullseye) manually).
+
+Then the usual
+```sh
+sudo apt update
+sudo apt install http
+```
+will work on amd64 and i386.
+
+See the [repository README](//debian.nabijaczleweli.xyz/README) for more information.
 
 ### On Arch Linux
 

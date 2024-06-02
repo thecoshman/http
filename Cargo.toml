@@ -8,7 +8,7 @@ keywords = ["http", "server", "https", "webdav", "directory"]
 categories = ["network-programming", "web-programming::http-server"]
 license = "MIT"
 build = "build.rs"
-version = "2.0.0"
+version = "2.0.1"
 # Remember to also update in http.md
 authors = ["nabijaczleweli@nabijaczleweli.xyz"]
 
