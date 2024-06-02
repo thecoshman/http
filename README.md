@@ -33,8 +33,9 @@ See [the manpage](http.md) for full list.
 If you have `cargo` installed (you're a Rust developer) all you need to do is:
 
 ```sh
-cargo install https
+cargo install --git https://github.com/thecoshman/http
 ```
+(the `https` crates.io package *was* http, but [is now unpublishable](//github.com/thecoshman/http/pull/160#issuecomment-2143877822))
 
 Which will install `http` and `httplz` (identical, disable one or another if they clash) in the folder where all other binaries go.
 
