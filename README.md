@@ -33,11 +33,23 @@ See [the manpage](http.md) for full list.
 If you have `cargo` installed (you're a Rust developer) all you need to do is:
 
 ```sh
+# unix:
+RUSTC_BOOTSTRAP=1 cargo install --git https://github.com/thecoshman/http
+```
+```cmd
+rem windows:
+set RUSTC_BOOTSTRAP=1
 cargo install --git https://github.com/thecoshman/http
 ```
 (the `https` crates.io package *was* http, but [is now unpublishable](//github.com/thecoshman/http/pull/160#issuecomment-2143877822)).
+Similarly, cargo [*expressly ignores* configuration that lets the crate be built](https://github.com/rust-lang/cargo/issues/14001) when building through `cargo install`,
+hence the need for manual `RUSTC_BOOTSTRAP=1`, you may also want to set
+```sh
+cargo install-update-config -e RUSTC_BOOTSTRAP=1 https
+```
+for use with [cargo-update](//crates.io/crates/cargo-update)
 
-Which will install `http` and `httplz` (identical, disable one or another if they clash) in the folder where all other binaries go.
+This will install `http` and `httplz` (identical, disable one or another if they clash) in the folder where all other binaries go.
 
 #### From Debian repository
 
