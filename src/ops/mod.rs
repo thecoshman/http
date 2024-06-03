@@ -9,7 +9,6 @@ use time::precise_time_ns;
 use arrayvec::ArrayString;
 use std::fs::{self, File};
 use std::default::Default;
-use rand::{Rng, thread_rng};
 use iron::modifiers::Header;
 use std::path::{PathBuf, Path};
 use std::ffi::{OsString, OsStr};
@@ -18,13 +17,12 @@ use iron::headers::EncodingType;
 use iron::url::Url as GenericUrl;
 use mime_guess::get_mime_type_opt;
 use hyper_native_tls::NativeTlsServer;
+use std::hash::{BuildHasher, RandomState};
 use std::collections::{BTreeMap, HashMap};
 use self::super::{LogLevel, Options, Error};
 use std::process::{ExitStatus, Command, Child, Stdio};
 use rfsapi::{RawFsApiHeader, FilesetData, RawFileData};
 use std::sync::atomic::{AtomicU64, Ordering as AtomicOrdering};
-use rand::distributions::uniform::Uniform as UniformDistribution;
-use rand::distributions::Alphanumeric as AlphanumericDistribution;
 use iron::{headers, status, method, IronResult, Listening, Response, Headers, Request, Handler, Iron};
 use std::io::{self, ErrorKind as IoErrorKind, BufReader, SeekFrom, Write, Error as IoError, Read, Seek};
 use iron::mime::{Mime, Attr as MimeAttr, Value as MimeAttrValue, SubLevel as MimeSubLevel, TopLevel as MimeTopLevel};
@@ -1749,25 +1747,21 @@ pub fn generate_tls_data(temp_dir: &(String, PathBuf)) -> Result<((String, PathB
 
 /// Generate random username:password auth credentials.
 pub fn generate_auth_data() -> String {
+    const USERNAME_SET_LEN: usize = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789".len();
     const PASSWORD_SET: &[u8] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789~!@#$%^&*()_+`-=[]{}|;',./<>?";
 
 
-    let mut rng = thread_rng();
-    let username_len = rng.sample(UniformDistribution::new(6, 12));
-    let password_len = rng.sample(UniformDistribution::new(10, 25));
+    let rnd = RandomState::new();
+    let username_len = (rnd.hash_one((0, 0)) % (12 - 6) + 6) as usize;
+    let password_len = (rnd.hash_one((0, 1)) % (25 - 10) + 10) as usize;
 
     let mut res = String::with_capacity(username_len + 1 + password_len);
-
-    for _ in 0..username_len {
-        res.push(rng.sample(AlphanumericDistribution));
+    for b in 0..username_len {
+        res.push(PASSWORD_SET[(rnd.hash_one((1, b)) % (USERNAME_SET_LEN as u64)) as usize] as char);
     }
-
     res.push(':');
-
-    let password_gen = UniformDistribution::new(0, PASSWORD_SET.len());
-    for _ in 0..password_len {
-        res.push(PASSWORD_SET[rng.sample(password_gen) as usize] as char);
+    for b in 0..password_len {
+        res.push(PASSWORD_SET[(rnd.hash_one((2, b)) % (PASSWORD_SET.len() as u64)) as usize] as char);
     }
-
     res
 }

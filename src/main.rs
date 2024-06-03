@@ -22,7 +22,6 @@ extern crate cidr;
 extern crate clap;
 extern crate iron;
 extern crate libc;
-extern crate rand;
 extern crate time;
 extern crate xml;
 

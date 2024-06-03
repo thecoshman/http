@@ -37,7 +37,6 @@ ctrlc = "3.1"
 serde = "1.0"
 clap = "2.33"
 libc = "0.2"
-rand = "0.7"
 time = "0.1"
 
 [dependencies.trivial_colours]
