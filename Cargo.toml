@@ -9,7 +9,6 @@ categories = ["network-programming", "web-programming::http-server"]
 license = "MIT"
 build = "build.rs"
 # Remember to also update in appveyor.yml and the http-crates.io branch
-# Remember to also update brotli feature list!
 version = "2.0.2"
 # Remember to also update in http.md
 authors = ["thecoshman <rust@thecoshman.com>",
@@ -54,7 +53,7 @@ default-features = false
 
 [dependencies.brotli]
 version = "6.0"
-# features = ["simd"]  # comment this out for release
+features = ["simd"]  # comment this out for release
 
 [dependencies.iron]
 path = "vendor/iron-0.6.1"

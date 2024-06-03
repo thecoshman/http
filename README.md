@@ -33,11 +33,46 @@ See [the manpage](http.md) for full list.
 If you have `cargo` installed (you're a Rust developer) all you need to do is:
 
 ```sh
+# unix:
+RUSTC_BOOTSTRAP=1 cargo install --git https://github.com/thecoshman/http
+```
+```cmd
+rem windows:
+set RUSTC_BOOTSTRAP=1
 cargo install --git https://github.com/thecoshman/http
 ```
-(the `https` crates.io package *was* http, but [is now unpublishable](//github.com/thecoshman/http/pull/160#issuecomment-2143877822))
+(the `https` crates.io package *was* http, but [is now unpublishable](//github.com/thecoshman/http/pull/160#issuecomment-2143877822)).
+Similarly, cargo [*expressly ignores* configuration that lets the crate be built](https://github.com/rust-lang/cargo/issues/14001) when building through `cargo install`,
+hence the need for manual `RUSTC_BOOTSTRAP=1`, you may also want to set
+```sh
+cargo install-update-config -e RUSTC_BOOTSTRAP=1 https
+```
+for use with [cargo-update](//crates.io/crates/cargo-update)
 
-Which will install `http` and `httplz` (identical, disable one or another if they clash) in the folder where all other binaries go.
+This will install `http` and `httplz` (identical, disable one or another if they clash) in the folder where all other binaries go.
+
+#### From Debian repository
+
+The following line in `/etc/apt/sources.list` or equivalent:
+```apt
+deb [signed-by=/etc/apt/keyrings/nabijaczleweli.asc] https://debian.nabijaczleweli.xyz sid main
+```
+
+With [my PGP key](//nabijaczleweli.xyz/pgp.txt) (the two URLs are interchangeable):
+```sh
+sudo wget -O/etc/apt/keyrings/nabijaczleweli.asc https://debian.nabijaczleweli.xyz/nabijaczleweli.gpg.key
+sudo wget -O/etc/apt/keyrings/nabijaczleweli.asc https://nabijaczleweli.xyz/pgp.txt
+```
+(you may need to create /etc/apt/keyrings on apt <2.4.0 (<=bullseye) manually).
+
+Then the usual
+```sh
+sudo apt update
+sudo apt install http
+```
+will work on amd64, i386, and most likely arm64.
+
+See the [repository README](//debian.nabijaczleweli.xyz/README) for more information.
 
 ### On Arch Linux
 
