@@ -13,6 +13,8 @@ use std::collections::{BTreeMap, BTreeSet};
 
 
 fn main() {
+    env!("RUSTC_BOOTSTRAP", "Please set RUSTC_BOOTSTRAP=1 in the environment. This is a cargo bug.");
+
     htmls();
     extensions();
 
