@@ -21,10 +21,10 @@ use xml::common::{TextPosition as XmlTextPosition, XmlVersion, Position};
 use xml::name::{OwnedName as OwnedXmlName, Name as XmlName};
 use iron::{status, IronResult, Response, Request};
 use iron::url::Url as GenericUrl;
+use std::collections::BTreeSet;
 use std::path::{PathBuf, Path};
 use std::fs::{self, Metadata};
 use self::super::HttpHandler;
-use itertools::Itertools;
 use std::{fmt, mem};
 use time::strptime;
 
@@ -819,15 +819,13 @@ fn intialise_xml_output() -> Result<XmlWriter<Vec<u8>>, XmlWError> {
 }
 
 fn namespaces_for_props<'n, N: 'n + BorrowXmlName<'n>, Ni: Iterator<Item = &'n N>>(elem_name: &str, props: Ni) -> XmlWEventStartElementBuilder {
-    let mut bldr = XmlWEvent::start_element(elem_name).ns(WEBDAV_XML_NAMESPACES[0].0, WEBDAV_XML_NAMESPACES[0].1);
-
-    for prop_namespace in props.map(|p| p.borrow_xml_name()).flat_map(|p| p.namespace).unique() {
-        if let Some((prefix, namespace)) = WEBDAV_XML_NAMESPACES[1..].iter().find(|(_, ns)| *ns == prop_namespace) {
-            bldr = bldr.ns(*prefix, *namespace);
-        }
-    }
-
-    bldr
+    props.map(|p| p.borrow_xml_name())
+        .flat_map(|p| p.namespace)
+        .collect::<BTreeSet<_>>()
+        .into_iter()
+        .flat_map(|prop_namespace| WEBDAV_XML_NAMESPACES[1..].iter().find(|(_, ns)| *ns == prop_namespace))
+        .fold(XmlWEvent::start_element(elem_name).ns(WEBDAV_XML_NAMESPACES[0].0, WEBDAV_XML_NAMESPACES[0].1),
+              |bldr, (prefix, namespace)| bldr.ns(*prefix, *namespace))
 }
 
 /// text/xml; charset=utf-8
