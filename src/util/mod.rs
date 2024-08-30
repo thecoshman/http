@@ -307,6 +307,9 @@ fn file_binary_impl(path: &Path) -> bool {
                             return str::from_utf8(&buf[0..buf.len() - remaining_len]).map(|_|()).map_err(|_|());
                         }
                         remaining = &mut remaining[rd..];
+                        if remaining.len() == 0 {
+                            break;
+                        }
                     }
                     Err(())
                 })
