@@ -20,7 +20,7 @@ use iron::headers::{HeaderFormat, UserAgent, Header};
 use xml::name::{OwnedName as OwnedXmlName, Name as XmlName};
 use iron::error::{HttpResult as HyperResult, HttpError as HyperError};
 use iron::mime::{Mime, SubLevel as MimeSubLevel, TopLevel as MimeTopLevel};
-use std::io::{ErrorKind as IoErrorKind, BufReader, BufRead, Result as IoResult, Error as IoError, Write};
+use std::io::{ErrorKind as IoErrorKind, Result as IoResult, Error as IoError, Write, Read};
 
 pub use self::os::*;
 pub use self::webdav::*;
@@ -288,7 +288,30 @@ pub fn file_binary<P: AsRef<Path>>(path: P) -> bool {
 
 fn file_binary_impl(path: &Path) -> bool {
     path.metadata()
-        .map(|m| is_device(&m.file_type()) || File::open(path).and_then(|f| BufReader::new(f).read_line(&mut String::new())).is_err())
+        .map(|m| {
+            is_device(&m.file_type()) ||
+            File::open(path)
+                .map_err(|_| ())
+                .and_then(|mut f| {
+                    #[allow(invalid_value)]
+                    let mut buf: [u8; 2048] = unsafe { mem::MaybeUninit::uninit().assume_init() }; // 2k matches LINE_MAX
+                    let mut remaining = &mut buf[..];
+                    while let Ok(rd) = f.read(remaining) {
+                        if rd == 0 || remaining[0..rd].contains(&b'\0') {
+                            return Err(());
+                        }
+                        if let Some(idx) = remaining[0..rd].iter().position(|&b| b== b'\n') {
+                            remaining = &mut remaining[idx..];
+                            let remaining_len = remaining.len();
+                            let _ = remaining;
+                            return str::from_utf8(&buf[0..buf.len() - remaining_len]).map(|_|()).map_err(|_|());
+                        }
+                        remaining = &mut remaining[rd..];
+                    }
+                    Err(())
+                })
+                .is_err()
+        })
         .unwrap_or(true)
 }
 

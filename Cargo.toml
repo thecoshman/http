@@ -51,7 +51,7 @@ default-features = false
 
 [dependencies.brotli]
 version = "6.0"
-features = ["simd"]  # comment this out for release
+features = ["simd"]
 
 [dependencies.iron]
 path = "vendor/iron-0.6.1"
