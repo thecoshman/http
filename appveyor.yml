@@ -1,7 +1,7 @@
 image:
   - Visual Studio 2022
 
-version: 2.0.2-{build}
+version: 2.1.0-{build}
 
 skip_tags: false
 
@@ -27,21 +27,21 @@ build: off
 build_script:
   - git submodule update --init --recursive
   - cargo build --verbose --release
-  - cp target\release\http.exe http-v2.0.2.exe
-  - strip --strip-all --remove-section=.comment --remove-section=.note http-v2.0.2.exe
-  - makensis -DHTTP_VERSION=v2.0.2 install.nsi
+  - cp target\release\http.exe http-v2.1.0.exe
+  - strip --strip-all --remove-section=.comment --remove-section=.note http-v2.1.0.exe
+  - makensis -DHTTP_VERSION=v2.1.0 install.nsi
 
 test: off
 test_script:
   - cargo test --verbose --release
 
 artifacts:
-  - path: http-v2.0.2.exe
-  - path: http v2.0.2 installer.exe
+  - path: http-v2.1.0.exe
+  - path: http v2.1.0 installer.exe
 
 deploy:
   provider: GitHub
-  artifact: /http.*v2.0.2.*\.exe/
+  artifact: /http.*v2.1.0.*\.exe/
   auth_token:
     secure: ZTXvCrv9y01s7Hd60w8W7NaouPnPoaw9YJt9WhWQ2Pep8HLvCikt9Exjkz8SGP9P
   on:
