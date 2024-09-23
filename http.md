@@ -188,6 +188,18 @@ pass parameters like what port to use.
     This is false by default because it's most likely not something you
     want to do.
 
+  -D --convenient-webdav
+
+    Allow MKCOL (create directory) and PROPPATCH (rename) WebDAV requests.
+
+    These are write requests so this is a no-op unless -w. False by default.
+
+  -d --webdav
+
+    Handle WebDAV requests.
+
+    False by default. Supersedes -D.
+
   -l --no-listings
 
     Do not generate directory listings.
@@ -260,12 +272,6 @@ pass parameters like what port to use.
   -c --no-colour
 
     Don't colourise log output.
-
-  -d --webdav
-
-    Handle WebDAV requests.
-
-    False by default.
 
 ## NOTES
 

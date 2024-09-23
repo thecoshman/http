@@ -13,16 +13,17 @@
 
 use clap::{AppSettings, ErrorKind as ClapErrorKind, Error as ClapError, Arg, App};
 use std::collections::btree_map::{BTreeMap, Entry as BTreeMapEntry};
+use self::super::ops::WebDavLevel;
 use std::ffi::{OsString, OsStr};
 use std::collections::BTreeSet;
 use std::env::{self, temp_dir};
 use std::num::NonZeroU64;
+use std::{cmp, str, fs};
 use std::path::PathBuf;
 use std::str::FromStr;
 use std::borrow::Cow;
 use iron::mime::Mime;
 use std::net::IpAddr;
-use std::{str, fs};
 use cidr::IpCidr;
 use blake3;
 
@@ -98,7 +99,7 @@ pub struct Options {
     /// Whether to colourise the log output. Default: `true`
     pub log_colour: bool,
     /// Whether to handle WebDAV requests. Default: false
-    pub webdav: bool,
+    pub webdav: WebDavLevel,
     /// Data for HTTPS, identity file and password. Default: `None`
     pub tls_data: Option<((String, PathBuf), String)>,
     /// Whether to generate a one-off certificate. Default: false
@@ -151,6 +152,7 @@ impl Options {
             .arg(Arg::from_usage("-Q --quiet-time 'Don't prefix logs with the timestamp'"))
             .arg(Arg::from_usage("-c --no-colour 'Don't colourise the log output'"))
             .arg(Arg::from_usage("-d --webdav 'Handle WebDAV requests. Default: false'"))
+            .arg(Arg::from_usage("-D --convenient-webdav 'Allow WebDAV MKCOL and PROPPATCH only. Default: false'"))
             .arg(Arg::from_usage("--ssl [TLS_IDENTITY] 'Data for HTTPS, identity file. Password in HTTP_SSL_PASS env var, otherwise empty'")
                 .validator(Options::identity_validator))
             .arg(Arg::from_usage("--gen-ssl 'Generate a one-off TLS certificate'").conflicts_with("ssl"))
@@ -259,7 +261,16 @@ impl Options {
             loglevel: matches.occurrences_of("quiet").into(),
             log_time: !matches.is_present("quiet-time"),
             log_colour: !matches.is_present("no-colour"),
-            webdav: matches.is_present("webdav"),
+            webdav: cmp::max(if matches.is_present("webdav") {
+                            WebDavLevel::All
+                        } else {
+                            WebDavLevel::No
+                        },
+                        if matches.is_present("convenient-webdav") {
+                            WebDavLevel::MkColProppatchOnly
+                        } else {
+                            WebDavLevel::No
+                        }),
             tls_data: matches.value_of("ssl").map(|id| ((id.to_string(), fs::canonicalize(id).unwrap()), env::var("HTTP_SSL_PASS").unwrap_or_default())),
             generate_tls: matches.is_present("gen-ssl"),
             path_auth_data: path_auth_data,
