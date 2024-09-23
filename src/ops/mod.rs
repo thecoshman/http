@@ -123,7 +123,7 @@ type CacheT<Cnt> = HashMap<(blake3::Hash, EncodingType), (Cnt, AtomicU64)>;
 #[derive(Debug, Copy, Clone, Hash, PartialEq, Eq, PartialOrd, Ord)]
 pub enum WebDavLevel {
     No,
-    MkColProppatchOnly,
+    MkColMoveOnly,
     All,
 }
 
@@ -180,7 +180,7 @@ impl HttpHandler {
             .iter()
             .chain(dav_level_1_methods(opts.allow_writes)
                 .iter()
-                .filter(|method| opts.webdav == WebDavLevel::All || (opts.webdav == WebDavLevel::MkColProppatchOnly && matches!(**method, method::DavMkcol | method::DavProppatch))))
+                .filter(|method| opts.webdav == WebDavLevel::All || (opts.webdav == WebDavLevel::MkColMoveOnly && matches!(**method, method::DavMkcol | method::DavMove))))
             .chain([method::Put, method::Delete].iter().filter(|_| opts.allow_writes))
             .cloned()
             .collect::<Vec<_>>()
@@ -268,10 +268,10 @@ impl Handler for &'static HttpHandler {
             method::Trace => self.handle_trace(req),
 
             method::DavCopy if self.webdav >= WebDavLevel::All => self.handle_webdav_copy(req),
-            method::DavMkcol if self.webdav >= WebDavLevel::MkColProppatchOnly => self.handle_webdav_mkcol(req),
-            method::DavMove if self.webdav >= WebDavLevel::All => self.handle_webdav_move(req),
+            method::DavMkcol if self.webdav >= WebDavLevel::MkColMoveOnly => self.handle_webdav_mkcol(req),
+            method::DavMove if self.webdav >= WebDavLevel::MkColMoveOnly => self.handle_webdav_move(req),
             method::DavPropfind if self.webdav >= WebDavLevel::All => self.handle_webdav_propfind(req),
-            method::DavProppatch if self.webdav >= WebDavLevel::MkColProppatchOnly => self.handle_webdav_proppatch(req),
+            method::DavProppatch if self.webdav >= WebDavLevel::All => self.handle_webdav_proppatch(req),
 
             _ => self.handle_bad_method(req),
         }?;
@@ -954,7 +954,7 @@ impl HttpHandler {
                                  if is_file { "" } else { "/" },
                                  if show_file_management_controls {
                                      DisplayThree(r#"<span class="manage"><span class="delete_file_icon" onclick="delete_onclick(arguments[0])">Delete</span>"#,
-                                                  if self.webdav >= WebDavLevel::MkColProppatchOnly {
+                                                  if self.webdav >= WebDavLevel::MkColMoveOnly {
                                                       r#" <span class="rename_icon" onclick="rename_onclick(arguments[0])">Rename</span>"#
                                                   } else {
                                                       ""
@@ -1002,7 +1002,7 @@ impl HttpHandler {
                                                                               } else {
                                                                                   ""
                                                                               },
-                                                                              if show_file_management_controls && self.webdav >= WebDavLevel::MkColProppatchOnly {
+                                                                              if show_file_management_controls && self.webdav >= WebDavLevel::MkColMoveOnly {
                                                                                   r#"<a id='new"directory' href><span class="new_dir_icon">Create directory</span></a>"#
                                                                               } else {
                                                                                   ""
@@ -1104,7 +1104,7 @@ impl HttpHandler {
                                if is_file { "</abbr>" } else { "" },
                                if show_file_management_controls {
                                    DisplayThree("<td><a href class=\"delete_file_icon\" onclick=\"delete_onclick(arguments[0])\">Delete</a>",
-                                                if self.webdav >= WebDavLevel::MkColProppatchOnly {
+                                                if self.webdav >= WebDavLevel::MkColMoveOnly {
                                                     " <a href class=\"rename_icon\" onclick=\"rename_onclick(arguments[0])\">Rename</a>"
                                                 } else {
                                                     ""
@@ -1149,7 +1149,7 @@ impl HttpHandler {
                                                                        } else {
                                                                            ""
                                                                        },
-                                                                       if show_file_management_controls && self.webdav >= WebDavLevel::MkColProppatchOnly {
+                                                                       if show_file_management_controls && self.webdav >= WebDavLevel::MkColMoveOnly {
                                                                            "<tr id=\'new\"directory\'><td><a tabindex=\"-1\" href class=\"new_dir_icon\"></a></td>\
                                                                                                       <td colspan=3><a href>Create directory</a></td>\
                                                                                                       <td><a tabindex=\"-1\" href>&nbsp;</a></td></tr>"

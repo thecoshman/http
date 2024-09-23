@@ -190,7 +190,7 @@ pass parameters like what port to use.
 
   -D --convenient-webdav
 
-    Allow MKCOL (create directory) and PROPPATCH (rename) WebDAV requests.
+    Allow MKCOL (create directory) and MOVE (rename) WebDAV requests.
 
     These are write requests so this is a no-op unless -w. False by default.
 
