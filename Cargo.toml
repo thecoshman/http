@@ -90,3 +90,6 @@ doc = false
 name = "http"
 maintainer = "nabijaczleweli <nabijaczleweli@gmail.com>"
 section = "web"
+
+[profile.release]
+lto = true
