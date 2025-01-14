@@ -340,7 +340,7 @@ impl HttpHandler {
                          if password.is_some() { ":" } else { "" },
                          password.as_ref().map_or("", |s| &s[..]));
 
-                    Ok(Some(Response::with((status::Unauthorized, Header(WwwAuthenticate("basic".into())), "Supplied credentials invalid."))))
+                    Ok(Some(Response::with((status::Unauthorized, Header(WwwAuthenticate("basic".into())), "Supplied credentials invalid.\n"))))
                 }
             }
             None => {
@@ -350,7 +350,7 @@ impl HttpHandler {
                      req.method,
                      req.url);
 
-                Ok(Some(Response::with((status::Unauthorized, Header(WwwAuthenticate("basic".into())), "Credentials required."))))
+                Ok(Some(Response::with((status::Unauthorized, Header(WwwAuthenticate("basic".into())), "Credentials required.\n"))))
             }
         }
     }
