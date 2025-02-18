@@ -76,7 +76,7 @@ See the [repository README](//debian.nabijaczleweli.xyz/README) for more informa
 
 ### On Arch Linux
 
-Available from the [community repository](https://archlinux.org/packages/community/x86_64/httplz/) as `httplz`:
+Available from the [extra repository](https://archlinux.org/packages/extra/x86_64/httplz/) as `httplz`:
 
 ```sh
 pacman -S httplz
