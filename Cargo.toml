@@ -19,7 +19,8 @@ authors = ["thecoshman <rust@thecoshman.com>",
            "jim4067",
            "Orhun Parmaksız <orhunparmaksiz@gmail.com>",
            "Kian-Meng Ang <kianmeng@cpan.org>",
-           "Theodore Ni"]
+           "Theodore Ni",
+           "Thorbjørn Lindeijer <bjorn@lindeijer.nl>"]
 
 [dependencies]
 hyper-native-tls = "0.3"
