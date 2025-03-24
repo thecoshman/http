@@ -34,6 +34,9 @@ window.addEventListener("DOMContentLoaded", function() {
   });
 
   let file_upload = document.querySelector("input[type=file]");
+  let upload_list = document.createElement('ol');
+  file_upload.parentNode.appendChild(upload_list)
+
   file_upload.addEventListener("change", function() {
     for(let i = file_upload.files.length - 1; i >= 0; --i) {
       let file = file_upload.files[i];
@@ -43,6 +46,17 @@ window.addEventListener("DOMContentLoaded", function() {
 
   function upload_file(req_url, file) {
     ++remaining_files;
+
+    let list_item = document.createElement('li');
+    let filename_line = document.createElement('p')
+    let progress_line = document.createElement('p')
+
+    filename_line.textContent = file.name
+
+    list_item.appendChild(filename_line)
+    list_item.appendChild(progress_line)
+    upload_list.appendChild(list_item)
+
     if(!file_upload_text) {
       file_upload_text = document.createTextNode(1);
       file_upload.parentNode.insertBefore(file_upload_text, file_upload.nextSibling); // insertafter
@@ -50,13 +64,40 @@ window.addEventListener("DOMContentLoaded", function() {
       file_upload_text.data = remaining_files;
 
     let request = new XMLHttpRequest();
+    let startTime = Date.now();
+
     request.addEventListener("loadend", function(e) {
       if(request.status >= 200 && request.status < 300) {
+        progress_line.textContent = 'Done'
         if(!--remaining_files)
          window.location.reload();
         file_upload_text.data = remaining_files;
-      } else
+      } else {
+        progress_line.textContent = request.response;
         file_upload.outerHTML = req_url + "<br />" + request.response;
+      }
+    });
+
+    request.upload.addEventListener("progress", function(e) {
+      if (e.lengthComputable) {
+        const total = event.total;
+        const loaded = event.loaded;
+
+        const percentComplete = (loaded / total) * 100;
+        const elapsedTime = Math.floor((Date.now() - startTime) / 1000); // in seconds
+        const speed = (loaded / elapsedTime) || 0; // bytes per second
+        const totalTime = Math.floor(total / speed) || 0; // in seconds
+
+        // Print output
+        progress_line.textContent = progressString(
+          percentComplete.toFixed(0),
+          formatBytes(loaded),
+          formatBytes(total),
+          formatTime(elapsedTime),
+          formatTime(totalTime),
+          formatBytes(speed) + "/s",
+        );
+      }
     });
     request.open("PUT", req_url);
     if(file.lastModified)
@@ -89,5 +130,36 @@ window.addEventListener("DOMContentLoaded", function() {
       if(e.length)
         all_in_reader(reader, f);
     });
+  }
+
+  // Helper function to format display
+  function progressString(percent, loaded, total, spent, all, speed) {
+    return `${percent}% ${speed} ${loaded}/${total} ${spent}/${all}`;
+  }
+
+  // Function to format bytes to a human-readable string
+  function formatBytes(bytes) {
+    const units = ['B', 'KB', 'MB', 'GB', 'TB'];
+    let i = 0;
+    while (bytes >= 1024 && i < units.length - 1) {
+        bytes /= 1024;
+        i++;
+    }
+    return `${bytes.toFixed(2)} ${units[i]}`;
+  }
+
+  // Function to format seconds to a human-readable time string
+  function formatTime(seconds) {
+    const hours = Math.floor(seconds / 3600);
+    const minutes = Math.floor((seconds % 3600) / 60);
+    const remainingSeconds = seconds % 60;
+
+    if (hours > 0) {
+        return `${hours}h ${minutes}m ${remainingSeconds}s`;
+    } else if (minutes > 0) {
+        return `${minutes}m ${remainingSeconds}s`;
+    } else {
+        return `${remainingSeconds}s`;
+    }
   }
 });
