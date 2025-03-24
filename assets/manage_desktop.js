@@ -2,6 +2,9 @@
 
 window.addEventListener("DOMContentLoaded", function() {
   let new_directory               = document.getElementById('new"directory');
+  if(!new_directory)
+    return;
+
   let new_directory_filename_cell = new_directory.children[1];
   let new_directory_status_output = new_directory.children[2].children[0];
   let new_directory_filename_input = null;

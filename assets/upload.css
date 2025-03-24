@@ -1,0 +1,12 @@
+dd span {
+  text-align: right;
+  display: inline-block;
+}
+
+dd label span {
+  width: 11em;
+}
+
+dd > span:nth-child(n + 2) {
+  width: 6em;
+}

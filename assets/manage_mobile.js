@@ -2,6 +2,8 @@
 
 window.addEventListener("DOMContentLoaded", function() {
   let new_directory = document.getElementById('new"directory');
+  if(!new_directory)
+    return;
 
   let first_onclick = true, input;
   let submit_callback = function() {
