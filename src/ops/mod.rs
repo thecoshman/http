@@ -980,7 +980,8 @@ impl HttpHandler {
                                                 status::Ok,
                                                 directory_listing_mobile_html(&relpath_escaped[!is_root as usize..],
                                                                               if show_file_management_controls {
-                                                                                  concat!(r#"<script>"#, include_str!(concat!(env!("OUT_DIR"), "/assets/upload.js")))
+                                                                                  concat!(r#"<style>"#, include_str!(concat!(env!("OUT_DIR"), "/assets/upload.css")), r#"</style>"#,
+                                                                                          r#"<script>"#, include_str!(concat!(env!("OUT_DIR"), "/assets/upload.js")))
                                                                               } else {
                                                                                   ""
                                                                               },
@@ -1122,7 +1123,8 @@ impl HttpHandler {
                                                 status::Ok,
                                                 directory_listing_html(&relpath_escaped[!is_root as usize..],
                                                                        if show_file_management_controls {
-                                                                           concat!(r#"<script>"#, include_str!(concat!(env!("OUT_DIR"), "/assets/upload.js")))
+                                                                           concat!(r#"<style>"#, include_str!(concat!(env!("OUT_DIR"), "/assets/upload.css")), r#"</style>"#,
+                                                                                   r#"<script>"#, include_str!(concat!(env!("OUT_DIR"), "/assets/upload.js")))
                                                                        } else {
                                                                            ""
                                                                        },

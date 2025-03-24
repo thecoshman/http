@@ -34,8 +34,8 @@ window.addEventListener("DOMContentLoaded", function() {
   });
 
   let file_upload = document.querySelector("input[type=file]");
-  let upload_list = document.createElement('ol');
-  file_upload.parentNode.appendChild(upload_list)
+  let upload_list = document.createElement("dl");
+  file_upload.parentElement.appendChild(upload_list);
 
   file_upload.addEventListener("change", function() {
     for(let i = file_upload.files.length - 1; i >= 0; --i) {
@@ -47,15 +47,34 @@ window.addEventListener("DOMContentLoaded", function() {
   function upload_file(req_url, file) {
     ++remaining_files;
 
-    let list_item = document.createElement('li');
-    let filename_line = document.createElement('p')
-    let progress_line = document.createElement('p')
+    let filename_line = document.createElement("dt");
+    filename_line.innerText = file.name;
+    upload_list.appendChild(filename_line)
 
-    filename_line.textContent = file.name
+    let progress_progress_label = document.createElement("label");
+    let progress_progress_desc  = document.createElement("span");
+    let progress_progress       = document.createElement("progress");
+    progress_progress.value = 0;
+    progress_progress_label.appendChild(progress_progress);
+    progress_progress_label.appendChild(document.createTextNode(" "));
+    progress_progress_desc.innerText = "pending";
+    progress_progress_label.appendChild(progress_progress_desc);
 
-    list_item.appendChild(filename_line)
-    list_item.appendChild(progress_line)
-    upload_list.appendChild(list_item)
+    let progress_speed = document.createElement("span");
+    let progress_speed_text = document.createTextNode("?");
+    progress_speed.appendChild(progress_speed_text);
+    progress_speed.appendChild(document.createTextNode("/s"));
+
+    let progress_time = document.createElement("span");
+    progress_speed.appendChild(progress_time);
+
+    let progress_line     = document.createElement("dd");
+    progress_line.appendChild(progress_progress_label);
+    progress_line.appendChild(document.createTextNode(" "));
+    progress_line.appendChild(progress_speed);
+    progress_line.appendChild(document.createTextNode(" "));
+    progress_line.appendChild(progress_time);
+    upload_list.appendChild(progress_line)
 
     if(!file_upload_text) {
       file_upload_text = document.createTextNode(1);
@@ -64,41 +83,46 @@ window.addEventListener("DOMContentLoaded", function() {
       file_upload_text.data = remaining_files;
 
     let request = new XMLHttpRequest();
-    let startTime = Date.now();
-
     request.addEventListener("loadend", function(e) {
       if(request.status >= 200 && request.status < 300) {
-        progress_line.textContent = 'Done'
         if(!--remaining_files)
-         window.location.reload();
+          window.location.reload();
+
+        filename_line.remove();
+        progress_line.remove();
+
         file_upload_text.data = remaining_files;
       } else {
-        progress_line.textContent = request.response;
+        progress_line.innerText = request.response;
         file_upload.outerHTML = req_url + "<br />" + request.response;
       }
     });
 
-    request.upload.addEventListener("progress", function(e) {
-      if (e.lengthComputable) {
-        const total = event.total;
-        const loaded = event.loaded;
-
-        const percentComplete = (loaded / total) * 100;
-        const elapsedTime = Math.floor((Date.now() - startTime) / 1000); // in seconds
-        const speed = (loaded / elapsedTime) || 0; // bytes per second
-        const totalTime = Math.floor(total / speed) || 0; // in seconds
-
-        // Print output
-        progress_line.textContent = progressString(
-          percentComplete.toFixed(0),
-          formatBytes(loaded),
-          formatBytes(total),
-          formatTime(elapsedTime),
-          formatTime(totalTime),
-          formatBytes(speed) + "/s",
-        );
-      }
+    let start = 0;
+    let update = -1000;
+    request.upload.addEventListener("loadstart", function(e) {
+      start = e.timeStamp;
     });
+    let prog = function(e) {
+      if(e.lengthComputable) {
+        progress_progress.value = event.loaded;
+        progress_progress.max   = event.total;
+
+        let elapsed = (e.timeStamp - start) / 1000; // s
+        if(elapsed > 0.1) {
+          let speed = event.loaded / elapsed;
+          progress_progress_desc.innerText = human_readable_size(event.loaded) + "/" + human_readable_size(event.total);
+          progress_speed_text.data         = human_readable_size(speed);
+          progress_time.innerText          = hms(elapsed) + "/" + hms(event.total / speed);
+        }
+      } else {
+        progress_progress.removeAttribute("value");
+        progress_progress_desc.innerText = "uploading";
+        request.upload.removeEventListener("progress", prog);
+      }
+    };
+    request.upload.addEventListener("progress", prog);
+
     request.open("PUT", req_url);
     if(file.lastModified)
       request.setRequestHeader("X-Last-Modified", file.lastModified);
@@ -132,34 +156,27 @@ window.addEventListener("DOMContentLoaded", function() {
     });
   }
 
-  // Helper function to format display
-  function progressString(percent, loaded, total, spent, all, speed) {
-    return `${percent}% ${speed} ${loaded}/${total} ${spent}/${all}`;
+  // Ported from util::HumanReadableSize
+  const LN_KIB = Math.LN2 * 10; // 1024f64.ln()
+  function human_readable_size(num) {
+    let exp = Math.min(Math.max(Math.trunc(Math.log(num) / LN_KIB), 0), 8);
+
+    let val = num / Math.pow(2, exp * 10);
+
+    return ((exp > 0) ? Math.round(val * 10) / 10 : Math.round(val)) + " "
+           + ["B", "KiB", "MiB", "GiB", "TiB", "PiB", "EiB", "ZiB", "YiB"][Math.trunc(Math.max(exp, 0))];
   }
 
-  // Function to format bytes to a human-readable string
-  function formatBytes(bytes) {
-    const units = ['B', 'KB', 'MB', 'GB', 'TB'];
-    let i = 0;
-    while (bytes >= 1024 && i < units.length - 1) {
-        bytes /= 1024;
-        i++;
-    }
-    return `${bytes.toFixed(2)} ${units[i]}`;
-  }
+  function hms(seconds) {
+    let h = Math.trunc(seconds / 3600);
+    let m = Math.trunc((seconds % 3600) / 60);
+    let s = Math.trunc(seconds % 60);
 
-  // Function to format seconds to a human-readable time string
-  function formatTime(seconds) {
-    const hours = Math.floor(seconds / 3600);
-    const minutes = Math.floor((seconds % 3600) / 60);
-    const remainingSeconds = seconds % 60;
-
-    if (hours > 0) {
-        return `${hours}h ${minutes}m ${remainingSeconds}s`;
-    } else if (minutes > 0) {
-        return `${minutes}m ${remainingSeconds}s`;
-    } else {
-        return `${remainingSeconds}s`;
-    }
+    if(h)
+      return h + ":" + String(m).padStart(2, '0') + ":" + String(s).padStart(2, '0');
+    else if(m)
+      return m + ":" + String(s).padStart(2, '0');
+    else
+      return seconds.toFixed(1) + "s";
   }
 });

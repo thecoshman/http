@@ -59,6 +59,7 @@ fn assets() -> Vec<(&'static str, String)> {
                         ("manage_mobile", "assets/manage_mobile.js"),
                         ("manage_desktop", "assets/manage_desktop.js"),
                         ("upload", "assets/upload.js"),
+                        ("upload_css", "assets/upload.css"),
                         ("adjust_tz", "assets/adjust_tz.js")] {
         println!("cargo:rerun-if-changed={}", file);
         let data = fs::read_to_string(file).unwrap();
