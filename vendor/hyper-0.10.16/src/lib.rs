@@ -166,7 +166,7 @@ pub use status::StatusCode::{Ok, BadRequest, NotFound};
 pub use server::Server;
 
 macro_rules! todo(
-    ($($arg:tt)*) => (if cfg!(not(ndebug)) {
+    ($($arg:tt)*) => (if false {
         trace!("TODO: {:?}", format_args!($($arg)*))
     })
 );
