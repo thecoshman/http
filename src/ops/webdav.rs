@@ -7,10 +7,10 @@
 
 
 use self::super::super::util::{BorrowXmlName, Destination, DisplayThree, CommaList, Overwrite, Depth, win32_file_attributes, file_time_accessed,
-                               file_time_modified, file_time_created, client_microsoft, is_actually_file, is_descendant_of, file_executable, set_executable,
-                               error_html, file_length, set_times, copy_dir, WEBDAV_ALLPROP_PROPERTIES_NON_WINDOWS, WEBDAV_ALLPROP_PROPERTIES_WINDOWS,
-                               WEBDAV_XML_NAMESPACE_MICROSOFT, WEBDAV_XML_NAMESPACE_APACHE, WEBDAV_PROPNAME_PROPERTIES, WEBDAV_XML_NAMESPACE_DAV,
-                               WEBDAV_XML_NAMESPACES, MAX_SYMLINKS};
+                               file_time_modified, file_time_created, client_microsoft, is_actually_file, is_descendant_of, escape_specials, file_executable,
+                               set_executable, error_html, file_length, set_times, copy_dir, WEBDAV_ALLPROP_PROPERTIES_NON_WINDOWS,
+                               WEBDAV_ALLPROP_PROPERTIES_WINDOWS, WEBDAV_XML_NAMESPACE_MICROSOFT, WEBDAV_XML_NAMESPACE_APACHE, WEBDAV_PROPNAME_PROPERTIES,
+                               WEBDAV_XML_NAMESPACE_DAV, WEBDAV_XML_NAMESPACES, MAX_SYMLINKS};
 use iron::mime::{Mime, Attr as MimeAttr, Value as MimeAttrValue, SubLevel as MimeSubLevel, TopLevel as MimeTopLevel};
 use std::io::{ErrorKind as IoErrorKind, Result as IoResult, Error as IoError, Write, Read};
 use xml::reader::{EventReader as XmlReader, XmlEvent as XmlREvent, Error as XmlRError};
@@ -403,7 +403,7 @@ impl HttpHandler {
         out.write(XmlWEvent::start_element("D:response"))?;
 
         out.write(XmlWEvent::start_element("D:href"))?;
-        out.write(XmlWEvent::characters(url))?;
+        out.write(XmlWEvent::characters(&escape_specials(url)))?;
         out.write(XmlWEvent::end_element())?; // href
 
         let prop_count = props.iter().map(|pp| pp.len()).sum();
