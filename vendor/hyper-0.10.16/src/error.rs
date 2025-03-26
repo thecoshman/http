@@ -8,9 +8,6 @@ use std::string::FromUtf8Error;
 use httparse;
 use url;
 
-#[cfg(feature = "openssl")]
-use openssl::ssl::error::SslError;
-
 use self::Error::{
     Method,
     Uri,
@@ -99,16 +96,6 @@ impl From<IoError> for Error {
 impl From<url::ParseError> for Error {
     fn from(err: url::ParseError) -> Error {
         Uri(err)
-    }
-}
-
-#[cfg(feature = "openssl")]
-impl From<SslError> for Error {
-    fn from(err: SslError) -> Error {
-        match err {
-            SslError::StreamError(err) => Io(err),
-            err => Ssl(Box::new(err)),
-        }
     }
 }
 
