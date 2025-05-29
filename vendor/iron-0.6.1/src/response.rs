@@ -114,7 +114,9 @@ impl Response {
         let out = match self.body {
             Some(body) => write_with_body(http_res, body),
             None => {
-                http_res.headers_mut().set(headers::ContentLength(0));
+                if !http_res.headers().has::<headers::ContentLength>() {
+                    http_res.headers_mut().set(headers::ContentLength(0));
+                }
                 http_res.start().and_then(|res| res.end())
             }
         };
