@@ -78,6 +78,8 @@ pub struct Options {
     pub check_indices: bool,
     /// Whether to allow requests to `/file` to return `/file.{INDEX_EXTENSIONS`. Default: false
     pub strip_extensions: bool,
+    /// Instead of returning 404, try this file first. Default: `None`
+    pub try_404: Option<PathBuf>,
     /// Whether to allow write operations. Default: false
     pub allow_writes: bool,
     /// Whether to encode filesystem files. Default: true
@@ -134,6 +136,7 @@ impl Options {
             .arg(Arg::from_usage("-a --address [address] 'Address to bind to. Default: 0.0.0.0'").validator(Options::ipaddr_validator))
             .arg(Arg::from_usage("-t --temp-dir [temp] 'Temporary directory. Default: $TEMP'")
                 .validator(|s| Options::filesystem_dir_validator(s, "Temporary directory")))
+            .arg(Arg::from_usage("--404 [fallback-file] 'Return this file instead of a 404 for a GET. Default: generated response'"))
             .arg(Arg::from_usage("-s --no-follow-symlinks 'Don't follow symlinks. Default: false'"))
             .arg(Arg::from_usage("-r --sandbox-symlinks 'Restrict/sandbox where symlinks lead to only the direct descendants of the hosted directory. \
                                   Default: false'"))
@@ -253,6 +256,7 @@ impl Options {
             generate_listings: !matches.is_present("no-listings"),
             check_indices: !matches.is_present("no-indices"),
             strip_extensions: matches.is_present("strip-extensions"),
+            try_404: matches.value_of("404").map(|t4| PathBuf::from(t4)),
             allow_writes: matches.is_present("allow-write"),
             encode_fs: !matches.is_present("no-encode"),
             encoded_filesystem_limit: matches.value_of("encoded-filesystem").and_then(|s| Options::size_parse(s.into()).ok()),

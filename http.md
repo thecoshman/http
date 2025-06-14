@@ -255,6 +255,14 @@ pass parameters like what port to use.
 
     This is false by default
 
+  --404 FALLBACK-FILE
+
+    When returning a 404 response to a GET,
+    send FALLBACK-FILE, instead of a generated error page,
+    as the body.
+
+    FALLBACK-FILE is a filesystem path and is not subject to -s/-r restrictions.
+
   -q --quiet...
 
     Suppress increasing amounts of output.
