@@ -489,7 +489,7 @@ impl fmt::Display for HumanReadableSize {
             f.write_str("0 B")
         } else {
             let num = self.0 as f64;
-            let exp = cmp::min(cmp::max((num.ln() / LN_KIB) as i32, 0), 8);
+            let exp = ((num.ln() / LN_KIB) as i32).clamp(0, 8);
 
             let val = num / 2f64.powi(exp * 10);
 

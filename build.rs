@@ -96,7 +96,7 @@ fn htmls() {
         let mut argsused = BTreeMap::<u32, u8>::new();
         let mut idx = 0;
         for (start, (len, argi)) in arguments {
-            if with_assets[idx..start].len() != 0 {
+            if !with_assets[idx..start].is_empty() {
                 data.push(Ok(&with_assets[idx..start]));
             }
             data.push(Err(argi));

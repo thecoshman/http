@@ -49,7 +49,7 @@ impl PruneChain {
                     let key = match cache.iter().min_by_key(|i| (i.1).1.load(AtomicOrdering::Relaxed)) {
                         Some((key, ((path, _, _), _))) => {
                             match fs::remove_file(path) {
-                                Ok(()) => key.clone(),
+                                Ok(()) => *key,
                                 Err(_) => break,
                             }
                         }

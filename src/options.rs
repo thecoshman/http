@@ -256,7 +256,7 @@ impl Options {
             generate_listings: !matches.is_present("no-listings"),
             check_indices: !matches.is_present("no-indices"),
             strip_extensions: matches.is_present("strip-extensions"),
-            try_404: matches.value_of("404").map(|t4| PathBuf::from(t4)),
+            try_404: matches.value_of("404").map(PathBuf::from),
             allow_writes: matches.is_present("allow-write"),
             encode_fs: !matches.is_present("no-encode"),
             encoded_filesystem_limit: matches.value_of("encoded-filesystem").and_then(|s| Options::size_parse(s.into()).ok()),
@@ -363,7 +363,7 @@ impl Options {
 
     fn normalise_path(path: &str) -> String {
         let mut frags = vec![];
-        for fragment in path.split(|c| c == '/' || c == '\\') {
+        for fragment in path.split(['/', '\\']) {
             match fragment {
                 "" | "." => {}
                 ".." => {
