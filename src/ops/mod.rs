@@ -134,6 +134,7 @@ pub struct HttpHandler {
     pub generate_listings: bool,
     pub check_indices: bool,
     pub strip_extensions: bool,
+    pub try_404: Option<PathBuf>,
     /// (at all, log_time, log_colour)
     pub log: (bool, bool, bool),
     pub webdav: WebDavLevel,
@@ -180,7 +181,9 @@ impl HttpHandler {
             .iter()
             .chain(dav_level_1_methods(opts.allow_writes)
                 .iter()
-                .filter(|method| opts.webdav == WebDavLevel::All || (opts.webdav == WebDavLevel::MkColMoveOnly && matches!(**method, method::DavMkcol | method::DavMove))))
+                .filter(|method| {
+                    opts.webdav == WebDavLevel::All || (opts.webdav == WebDavLevel::MkColMoveOnly && matches!(**method, method::DavMkcol | method::DavMove))
+                }))
             .chain([method::Put, method::Delete].iter().filter(|_| opts.allow_writes))
             .cloned()
             .collect::<Vec<_>>()
@@ -193,6 +196,7 @@ impl HttpHandler {
             generate_listings: opts.generate_listings,
             check_indices: opts.check_indices,
             strip_extensions: opts.strip_extensions,
+            try_404: opts.try_404.clone(),
             log: (opts.loglevel < LogLevel::NoServeStatus, opts.log_time, opts.log_colour),
             webdav: opts.webdav,
             global_auth_data: global_auth_data,
@@ -375,7 +379,7 @@ impl HttpHandler {
 
         if !req_p.exists() || (symlink && !self.follow_symlinks) ||
            (symlink && self.follow_symlinks && self.sandbox_symlinks && !is_descendant_of(&req_p, &self.hosted_directory.1)) {
-            return self.handle_nonexistent(req, req_p);
+            return self.handle_nonexistent_get(req, req_p);
         }
 
         let is_file = is_actually_file(&req_p.metadata().expect("Failed to get file metadata").file_type(), &req_p);
@@ -387,7 +391,7 @@ impl HttpHandler {
             } else if let Some(range) = range {
                 self.handle_get_file_range(req, req_p, range)
             } else {
-                self.handle_get_file(req, req_p)
+                self.handle_get_file(req, &req_p, false)
             }
         } else {
             if raw_fs {
@@ -415,11 +419,25 @@ impl HttpHandler {
     }
 
     fn handle_nonexistent_status(&self, req: &mut Request, req_p: PathBuf, status: status::Status) -> IronResult<Response> {
+        self.handle_nonexistent_status_impl(req, req_p, status, &None)
+    }
+
+    fn handle_nonexistent_get(&self, req: &mut Request, req_p: PathBuf) -> IronResult<Response> {
+        self.handle_nonexistent_status_impl(req, req_p, status::NotFound, &self.try_404)
+    }
+
+    fn handle_nonexistent_status_impl(&self, req: &mut Request, req_p: PathBuf, status: status::Status, try_404: &Option<PathBuf>) -> IronResult<Response> {
         log!(self.log,
              "{} requested to {red}{}{reset} nonexistent entity {magenta}{}{reset}",
              self.remote_addresses(&req),
              req.method,
              req_p.display());
+
+        if let Some(try_404) = try_404.as_ref() {
+            if try_404.metadata().map(|m| !m.is_dir()).unwrap_or(false) {
+                return self.handle_get_file(req, try_404, true)
+            }
+        }
 
         let url_p = url_path(&req.url);
         self.handle_generated_response_encoding(req,
@@ -473,7 +491,7 @@ impl HttpHandler {
                     let _ = write!(&mut etag, "+{}", brs[0]);
                     let etag = unsafe { String::from_utf8_unchecked(etag) };
                     if HttpHandler::should_304_path(req, &req_p, &etag) {
-                        log!(self.log, "{:w$} Not Modified", "", w = self.remote_addresses(req).width());
+                        log!(self.log, "{} Not Modified", self.remote_addresses(req));
                         return Ok(Response::with((status::NotModified,
                                                   (Header(headers::Server(USER_AGENT.into())),
                                                    Header(headers::LastModified(headers::HttpDate(file_time_modified_p(&req_p)))),
@@ -609,34 +627,34 @@ impl HttpHandler {
                            mime_type)))
     }
 
-    fn handle_get_file(&self, req: &mut Request, req_p: PathBuf) -> IronResult<Response> {
+    fn handle_get_file(&self, req: &mut Request, req_p: &PathBuf, is_404: bool) -> IronResult<Response> {
         let mime_type = self.guess_mime_type(&req_p);
         log!(self.log,
              "{} was served file {magenta}{}{reset} as {blue}{}{reset}",
-             self.remote_addresses(&req),
+             self.remote_addresses(&req).maybe_spaces(is_404),
              req_p.display(),
              mime_type);
 
-        let metadata = req_p.metadata().expect("Failed to get requested file metadata");
+        let metadata = &req_p.metadata().expect("Failed to get requested file metadata");
         let etag = file_etag(&metadata);
         let headers = (Header(headers::Server(USER_AGENT.into())),
                        Header(headers::LastModified(headers::HttpDate(file_time_modified(&metadata)))),
                        Header(headers::AcceptRanges(headers::RangeUnit::Bytes)));
         if HttpHandler::should_304_path(req, &req_p, &etag) {
-            log!(self.log, "{:w$} Not Modified", "", w = self.remote_addresses(req).width());
+            log!(self.log, "{} Not Modified", self.remote_addresses(req).as_spaces());
             return Ok(Response::with((status::NotModified, headers, Header(headers::ETag(headers::EntityTag::strong(etag))))));
         }
 
         let flen = file_length(&metadata, &req_p);
         if self.encoded_temp_dir.is_some() && flen > MIN_ENCODING_SIZE && flen < MAX_ENCODING_SIZE &&
            req_p.extension().map(|s| !extension_is_blacklisted(s)).unwrap_or(true) {
-            self.handle_get_file_encoded(req, req_p, mime_type, headers, etag)
+            self.handle_get_file_encoded(req, &req_p, mime_type, headers, etag)
         } else {
             let file = match File::open(&req_p) {
                 Ok(file) => file,
                 Err(err) => return self.handle_requested_entity_unopenable(req, err, "file"),
             };
-            Ok(Response::with((status::Ok,
+            Ok(Response::with((if is_404 { status::NotFound } else { status::Ok },
                                headers,
                                Header(headers::ETag(headers::EntityTag::strong(etag))),
                                file,
@@ -645,7 +663,7 @@ impl HttpHandler {
         }
     }
 
-    fn handle_get_file_encoded(&self, req: &mut Request, req_p: PathBuf, mt: Mime,
+    fn handle_get_file_encoded(&self, req: &mut Request, req_p: &PathBuf, mt: Mime,
                                headers: (Header<headers::Server>, Header<headers::LastModified>, Header<headers::AcceptRanges>), etag: String)
                                -> IronResult<Response> {
         if let Some(encoding) = req.headers.get_mut::<headers::AcceptEncoding>().and_then(|es| response_encoding(&mut **es)) {
@@ -673,13 +691,12 @@ impl HttpHandler {
                             Ok(resp) => {
                                 atime.store(precise_time_ns(), AtomicOrdering::Relaxed);
                                 log!(self.log,
-                                     "{:w$} encoded as {} for {:.1}% ratio (cached)",
-                                     "",
+                                     "{} encoded as {} for {:.1}% ratio (cached)",
+                                     self.remote_addresses(req).as_spaces(),
                                      encoding,
                                      ((file_length(&req_p.metadata().expect("Failed to get requested file metadata"), &req_p) as f64) /
                                       (file_length(&resp.metadata().expect("Failed to get encoded file metadata"), &resp_p) as f64)) *
-                                     100f64,
-                                     w = self.remote_addresses(req).width());
+                                     100f64);
 
                                 return Ok(Response::with((status::Ok,
                                                           headers,
@@ -732,11 +749,10 @@ impl HttpHandler {
                     fs::remove_file(resp_p).expect("Failed to remove too big encoded file");
                 } else {
                     log!(self.log,
-                         "{:w$} encoded as {} for {:.1}% ratio",
-                         "",
+                         "{} encoded as {} for {:.1}% ratio",
+                         self.remote_addresses(req).as_spaces(),
                          encoding,
-                         gain * 100f64,
-                         w = self.remote_addresses(req).width());
+                         gain * 100f64);
 
                     let mut cache = self.cache_fs.write().expect("Filesystem cache write lock poisoned");
                     self.cache_fs_size.fetch_add(resp_p_len, AtomicOrdering::Relaxed);
@@ -751,10 +767,9 @@ impl HttpHandler {
                 }
             } else {
                 log!(self.log,
-                     "{:w$} failed to encode as {}, sending identity",
-                     "",
-                     encoding,
-                     w = self.remote_addresses(req).width());
+                     "{} failed to encode as {}, sending identity",
+                     self.remote_addresses(req).as_spaces(),
+                     encoding);
             }
         }
 
@@ -822,12 +837,11 @@ impl HttpHandler {
                      (self.follow_symlinks && self.sandbox_symlinks && is_descendant_of(&req_p, &self.hosted_directory.1)))
                 }) {
                 if req.url.as_ref().path_segments().unwrap().next_back() == Some("") {
-                    let r = self.handle_get_file(req, idx);
+                    let r = self.handle_get_file(req, &idx, false);
                     log!(self.log,
-                         "{:w$} found index file for directory {magenta}{}{reset}",
-                         "",
-                         req_p.display(),
-                         w = self.remote_addresses(req).width());
+                         "{} found index file for directory {magenta}{}{reset}",
+                         self.remote_addresses(req).as_spaces(),
+                         req_p.display());
                     return r;
                 } else {
                     return self.handle_get_dir_index_no_slash(req, e);
@@ -836,7 +850,7 @@ impl HttpHandler {
         }
 
         if !self.generate_listings {
-            return self.handle_nonexistent(req, req_p);
+            return self.handle_nonexistent_get(req, req_p);
         }
 
         if client_mobile(&req.headers) {
@@ -1123,8 +1137,11 @@ impl HttpHandler {
                                                 status::Ok,
                                                 directory_listing_html(&relpath_escaped[!is_root as usize..],
                                                                        if show_file_management_controls {
-                                                                           concat!(r#"<style>"#, include_str!(concat!(env!("OUT_DIR"), "/assets/upload.css")), r#"</style>"#,
-                                                                                   r#"<script>"#, include_str!(concat!(env!("OUT_DIR"), "/assets/upload.js")))
+                                                                           concat!(r#"<style>"#,
+                                                                                   include_str!(concat!(env!("OUT_DIR"), "/assets/upload.css")),
+                                                                                   r#"</style>"#,
+                                                                                   r#"<script>"#,
+                                                                                   include_str!(concat!(env!("OUT_DIR"), "/assets/upload.js")))
                                                                        } else {
                                                                            ""
                                                                        },
@@ -1152,9 +1169,9 @@ impl HttpHandler {
                                                                            ""
                                                                        },
                                                                        if show_file_management_controls && self.webdav >= WebDavLevel::MkColMoveOnly {
-                                                                           "<tr id=\'new\"directory\'><td><a tabindex=\"-1\" href class=\"new_dir_icon\"></a></td>\
-                                                                                                      <td colspan=3><a href>Create directory</a></td>\
-                                                                                                      <td><a tabindex=\"-1\" href>&nbsp;</a></td></tr>"
+                                                                           "<tr id=\'new\"directory\'><td><a tabindex=\"-1\" href \
+                                                                            class=\"new_dir_icon\"></a></td><td colspan=3><a href>Create \
+                                                                            directory</a></td><td><a tabindex=\"-1\" href>&nbsp;</a></td></tr>"
                                                                        } else {
                                                                            ""
                                                                        }))
@@ -1266,7 +1283,8 @@ impl HttpHandler {
                 let _temp_file_p_destroyer = DropDelete(&temp_file_p);
                 temp_file.rewind().expect("Failed to rewind temp file");
                 let mut file = File::create(&req_p).expect("Failed to open requested file");
-                #[cfg(any(target_os = "linux", target_os = "android"))] // matches std::io::copy() #[cfg]
+                // matches std::io::copy() #[cfg]
+                #[cfg(any(target_os = "linux", target_os = "android"))]
                 let err = io::copy(&mut temp_file, &mut file);
                 #[cfg(not(any(target_os = "linux", target_os = "android")))]
                 let err = io::copy(&mut BufReader::with_capacity(1024 * 1024, &mut temp_file), &mut file);
@@ -1291,7 +1309,7 @@ impl HttpHandler {
     }
 
     fn handle_put_error(&self, req: &mut Request, res: &str, err: IoError) -> IronResult<Response> {
-        log!(self.log, "{:w$} {} {}", "", res, err, w = self.remote_addresses(req).width());
+        log!(self.log, "{} {} {}", self.remote_addresses(req).as_spaces(), res, err);
         return self.handle_generated_response_encoding(req,
                                                        status::ServiceUnavailable,
                                                        error_html("503 Service Unavailable", res, format_args!("{}", err)));
@@ -1397,7 +1415,7 @@ impl HttpHandler {
         if st == status::Ok && (req.method == method::Get || req.method == method::Head) {
             if let Some(headers::IfNoneMatch::Items(inm)) = req.headers.get::<headers::IfNoneMatch>() {
                 if HttpHandler::etag_match(inm, &etag) {
-                    log!(self.log, "{:w$} Not Modified", "", w = self.remote_addresses(req).width());
+                    log!(self.log, "{} Not Modified", self.remote_addresses(req).as_spaces());
                     return Ok(Response::with((status::NotModified,
                                               Header(headers::Server(USER_AGENT.into())),
                                               Header(headers::ETag(headers::EntityTag::strong(etag))),
@@ -1413,11 +1431,10 @@ impl HttpHandler {
                 if let Some(enc_resp) = self.cache_gen.read().expect("Generated file cache read lock poisoned").get(&cache_key) {
                     enc_resp.1.store(precise_time_ns(), AtomicOrdering::Relaxed);
                     log!(self.log,
-                         "{:w$} encoded as {} for {:.1}% ratio (cached)",
-                         "",
+                         "{} encoded as {} for {:.1}% ratio (cached)",
+                         self.remote_addresses(req).as_spaces(),
                          encoding,
-                         ((resp.len() as f64) / (enc_resp.0.len() as f64)) * 100f64,
-                         w = self.remote_addresses(req).width());
+                         ((resp.len() as f64) / (enc_resp.0.len() as f64)) * 100f64);
 
                     return Ok(Response::with((st,
                                               Header(headers::Server(USER_AGENT.into())),
@@ -1430,11 +1447,10 @@ impl HttpHandler {
 
             if let Some(enc_resp) = encode_str(&resp, &encoding) {
                 log!(self.log,
-                     "{:w$} encoded as {} for {:.1}% ratio",
-                     "",
+                     "{} encoded as {} for {:.1}% ratio",
+                     self.remote_addresses(req).as_spaces(),
                      encoding,
-                     ((resp.len() as f64) / (enc_resp.len() as f64)) * 100f64,
-                     w = self.remote_addresses(req).width());
+                     ((resp.len() as f64) / (enc_resp.len() as f64)) * 100f64);
 
                 if enc_resp.len() as u64 <= self.encoded_generated_limit {
                     let mut cache = self.cache_gen.write().expect("Generated file cache write lock poisoned");
@@ -1457,10 +1473,9 @@ impl HttpHandler {
                 }
             } else {
                 log!(self.log,
-                     "{:w$} failed to encode as {}, sending identity",
-                     "",
-                     encoding,
-                     w = self.remote_addresses(req).width());
+                     "{} failed to encode as {}, sending identity",
+                     self.remote_addresses(req).as_spaces(),
+                     encoding);
             }
         }
 
@@ -1548,6 +1563,7 @@ impl HttpHandler {
             request: req,
             proxies: &self.proxies,
             log: self.log,
+            just_spaces: false,
         }
     }
 
@@ -1576,11 +1592,16 @@ pub struct AddressWriter<'r, 'p, 'ra, 'rb: 'ra> {
     pub proxies: &'p BTreeMap<IpCidr, String>,
     /// (at all, log_time, log_colour)
     pub log: (bool, bool, bool),
+    pub just_spaces: bool,
 }
 
 impl<'r, 'p, 'ra, 'rb: 'ra> fmt::Display for AddressWriter<'r, 'p, 'ra, 'rb> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         use trivial_colours::{Reset as CReset, Colour as C};
+
+        if self.just_spaces {
+            return write!(f, "{:w$}", "", w = self.width());
+        }
 
         if self.log.2 {
             write!(f, "{green}{}{reset}", self.request.remote_addr, green = C::Green, reset = CReset)?;
@@ -1607,6 +1628,15 @@ impl<'r, 'p, 'ra, 'rb: 'ra> fmt::Display for AddressWriter<'r, 'p, 'ra, 'rb> {
 }
 
 impl<'r, 'p, 'ra, 'rb: 'ra> AddressWriter<'r, 'p, 'ra, 'rb> {
+    fn maybe_spaces(mut self, ms: bool) -> Self {
+        self.just_spaces = ms;
+        self
+    }
+
+    fn as_spaces(self) -> Self {
+        self.maybe_spaces(true)
+    }
+
     fn width(&self) -> usize {
         // per http://192.168.1.109:8000/target/doc/rust/src/core/net/socket_addr.rs.html#571
         const LONGEST_IPV6_SOCKET_ADDR: &str = "[ffff:ffff:ffff:ffff:ffff:ffff:ffff:ffff%4294967296]:65536";
@@ -1694,7 +1724,9 @@ pub fn generate_tls_data(temp_dir: &(String, PathBuf)) -> Result<((String, PathB
             stderr = "<error getting process stderr".to_string();
         }
 
-        err(which, "Exiting", format_args!("{};\nstdout: ```\n{}```;\nstderr: ```\n{}```", exitc, stdout, stderr))
+        err(which,
+            "Exiting",
+            format_args!("{};\nstdout: ```\n{}```;\nstderr: ```\n{}```", exitc, stdout, stderr))
     }
 
     let tls_dir = temp_dir.1.join("tls");
