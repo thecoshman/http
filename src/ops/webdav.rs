@@ -720,7 +720,7 @@ fn parse_proppatch(req: &mut Request) -> Result<(Vec<(OwnedXmlName, String)>, Pr
 
             (State::InProp, XmlREvent::EndElement { name, .. }) => {
                 if Some(&name) == propname.as_ref() {
-                    props.push((name, mem::replace(&mut propdata, String::new())));
+                    props.push((name, mem::take(&mut propdata)));
                     state = State::Prop;
                 }
             }

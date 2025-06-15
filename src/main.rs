@@ -40,7 +40,6 @@ use std::net::IpAddr;
 use std::time::Duration;
 use tabwriter::TabWriter;
 use std::io::{Write, stdout};
-use std::collections::BTreeSet;
 use std::sync::{Mutex, Condvar};
 use hyper_native_tls::NativeTlsServer;
 
@@ -64,7 +63,7 @@ fn result_main() -> Result<(), Error> {
     if opts.generate_tls {
         opts.tls_data = Some(ops::generate_tls_data(&opts.temp_directory)?);
     }
-    for path in mem::replace(&mut opts.generate_path_auth, BTreeSet::new()) {
+    for path in mem::take(&mut opts.generate_path_auth) {
         opts.path_auth_data.insert(path, Some(ops::generate_auth_data()));
     }
 
