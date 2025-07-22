@@ -127,7 +127,7 @@ impl Options {
     pub fn parse() -> Options {
         let matches = App::new("http")
             .version(crate_version!())
-            .author(crate_authors!("\n"))
+            .author(&*env!("CARGO_PKG_AUTHORS").replace(":", "\n"))
             .about(crate_description!())
             .setting(AppSettings::ColoredHelp)
             .arg(Arg::from_usage("[DIR] 'Directory to host. Default: current working directory'")

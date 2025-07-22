@@ -1653,7 +1653,7 @@ impl<'r, 'p, 'ra, 'rb: 'ra> AddressWriter<'r, 'p, 'ra, 'rb> {
                 }
             }
         }
-        return len;
+        len
     }
 }
 
