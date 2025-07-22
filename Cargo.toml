@@ -101,3 +101,6 @@ section = "web"
 
 [profile.release]
 lto = true
+
+[lints.rust]
+mismatched_lifetime_syntaxes = "allow"

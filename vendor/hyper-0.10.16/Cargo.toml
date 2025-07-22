@@ -58,3 +58,6 @@ features = ["union"]
 
 [features]
 nightly = []
+
+[lints.rust]
+mismatched_lifetime_syntaxes = "allow"
