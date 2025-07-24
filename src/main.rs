@@ -93,17 +93,11 @@ fn result_main() -> Result<(), Error> {
             print!(" under address {}", responder.socket.ip());
         }
         print!(" with");
-        if let Some(&((ref id, _), _)) = opts.tls_data.as_ref() {
-            print!(" TLS certificate from \"{}\"", id);
-        } else {
-            print!("out TLS");
+        match opts.tls_data.as_ref() {
+            Some(&((ref id, _), _)) => print!(" TLS certificate from \"{}\"", id),
+            None => print!("out TLS"),
         }
-        if !opts.path_auth_data.is_empty() {
-            print!(" and basic authentication");
-        } else {
-            print!(" and no authentication");
-        }
-        println!("...");
+        println!(" and {} authentication...", ["basic", "no"][opts.path_auth_data.is_empty() as usize]);
 
         if let Some(band) = opts.request_bandwidth {
             println!("Requests limited to {}B/s.", band);
@@ -170,7 +164,7 @@ fn result_main() -> Result<(), Error> {
         loop {
             if !END_HANDLER.wait_timeout_while(END_HANDLER_MUTEX.lock().unwrap(),
                                     Duration::from_secs(handler.handler.prune_interval),
-                                    |quit| *quit)
+                                    |keepgoing| *keepgoing)
                 .unwrap()
                 .1
                 .timed_out() {
@@ -180,7 +174,7 @@ fn result_main() -> Result<(), Error> {
             handler.handler.prune();
         }
     } else {
-        drop(END_HANDLER.wait_while(END_HANDLER_MUTEX.lock().unwrap(), |quit| *quit).unwrap());
+        drop(END_HANDLER.wait_while(END_HANDLER_MUTEX.lock().unwrap(), |keepgoing| *keepgoing).unwrap());
     }
 
     responder.close().unwrap();
