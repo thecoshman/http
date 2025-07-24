@@ -159,17 +159,28 @@ fn result_main() -> Result<(), Error> {
     let Options { encoded_prune: opts_encoded_prune, temp_directory: opts_temp_directory, generate_tls: opts_generate_tls, .. } = opts;
 
     static END_HANDLER: Condvar = Condvar::new();
-    ctrlc::set_handler(|| END_HANDLER.notify_one()).unwrap();
+    static END_HANDLER_MUTEX: Mutex<bool> = Mutex::new(true);
+    ctrlc::set_handler(|| {
+            let mut mtx = END_HANDLER_MUTEX.lock().unwrap();
+            *mtx = false;
+            END_HANDLER.notify_one();
+        })
+        .unwrap();
     if opts_encoded_prune.is_some() {
         loop {
-            if !END_HANDLER.wait_timeout(Mutex::new(()).lock().unwrap(), Duration::from_secs(handler.handler.prune_interval)).unwrap().1.timed_out() {
+            if !END_HANDLER.wait_timeout_while(END_HANDLER_MUTEX.lock().unwrap(),
+                                    Duration::from_secs(handler.handler.prune_interval),
+                                    |quit| *quit)
+                .unwrap()
+                .1
+                .timed_out() {
                 break;
             }
 
             handler.handler.prune();
         }
     } else {
-        drop(END_HANDLER.wait(Mutex::new(()).lock().unwrap()).unwrap());
+        drop(END_HANDLER.wait_while(END_HANDLER_MUTEX.lock().unwrap(), |quit| *quit).unwrap());
     }
 
     responder.close().unwrap();
