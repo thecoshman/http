@@ -420,14 +420,14 @@ impl Options {
 
     fn age_parse<'s>(s: Cow<'s, str>) -> Result<u64, String> {
         let mut s = &s[..];
-        let mul: u64 = match s.as_bytes().last() {
-            Some(b's') => 1,
-            Some(b'm') => 60,
-            Some(b'h') => 60 * 60,
-            Some(b'd') => 60 * 60 * 24,
-            _ => 1,
+        let (mul, trim) = match s.as_bytes().last() {
+            Some(b's') => (1, true),
+            Some(b'm') => (60, true),
+            Some(b'h') => (60 * 60, true),
+            Some(b'd') => (60 * 60 * 24, true),
+            _ => (1, false),
         };
-        if mul != 1 {
+        if trim {
             s = &s[..s.len() - 1];
         }
         s.parse().map(|age: u64| age * mul).map_err(|e| format!("{} not a valid (optionally-s/m/h/d-suffixed) number: {}", s, e))
