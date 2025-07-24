@@ -2,8 +2,8 @@ use std::any::Any;
 use std::fmt::{self, Display};
 use std::str::{FromStr, from_utf8};
 use std::ops::{Deref, DerefMut};
-use base64::{encode, decode};
 use header::{Header, HeaderFormat};
+use base64::Engine;
 
 /// `Authorization` header, defined in [RFC7235](https://tools.ietf.org/html/rfc7235#section-4.2)
 ///
@@ -153,14 +153,14 @@ impl Scheme for Basic {
             text.push_str(&pass[..]);
         }
 
-        f.write_str(&encode(text.as_bytes()))
+        base64::display::Base64Display::new(text.as_bytes(), &base64::engine::general_purpose::STANDARD).fmt(f)
     }
 }
 
 impl FromStr for Basic {
     type Err = ::Error;
     fn from_str(s: &str) -> ::Result<Basic> {
-        match decode(s) {
+        match base64::engine::general_purpose::STANDARD.decode(s) {
             Ok(decoded) => match String::from_utf8(decoded) {
                 Ok(text) => {
                     let parts = &mut text.split(':');
