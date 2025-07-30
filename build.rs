@@ -36,22 +36,21 @@ fn assets() -> Vec<(&'static str, String)> {
                                  ["version = ".len()..]
                                  .trim_matches('"'))));
     }
-    for (key, mime, file) in
-        [("favicon", "image/png", "assets/favicon.png"),
-         ("dir_icon", "image/gif", "assets/icons/directory.gif"),
-         ("file_icon", "image/gif", "assets/icons/file.gif"),
-         ("file_binary_icon", "image/gif", "assets/icons/file_binary.gif"),
-         ("file_image_icon", "image/gif", "assets/icons/file_image.gif"),
-         ("file_text_icon", "image/gif", "assets/icons/file_text.gif"),
-         ("back_arrow_icon", "image/gif", "assets/icons/back_arrow.gif"),
-         ("new_dir_icon", "image/gif", "assets/icons/new_directory.gif"),
-         ("delete_file_icon", "image/png", "assets/icons/delete_file.png"),
-         ("rename_icon", "image/gif", "assets/icons/rename.gif"),
-         ("confirm_icon", "image/gif", "assets/icons/confirm.gif")] {
+    for (key, file) in [("favicon", "assets/favicon.png"),
+                        ("dir_icon", "assets/icons/directory.gif"),
+                        ("file_icon", "assets/icons/file.gif"),
+                        ("file_binary_icon", "assets/icons/file_binary.gif"),
+                        ("file_image_icon", "assets/icons/file_image.gif"),
+                        ("file_text_icon", "assets/icons/file_text.gif"),
+                        ("back_arrow_icon", "assets/icons/back_arrow.gif"),
+                        ("new_dir_icon", "assets/icons/new_directory.gif"),
+                        ("delete_file_icon", "assets/icons/delete_file.png"),
+                        ("rename_icon", "assets/icons/rename.gif"),
+                        ("confirm_icon", "assets/icons/confirm.gif")] {
         println!("cargo:rerun-if-changed={}", file);
         assets.push((key,
-                     format!("data:{};base64,{}",
-                             mime,
+                     format!("data:image/{};base64,{}",
+                             file.split('.').last().unwrap(),
                              Base64Display::new(&fs::read(file).unwrap()[..], &BASE64_STANDARD_NO_PAD))));
     }
     let outd = env::var("OUT_DIR").unwrap();
