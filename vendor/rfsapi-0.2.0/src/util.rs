@@ -1,7 +1,7 @@
 //! Module containing various utility functions.
 
 
-use time::{self, Tm};
+use chrono;
 
 
 /// Parse an RFC3339 string into a timespec.
@@ -16,49 +16,35 @@ use time::{self, Tm};
 /// # Examples
 ///
 /// ```
-/// # extern crate time;
+/// # extern crate chrono;
 /// # extern crate rfsapi;
-/// # use time::Tm;
 /// # use rfsapi::util::parse_rfc3339;
 /// # fn main() {
 /// assert_eq!(parse_rfc3339("2012-02-22T07:53:18-07:00"),
-///            Ok(Tm {
-///                tm_sec: 18,
-///                tm_min: 53,
-///                tm_hour: 7,
-///                tm_mday: 22,
-///                tm_mon: 1,
-///                tm_year: 112,
-///                tm_wday: 0,
-///                tm_yday: 0,
-///                tm_isdst: 0,
-///                tm_utcoff: -25200,
-///                tm_nsec: 0,
-///            }));
+///            Ok(chrono::DateTime::<chrono::FixedOffset>::from_naive_utc_and_offset(chrono::NaiveDateTime::new(chrono::NaiveDate::from_ymd_opt(2012, 2, 22).unwrap(),
+///                                                                                                             chrono::NaiveTime::from_hms_opt(7 + 7, 53, 18).unwrap()),
+///                                                           chrono::FixedOffset::west_opt(7 * 60 * 60).unwrap())));
 /// assert_eq!(parse_rfc3339("2012-02-22T14:53:18.42Z"),
-///            Ok(Tm {
-///                tm_sec: 18,
-///                tm_min: 53,
-///                tm_hour: 14,
-///                tm_mday: 22,
-///                tm_mon: 1,
-///                tm_year: 112,
-///                tm_wday: 0,
-///                tm_yday: 0,
-///                tm_isdst: 0,
-///                tm_utcoff: 0,
-///                tm_nsec: 420000000,
-///            }));
+///            Ok(chrono::DateTime::<chrono::FixedOffset>::from_naive_utc_and_offset(chrono::NaiveDateTime::new(chrono::NaiveDate::from_ymd_opt(2012, 2, 22).unwrap(),
+///                                                                                                             chrono::NaiveTime::from_hms_milli_opt(14, 53, 18, 420).unwrap()),
+///                                                           chrono::FixedOffset::west_opt(0).unwrap())));
 /// # }
 /// ```
-pub fn parse_rfc3339<S: AsRef<str>>(from: S) -> Result<Tm, time::ParseError> {
+pub fn parse_rfc3339<S: AsRef<str>>(from: S) -> chrono::ParseResult<chrono::DateTime<chrono::FixedOffset>> {
     let utc = from.as_ref().chars().last() == Some('Z');
     let fractional = from.as_ref().len() > if utc { 20 } else { 25 };
-    time::strptime(from.as_ref(),
-                   match (utc, fractional) {
-                       (true, false) => "%Y-%m-%dT%H:%M:%SZ",
-                       (true, true) => "%Y-%m-%dT%H:%M:%S.%fZ",
-                       (false, true) => "%Y-%m-%dT%H:%M:%S.%f%z",
-                       (false, false) => "%Y-%m-%dT%H:%M:%S%z",
-                   })
+    if utc {
+        chrono::NaiveDateTime::parse_from_str(from.as_ref(),
+                                              match fractional {
+                                                  false => "%Y-%m-%dT%H:%M:%SZ",
+                                                  true => "%Y-%m-%dT%H:%M:%S%.fZ",
+                                              })
+            .map(|ndt| ndt.and_utc().into())
+    } else {
+        chrono::DateTime::parse_from_str(from.as_ref(),
+                                         match fractional {
+                                             true => "%Y-%m-%dT%H:%M:%S%.f%z",
+                                             false => "%Y-%m-%dT%H:%M:%S%z",
+                                         })
+    }
 }

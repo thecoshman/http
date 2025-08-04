@@ -9,11 +9,11 @@
 extern crate serde_derive;
 extern crate serde;
 extern crate hyper;
-extern crate time;
+extern crate chrono;
 extern crate mime;
 
 use std::fmt;
-use time::Tm;
+use chrono::Timelike;
 use mime::Mime;
 use util::parse_rfc3339;
 use hyper::Error as HyperError;
@@ -110,7 +110,7 @@ pub struct RawFileData {
     /// File's name, which can be used to navigate to it.
     pub name: String,
     /// File's last modification time, as returned by the FS.
-    pub last_modified: Tm,
+    pub last_modified: chrono::DateTime<chrono::FixedOffset>,
     /// File size in bytes.
     ///
     /// Possibly garbage for directories.
@@ -128,12 +128,11 @@ impl Serialize for RawFileData {
         try!(map.serialize_entry("last_modified",
                                  &self.last_modified
                                      .to_utc()
-                                     .strftime(if self.last_modified.tm_nsec == 0 {
+                                     .format(if self.last_modified.nanosecond() == 0 {
                                          "%Y-%m-%dT%H:%M:%SZ"
                                      } else {
                                          "%Y-%m-%dT%H:%M:%S.%fZ"
                                      })
-                                     .unwrap()
                                      .to_string()));
         try!(map.serialize_entry("size", &self.size));
         try!(map.serialize_entry("is_file", &self.is_file));

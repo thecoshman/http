@@ -26,8 +26,8 @@ path = "../hyper-0.10.16"
 [dependencies.mime]
 version = "0.2"
 
-[dependencies.time]
-version = "0.1"
+[dependencies.chrono]
+version = "0.4"
 
 [dependencies.serde]
 version = "1.0"
