@@ -33,11 +33,11 @@ tabwriter = "1.1"
 arrayvec = "0.7"
 walkdir = "2.2"
 blake3 = "1.3"
+chrono = "0.4"
 flate2 = "1.0"
 xml-rs = "0.8"
 serde = "1.0"
 clap = "2.33"
-time = "0.1"
 
 [dependencies.trivial_colours]
 version = "0.3"

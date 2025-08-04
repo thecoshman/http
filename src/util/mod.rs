@@ -10,11 +10,11 @@ use percent_encoding;
 use walkdir::WalkDir;
 use std::borrow::Cow;
 use rfsapi::RawFileData;
-use std::time::SystemTime;
+use chrono::{DateTime, Utc};
 use iron::{mime, Headers, Url};
-use time::{self, Duration, Tm};
 use std::{cmp, fmt, f64, mem, str};
 use mime_guess::guess_mime_type_opt;
+use std::time::{SystemTime, Instant};
 use std::fs::{self, FileType, Metadata, File};
 use iron::headers::{HeaderFormat, UserAgent, Header};
 use xml::name::{OwnedName as OwnedXmlName, Name as XmlName};
@@ -352,40 +352,40 @@ pub fn percent_decode(s: &str) -> Option<Cow<str>> {
     percent_encoding::percent_decode(s.as_bytes()).decode_utf8().ok()
 }
 
-/// Get the timestamp of the file's last modification as a `time::Tm` in UTC.
-pub fn file_time_modified_p(f: &Path) -> Tm {
+/// Get the timestamp of the file's last modification as a `chrono::DateTime`.
+pub fn file_time_modified_p(f: &Path) -> DateTime<Utc> {
     file_time_modified(&f.metadata().expect("Failed to get file metadata"))
 }
 
-/// Get the timestamp of the file's creation as a `time::Tm` in UTC.
-pub fn file_time_created_p(f: &Path) -> Tm {
+/// Get the timestamp of the file's creation as a `chrono::DateTime`.
+pub fn file_time_created_p(f: &Path) -> DateTime<Utc> {
     file_time_created(&f.metadata().expect("Failed to get file metadata"))
 }
 
-/// Get the timestamp of the file's last access as a `time::Tm` in UTC.
-pub fn file_time_accessed_p(f: &Path) -> Tm {
+/// Get the timestamp of the file's last access as a `chrono::DateTime`.
+pub fn file_time_accessed_p(f: &Path) -> DateTime<Utc> {
     file_time_accessed(&f.metadata().expect("Failed to get file metadata"))
 }
 
-/// Get the timestamp of the file's last modification as a `time::Tm` in UTC.
-pub fn file_time_modified(m: &Metadata) -> Tm {
+/// Get the timestamp of the file's last modification as a `chrono::DateTime`.
+pub fn file_time_modified(m: &Metadata) -> DateTime<Utc> {
     file_time_impl(m.modified().expect("Failed to get file last modified date"))
 }
 
-/// Get the timestamp of the file's creation as a `time::Tm` in UTC.
-pub fn file_time_created(m: &Metadata) -> Tm {
+/// Get the timestamp of the file's creation as a `chrono::DateTime`.
+pub fn file_time_created(m: &Metadata) -> DateTime<Utc> {
     file_time_impl(m.created().or_else(|_| m.modified()).expect("Failed to get file created date"))
 }
 
-/// Get the timestamp of the file's last access as a `time::Tm` in UTC.
-pub fn file_time_accessed(m: &Metadata) -> Tm {
+/// Get the timestamp of the file's last access as a `chrono::DateTime`.
+pub fn file_time_accessed(m: &Metadata) -> DateTime<Utc> {
     file_time_impl(m.accessed().expect("Failed to get file accessed date"))
 }
 
-fn file_time_impl(time: SystemTime) -> Tm {
+fn file_time_impl(time: SystemTime) -> DateTime<Utc> {
     match time.elapsed() {
-        Ok(dur) => time::now_utc() - Duration::from_std(dur).unwrap(),
-        Err(ste) => time::now_utc() + Duration::from_std(ste.duration()).unwrap(),
+        Ok(dur) => Utc::now() - dur,
+        Err(ste) => Utc::now() + ste.duration(),
     }
 }
 
@@ -585,7 +585,7 @@ fn get_raw_fs_metadata_impl(f: &Path) -> RawFileData {
             Mime(MimeTopLevel::Text, MimeSubLevel::Plain, Default::default()) // text/plain
         }),
         name: f.file_name().unwrap().to_str().expect("Failed to get requested file name").to_string(),
-        last_modified: file_time_modified(&meta),
+        last_modified: file_time_modified(&meta).into(),
         size: file_length(&meta, &f),
         is_file: true,
     }
@@ -644,4 +644,11 @@ pub fn copy_dir(from: &Path, to: &Path) -> IoResult<Vec<(IoError, String)>> {
     }
 
     Ok(errors)
+}
+
+/// `clock_gettime(CLOCK_MONOTONIC)` in ns
+pub fn precise_time_ns() -> u64 {
+    // All Instants in libstd are PODs of integers
+    const ZERO: Instant = unsafe { mem::zeroed() };
+    (Instant::now() - ZERO).as_nanos() as u64
 }

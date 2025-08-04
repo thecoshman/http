@@ -1,10 +1,9 @@
+use self::super::super::util::{HumanReadableSize, precise_time_ns};
 use std::sync::atomic::{AtomicU64, Ordering as AtomicOrdering};
 use iron::{IronResult, Response, Handler, Request};
-use self::super::super::util::HumanReadableSize;
 use self::super::super::Options;
 use std::collections::HashSet;
 use self::super::HttpHandler;
-use time::precise_time_ns;
 use std::fs;
 
 

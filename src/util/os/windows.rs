@@ -54,7 +54,7 @@ const NO_FILETIME: FILETIME = FILETIME {
 pub fn set_times_f(f: &File, mtime_ms: Option<u64>, atime_ms: Option<u64>, ctime_ms: Option<u64>) {
     if mtime_ms.is_some() || atime_ms.is_some() || ctime_ms.is_some() {
         unsafe {
-            SetFileTime(f.as_raw_handle(),
+            SetFileTime(f.as_raw_handle() as _,
                         &ctime_ms.map(ms_to_FILETIME).unwrap_or(NO_FILETIME),
                         &atime_ms.map(ms_to_FILETIME).unwrap_or(NO_FILETIME),
                         &mtime_ms.map(ms_to_FILETIME).unwrap_or(NO_FILETIME));

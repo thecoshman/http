@@ -26,7 +26,7 @@ use std::path::{PathBuf, Path};
 use std::fs::{self, Metadata};
 use self::super::HttpHandler;
 use std::{fmt, mem};
-use time::strptime;
+use chrono;
 
 
 /// This should be a pub const but the default/new function isn't const
@@ -468,7 +468,7 @@ impl HttpHandler {
             match prop.local_name {
                 "creationdate" => {
                     out.write(XmlWEvent::start_element((WEBDAV_XML_NAMESPACE_DAV.0, "creationdate")))?;
-                    out.write(XmlWEvent::characters(&file_time_created(meta).rfc3339().to_string()))?;
+                    out.write(XmlWEvent::characters(&file_time_created(meta).to_rfc3339()))?;
                 }
 
                 "getcontentlength" => {
@@ -483,7 +483,7 @@ impl HttpHandler {
 
                 "getlastmodified" => {
                     out.write(XmlWEvent::start_element((WEBDAV_XML_NAMESPACE_DAV.0, "getlastmodified")))?;
-                    out.write(XmlWEvent::characters(&file_time_modified(meta).rfc3339().to_string()))?;
+                    out.write(XmlWEvent::characters(&file_time_modified(meta).to_rfc3339()))?;
                 }
 
                 "resourcetype" => {
@@ -500,7 +500,7 @@ impl HttpHandler {
             match prop.local_name {
                 "Win32CreationTime" => {
                     out.write(XmlWEvent::start_element((WEBDAV_XML_NAMESPACE_MICROSOFT.0, "Win32CreationTime")))?;
-                    out.write(XmlWEvent::characters(&file_time_created(meta).rfc3339().to_string()))?;
+                    out.write(XmlWEvent::characters(&file_time_created(meta).to_rfc3339()))?;
                 }
 
                 "Win32FileAttributes" => {
@@ -512,12 +512,12 @@ impl HttpHandler {
 
                 "Win32LastAccessTime" => {
                     out.write(XmlWEvent::start_element((WEBDAV_XML_NAMESPACE_MICROSOFT.0, "Win32LastAccessTime")))?;
-                    out.write(XmlWEvent::characters(&file_time_accessed(meta).rfc3339().to_string()))?;
+                    out.write(XmlWEvent::characters(&file_time_accessed(meta).to_rfc3339()))?;
                 }
 
                 "Win32LastModifiedTime" => {
                     out.write(XmlWEvent::start_element((WEBDAV_XML_NAMESPACE_MICROSOFT.0, "Win32LastModifiedTime")))?;
-                    out.write(XmlWEvent::characters(&file_time_modified(meta).rfc3339().to_string()))?;
+                    out.write(XmlWEvent::characters(&file_time_modified(meta).to_rfc3339()))?;
                 }
 
                 _ => return Ok(false),
@@ -669,8 +669,8 @@ impl ProppatchActionables {
 }
 
 fn win32time(t: &str) -> Option<u64> {
-    let tm = strptime(&t, "%a, %d %b %Y %T %Z").ok()?.to_timespec();
-    Some(tm.sec as u64 * 1000 + (tm.nsec / 1000 / 1000) as u64)
+    let tm = chrono::DateTime::parse_from_str(t, "%a, %d %b %Y %T %Z").ok()?;
+    Some(tm.timestamp() as u64 * 1000 + tm.timestamp_millis() as u64)
 }
 
 /// https://tools.ietf.org/html/rfc2518#section-12.13
