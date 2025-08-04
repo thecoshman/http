@@ -1,7 +1,7 @@
 use std::str::FromStr;
 use std::fmt::{self, Display};
 
-use time;
+use chrono::{self, TimeZone, Utc};
 
 /// A `time::Time` with HTTP formatting and parsing
 ///
@@ -28,17 +28,17 @@ use time;
 //   HTTP-date, the sender MUST generate those timestamps in the
 //   IMF-fixdate format.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
-pub struct HttpDate(pub time::Tm);
+pub struct HttpDate(pub chrono::DateTime<chrono::FixedOffset>);
 
 impl FromStr for HttpDate {
     type Err = ::Error;
     fn from_str(s: &str) -> ::Result<HttpDate> {
-        match time::strptime(s, "%a, %d %b %Y %T %Z").or_else(|_| {
-            time::strptime(s, "%A, %d-%b-%y %T %Z")
+        match chrono::NaiveDateTime::parse_from_str(s, "%a, %d %b %Y %T %Z").or_else(|_| {
+            chrono::NaiveDateTime::parse_from_str(s, "%A, %d-%b-%y %T %Z")
             }).or_else(|_| {
-                time::strptime(s, "%c")
+                chrono::NaiveDateTime::parse_from_str(s, "%c")
                 }) {
-                    Ok(t) => Ok(HttpDate(t)),
+                    Ok(t) => Ok(HttpDate(Utc.from_utc_datetime(&t).into())),
                     Err(_) => Err(::Error::Header),
                     }
     }
@@ -46,42 +46,33 @@ impl FromStr for HttpDate {
 
 impl Display for HttpDate {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        fmt::Display::fmt(&self.0.to_utc().rfc822(), f)
+        let mut stamp = self.0.to_utc().to_rfc2822(); // in "Mon, 4 Aug 2025 18:27:18 +0000" format; we need s/+0000/GMT/
+        stamp.replace_range(stamp.len() - 5.., "GMT");
+        f.write_str(&stamp)
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use time::Tm;
+    use chrono;
     use super::HttpDate;
 
-    const NOV_07: HttpDate = HttpDate(Tm {
-        tm_nsec: 0,
-        tm_sec: 37,
-        tm_min: 48,
-        tm_hour: 8,
-        tm_mday: 7,
-        tm_mon: 10,
-        tm_year: 94,
-        tm_wday: 0,
-        tm_isdst: 0,
-        tm_yday: 0,
-        tm_utcoff: 0,
-    });
+    const NOV_07: HttpDate = HttpDate(chrono::Utc.from_utc_datetime(&chrono::NaiveDateTime::new(chrono::NaiveDate::from_ymd_opt(1994, 11, 7).unwrap(),
+                                                                                                chrono::NaiveTime::from_hms_opt(8, 48, 37).unwrap())).into());
 
     #[test]
     fn test_imf_fixdate() {
-        assert_eq!("Sun, 07 Nov 1994 08:48:37 GMT".parse::<HttpDate>().unwrap(), NOV_07);
+        assert_eq!("Mon, 07 Nov 1994 08:48:37 GMT".parse::<HttpDate>().unwrap(), NOV_07);
     }
 
     #[test]
     fn test_rfc_850() {
-        assert_eq!("Sunday, 07-Nov-94 08:48:37 GMT".parse::<HttpDate>().unwrap(), NOV_07);
+        assert_eq!("Monday, 07-Nov-94 08:48:37 GMT".parse::<HttpDate>().unwrap(), NOV_07);
     }
 
     #[test]
     fn test_asctime() {
-        assert_eq!("Sun Nov  7 08:48:37 1994".parse::<HttpDate>().unwrap(), NOV_07);
+        assert_eq!("Mon Nov  7 08:48:37 1994".parse::<HttpDate>().unwrap(), NOV_07);
     }
 
     #[test]

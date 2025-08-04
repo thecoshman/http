@@ -9,7 +9,7 @@ use std::io::{self, Write};
 use std::ptr;
 use std::thread;
 
-use time::now_utc;
+use chrono::Utc;
 
 use header;
 use http::h1::{LINE_ENDING, HttpWriter};
@@ -85,7 +85,7 @@ impl<'a, W: Any> Response<'a, W> {
         try!(write!(&mut self.body, "{} {}\r\n", self.version, self.status));
 
         if !self.headers.has::<header::Date>() {
-            self.headers.set(header::Date(header::HttpDate(now_utc())));
+            self.headers.set(header::Date(header::HttpDate(Utc::now().into())));
         }
 
         let body_type = match self.status {
