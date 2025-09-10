@@ -921,8 +921,7 @@ impl HttpHandler {
             }
             let modified = file_time_modified_p(req_p.parent().unwrap_or(&req_p));
             let _ = write!(out,
-                       r#"<a href="{up_path}" id=".."><div><span class="back_arrow_icon">Parent directory</span></div><div><time ms={}{:03}>{} UTC</time></div></a>"#,
-                       modified.timestamp(),
+                       r#"<a href="{up_path}" id=".."><div><span class="back_arrow_icon">Parent directory</span></div><div><time ms={}>{} UTC</time></div></a>"#,
                        modified.timestamp_millis(),
                        modified.format("%F %T"),
                        up_path = unsafe { str::from_utf8_unchecked(parentpath) });
@@ -956,7 +955,7 @@ impl HttpHandler {
 
                 let _ = writeln!(out,
                                  concat!(r#"<a href="{path}{fname}" id="{}"><div><span class="{}{}_icon">{}{}</span>{}</div>"#,
-                                         r#"<div><time ms={}{:03}>{} UTC</time>{}</div></a>"#),
+                                         r#"<div><time ms={}>{} UTC</time>{}</div></a>"#),
                                  NoDoubleQuotes(&fname),
                                  if is_file { "file" } else { "dir" },
                                  file_icon_suffix(&path, is_file),
@@ -973,7 +972,6 @@ impl HttpHandler {
                                  } else {
                                      DisplayThree("", "", "")
                                  },
-                                 modified.timestamp(),
                                  modified.timestamp_millis(),
                                  modified.format("%F %T"),
                                  if is_file {
@@ -1044,9 +1042,8 @@ impl HttpHandler {
             let modified = file_time_modified_p(req_p.parent().unwrap_or(&req_p));
             let _ = write!(out,
                            "<tr id=\"..\"><td><a href=\"{up_path}\" tabindex=\"-1\" class=\"back_arrow_icon\"></a></td> <td><a \
-                            href=\"{up_path}\">Parent directory</a></td> <td><a href=\"{up_path}\" tabindex=\"-1\"><time ms={}{:03}>{}</time></a></td> \
+                            href=\"{up_path}\">Parent directory</a></td> <td><a href=\"{up_path}\" tabindex=\"-1\"><time ms={}>{}</time></a></td> \
                             <td><a href=\"{up_path}\" tabindex=\"-1\">&nbsp;</a></td> <td><a href=\"{up_path}\" tabindex=\"-1\">&nbsp;</a></td></tr>",
-                           modified.timestamp(),
                            modified.timestamp_millis(),
                            modified.format("%F %T"),
                            up_path = unsafe { str::from_utf8_unchecked(parentpath) });
@@ -1094,14 +1091,13 @@ impl HttpHandler {
 
                 let _ = write!(out,
                                "<tr id=\"{}\"><td><a href=\"{path}{fname}\" tabindex=\"-1\" class=\"{}{}_icon\"></a></td> <td><a \
-                                href=\"{path}{fname}\">{}{}</a></td> <td><a href=\"{path}{fname}\" tabindex=\"-1\"><time ms={}{:03}>{}</time></a></td> \
+                                href=\"{path}{fname}\">{}{}</a></td> <td><a href=\"{path}{fname}\" tabindex=\"-1\"><time ms={}>{}</time></a></td> \
                                 <td><a href=\"{path}{fname}\" tabindex=\"-1\">{}{}{}</a></td> {}</tr>\n",
                                NoDoubleQuotes(&fname),
                                if is_file { "file" } else { "dir" },
                                file_icon_suffix(&path, is_file),
                                NoHtmlLiteral(&fname),
                                if is_file { "" } else { "/" },
-                               modified.timestamp(),
                                modified.timestamp_millis(),
                                modified.format("%F %T"),
                                FileSizeDisplay(is_file, len),
