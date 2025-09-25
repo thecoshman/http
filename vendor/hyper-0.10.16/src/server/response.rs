@@ -13,7 +13,7 @@ use chrono::Utc;
 
 use header;
 use http::h1::{LINE_ENDING, HttpWriter};
-use http::h1::HttpWriter::{ThroughWriter, SizedWriter};
+use http::h1::HttpWriter::{ThroughWriter, ChunkedWriter, SizedWriter};
 use status;
 use net::{Fresh, Streaming};
 use version;
@@ -89,12 +89,21 @@ impl<'a, W: Any> Response<'a, W> {
         }
 
         let body_type = match self.status {
-            status::StatusCode::NoContent | status::StatusCode::NotModified => Body(0),
-            c if c.class() == status::StatusClass::Informational => Body(0),
+            status::StatusCode::NoContent | status::StatusCode::NotModified => Body::Sized(0),
+            c if c.class() == status::StatusClass::Informational => Body::Sized(0),
             _ => if let Some(cl) = self.headers.get::<header::ContentLength>() {
-                Body(**cl)
+                Body::Sized(**cl)
             } else {
-                panic!("Body::Chunked");
+                match self.headers.get_mut::<header::TransferEncoding>() {
+                    Some(&mut header::TransferEncoding(ref mut encodings)) => {
+                        //TODO: check if chunked is already in encodings. use HashSet?
+                        encodings.push(header::Encoding::Chunked);
+                    },
+                    None => {
+                        self.headers.set(header::TransferEncoding(vec![header::Encoding::Chunked]));
+                    }
+                }
+                Body::Chunked
             }
         };
 
@@ -159,7 +168,10 @@ impl<'a> Response<'a, Fresh> {
     pub fn start(mut self) -> io::Result<Response<'a, Streaming>> {
         let body_type = try!(self.write_head());
         let (version, body, status, headers) = self.deconstruct();
-        let stream = SizedWriter(body.into_inner(), body_type.0);
+        let stream = match body_type {
+            Body::Chunked => ChunkedWriter(body.into_inner()),
+            Body::Sized(len) => SizedWriter(body.into_inner(), len),
+        };
 
         // "copy" to change the phantom type
         Ok(Response {
@@ -198,7 +210,10 @@ impl<'a> Response<'a, Streaming> {
 }
 
 #[derive(PartialEq, Debug)]
-struct Body(u64);
+enum Body {
+    Chunked,
+    Sized(u64)
+}
 
 impl<'a, T: Any> Drop for Response<'a, T> {
     fn drop(&mut self) {
@@ -211,7 +226,8 @@ impl<'a, T: Any> Drop for Response<'a, T> {
             }
 
             let mut body = match self.write_head() {
-                Ok(Body(len)) => SizedWriter(self.body.get_mut(), len),
+                Ok(Body::Chunked) => ChunkedWriter(self.body.get_mut()),
+                Ok(Body::Sized(len)) => SizedWriter(self.body.get_mut(), len),
                 Err(e) => {
                     debug!("error dropping request: {:?}", e);
                     return;

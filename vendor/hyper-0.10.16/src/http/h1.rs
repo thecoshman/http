@@ -1,10 +1,11 @@
 //! Adapts the HTTP/1.1 implementation into the `HttpMessage` API.
 use std::cmp::min;
 use std::fmt;
-use std::io::{self, Write, BufRead, Read};
+use std::io::{self, Write, BufRead, Read, IoSlice};
 
 use httparse;
 
+use arrayvec::ArrayVec;
 use buffer::BufReader;
 use Error;
 use header::{Headers};
@@ -14,7 +15,7 @@ use version::HttpVersion::{Http10, Http11};
 use uri::RequestUri;
 
 use self::HttpReader::{SizedReader, ChunkedReader, EofReader, EmptyReader};
-use self::HttpWriter::{SizedWriter, ThroughWriter};
+use self::HttpWriter::{SizedWriter, ChunkedWriter, ThroughWriter};
 
 /// Readers to handle different Transfer-Encodings.
 ///
@@ -250,6 +251,8 @@ fn read_chunk_size<R: Read>(rdr: &mut R) -> io::Result<u64> {
 pub enum HttpWriter<W: Write> {
     /// A no-op Writer, used initially before Transfer-Encoding is determined.
     ThroughWriter(W),
+    /// A Writer for when Transfer-Encoding includes `chunked`.
+    ChunkedWriter(W),
     /// A Writer for when Content-Length is set.
     ///
     /// Enforces that the body is not longer than the Content-Length header.
@@ -262,6 +265,7 @@ impl<W: Write> HttpWriter<W> {
     pub fn into_inner(self) -> W {
         match self {
             ThroughWriter(w) => w,
+            ChunkedWriter(w) => w,
             SizedWriter(w, _) => w,
         }
     }
@@ -271,6 +275,7 @@ impl<W: Write> HttpWriter<W> {
     pub fn get_ref(&self) -> &W {
         match *self {
             ThroughWriter(ref w) => w,
+            ChunkedWriter(ref w) => w,
             SizedWriter(ref w, _) => w,
         }
     }
@@ -283,6 +288,7 @@ impl<W: Write> HttpWriter<W> {
     pub fn get_mut(&mut self) -> &mut W {
         match *self {
             ThroughWriter(ref mut w) => w,
+            ChunkedWriter(ref mut w) => w,
             SizedWriter(ref mut w, _) => w,
         }
     }
@@ -293,7 +299,7 @@ impl<W: Write> HttpWriter<W> {
     /// The ChunkedWriter variant will use this to write the 0-sized last-chunk.
     #[inline]
     pub fn end(mut self) -> Result<W, EndError<W>> {
-        match self.flush() {
+        match self.write(&[]).and_then(|_| self.flush()) {
             Ok(..) => Ok(self.into_inner()),
             Err(e) => Err(EndError(e, self))
         }
@@ -314,6 +320,13 @@ impl<W: Write> Write for HttpWriter<W> {
     fn write(&mut self, msg: &[u8]) -> io::Result<usize> {
         match *self {
             ThroughWriter(ref mut w) => w.write(msg),
+            ChunkedWriter(ref mut w) => {
+                const LONGEST_MSG_LEN: &str = "FFFFFFFFFFFFFFFF";
+                let mut len = ArrayVec::<u8, { LONGEST_MSG_LEN.len() }>::new();
+                try!(write!(&mut len, "{:X}", msg.len()));
+                try!(w.write_all_vectored(&mut [&*len, LINE_ENDING.as_bytes(), msg, LINE_ENDING.as_bytes()].map(IoSlice::new)));
+                Ok(msg.len())
+            },
             SizedWriter(ref mut w, ref mut remaining) => {
                 let len = msg.len() as u64;
                 if len > *remaining {
@@ -340,6 +353,7 @@ impl<W: Write> fmt::Debug for HttpWriter<W> {
     fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
         match *self {
             ThroughWriter(_) => write!(fmt, "ThroughWriter"),
+            ChunkedWriter(_) => write!(fmt, "ChunkedWriter"),
             SizedWriter(_, rem) => write!(fmt, "SizedWriter(remaining={:?})", rem),
         }
     }
@@ -449,6 +463,17 @@ mod tests {
     use http::HttpMessage;
 
     use super::{read_chunk_size, parse_request, parse_response, Http11Message};
+
+    #[test]
+    fn test_write_chunked() {
+        use std::str::from_utf8;
+        let mut w = super::HttpWriter::ChunkedWriter(Vec::new());
+        w.write_all(b"foo bar").unwrap();
+        w.write_all(b"baz quux herp").unwrap();
+        let buf = w.end().unwrap();
+        let s = from_utf8(buf.as_ref()).unwrap();
+        assert_eq!(s, "7\r\nfoo bar\r\nD\r\nbaz quux herp\r\n0\r\n\r\n");
+    }
 
     #[test]
     fn test_write_sized() {

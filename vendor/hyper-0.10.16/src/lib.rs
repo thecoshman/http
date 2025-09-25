@@ -135,6 +135,8 @@
 //! implement `Reader` and can be read to get the data out of a `Response`.
 //!
 
+#![feature(write_all_vectored)]
+
 extern crate base64;
 extern crate chrono;
 #[macro_use] extern crate url;
@@ -145,6 +147,7 @@ extern crate traitobject;
 extern crate typeable;
 extern crate crossbeam_channel;
 extern crate smallvec;
+extern crate arrayvec;
 
 #[macro_use]
 extern crate mime as mime_crate;

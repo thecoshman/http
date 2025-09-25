@@ -52,6 +52,7 @@ version = "1.0"
 
 [dependencies]
 crossbeam-channel = "0.5"
+arrayvec = "0.7"
 [dependencies.smallvec]
 version = "1.13"
 features = ["union"]
