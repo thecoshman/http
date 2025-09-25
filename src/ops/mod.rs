@@ -25,15 +25,15 @@ use std::sync::atomic::{AtomicU64, Ordering as AtomicOrdering};
 use iron::{headers, status, method, IronResult, Listening, Response, Headers, Request, Handler, Iron};
 use std::io::{self, ErrorKind as IoErrorKind, BufReader, SeekFrom, Write, Error as IoError, Read, Seek};
 use iron::mime::{Mime, Attr as MimeAttr, Value as MimeAttrValue, SubLevel as MimeSubLevel, TopLevel as MimeTopLevel};
-use self::super::util::{HumanReadableSize, WwwAuthenticate, NoDoubleQuotes, NoHtmlLiteral, XLastModified, DisplayThree, CommaList, XOcMTime, MsAsS, Maybe, Dav,
-                        url_path, file_etag, file_hash, set_mtime_f, is_symlink, encode_str, error_html, encode_file, file_length, file_binary, client_mobile,
-                        percent_decode, escape_specials, precise_time_ns, file_icon_suffix, is_actually_file, is_descendant_of, response_encoding,
-                        detect_file_as_dir, encoding_extension, file_time_modified, file_time_modified_p, dav_level_1_methods, get_raw_fs_metadata,
-                        encode_tail_if_trimmed, extension_is_blacklisted, directory_listing_html, directory_listing_mobile_html, is_nonexistent_descendant_of,
-                        USER_AGENT, MAX_SYMLINKS, INDEX_EXTENSIONS, MIN_ENCODING_GAIN, MAX_ENCODING_SIZE, MIN_ENCODING_SIZE};
+use self::super::util::{HumanReadableSize, WwwAuthenticate, NoDoubleQuotes, NoHtmlLiteral, XLastModified, DisplayThree, CommaList,
+                        XOcMTime, MsAsS, Maybe, Dav, url_path, file_etag, file_hash, set_mtime_f, is_symlink, encode_str, error_html, encode_file, file_length,
+                        file_binary, client_mobile, percent_decode, escape_specials, precise_time_ns, file_icon_suffix, is_actually_file, is_descendant_of,
+                        response_encoding, detect_file_as_dir, encoding_extension, file_time_modified, file_time_modified_p, dav_level_1_methods,
+                        get_raw_fs_metadata, encode_tail_if_trimmed, extension_is_blacklisted, directory_listing_html, directory_listing_mobile_html,
+                        is_nonexistent_descendant_of, USER_AGENT, MAX_SYMLINKS, INDEX_EXTENSIONS, MIN_ENCODING_GAIN, MAX_ENCODING_SIZE, MIN_ENCODING_SIZE};
 
 macro_rules! log {
-    ($logcfg:expr, $fmt:expr) => {
+    ($logcfg:expr, $fmt:expr) => {{
         use chrono::Local;
         use trivial_colours::{Reset as CReset, Colour as C};
 
@@ -68,8 +68,8 @@ macro_rules! log {
                          reset = "");
             }
         }
-    };
-    ($logcfg:expr, $fmt:expr, $($arg:tt)*) => {
+    }};
+    ($logcfg:expr, $fmt:expr, $($arg:tt)*) => {{
         use chrono::Local;
         use trivial_colours::{Reset as CReset, Colour as C};
 
@@ -106,14 +106,16 @@ macro_rules! log {
                          reset = "");
             }
         }
-    };
+    }};
 }
 
 mod prune;
 mod webdav;
+mod archive;
 mod bandwidth;
 
 pub use self::prune::PruneChain;
+pub use self::archive::ArchiveType;
 pub use self::bandwidth::{LimitBandwidthMiddleware, SimpleChain};
 
 
@@ -137,6 +139,7 @@ pub struct HttpHandler {
     /// (at all, log_time, log_colour)
     pub log: (bool, bool, bool),
     pub webdav: WebDavLevel,
+    pub archives: bool,
     pub global_auth_data: Option<(String, Option<String>)>,
     pub path_auth_data: BTreeMap<String, Option<(String, Option<String>)>>,
     pub writes_temp_dir: Option<(String, PathBuf)>,
@@ -198,6 +201,7 @@ impl HttpHandler {
             try_404: opts.try_404.clone(),
             log: (opts.loglevel < LogLevel::NoServeStatus, opts.log_time, opts.log_colour),
             webdav: opts.webdav,
+            archives: opts.archives,
             global_auth_data: global_auth_data,
             path_auth_data: path_auth_data,
             writes_temp_dir: HttpHandler::temp_subdir(&opts.temp_directory, opts.allow_writes, "writes"),
@@ -275,6 +279,14 @@ impl Handler for &'static HttpHandler {
             method::DavMove if self.webdav >= WebDavLevel::MkColMoveOnly => self.handle_webdav_move(req),
             method::DavPropfind if self.webdav >= WebDavLevel::All => self.handle_webdav_propfind(req),
             method::DavProppatch if self.webdav >= WebDavLevel::All => self.handle_webdav_proppatch(req),
+
+            method::Post if self.archives => {
+                if let Some(archive_type) = self.parse_post_archive(req) {
+                    self.handle_get_archive(req, archive_type)
+                } else {
+                    self.handle_bad_method(req)
+                }
+            }
 
             _ => self.handle_bad_method(req),
         }?;
@@ -364,6 +376,12 @@ impl HttpHandler {
     }
 
     fn handle_get(&self, req: &mut Request) -> IronResult<Response> {
+        if self.archives{
+            if let Some(archive_type) = self.parse_get_accept_archive(req) {
+                return self.handle_get_archive(req, archive_type);
+            }
+        }
+
         let (mut req_p, symlink, url_err) = self.parse_requested_path(req);
 
         if url_err {
@@ -434,7 +452,7 @@ impl HttpHandler {
 
         if let Some(try_404) = try_404.as_ref() {
             if try_404.metadata().map(|m| !m.is_dir()).unwrap_or(false) {
-                return self.handle_get_file(req, try_404, true)
+                return self.handle_get_file(req, try_404, true);
             }
         }
 
@@ -1015,6 +1033,15 @@ impl HttpHandler {
                                                                                   r#"<a id='new"directory' href><span class="new_dir_icon">Create directory</span></a>"#
                                                                               } else {
                                                                                   ""
+                                                                              },
+                                                                              if self.archives{
+                                                                                  concat!(r#"<form method=post enctype=text/plain class="heading">"#,
+                                                                                          "Download as archive: ",
+                                                                                          include_str!(concat!(env!("OUT_DIR"),
+                                                                                                       "/assets/directory_listing_achive_inputs.html")),
+                                                                                          "</form>")
+                                                                              } else {
+                                                                                  ""
                                                                               }))
     }
 
@@ -1162,6 +1189,16 @@ impl HttpHandler {
                                                                            "<tr id=\'new\"directory\'><td><a tabindex=\"-1\" href \
                                                                             class=\"new_dir_icon\"></a></td><td colspan=3><a href>Create \
                                                                             directory</a></td><td><a tabindex=\"-1\" href>&nbsp;</a></td></tr>"
+                                                                       } else {
+                                                                           ""
+                                                                       },
+                                                                       if self.archives{
+                                                                           concat!("<hr />\
+                                                                            <form method=post enctype=text/plain>\
+                                                                            <p>Archive as ",
+                                                                            include_str!(concat!(env!("OUT_DIR"),
+                                                                            "/assets/directory_listing_achive_inputs.html")),
+                                                                            ".</p></form>")
                                                                        } else {
                                                                            ""
                                                                        }))

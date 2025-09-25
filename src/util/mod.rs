@@ -162,6 +162,35 @@ impl HeaderFormat for XOcMTime {
     }
 }
 
+/// The [Content-Disposition header](https://developer.mozilla.org/en-US/docs/Web/HTTP/Reference/Headers/Content-Disposition),
+/// without parsing.
+///
+/// We don't ever receive this header, only ever send it, so this is fine.
+#[derive(Debug, Clone, Hash, PartialOrd, Ord, PartialEq, Eq)]
+pub enum ContentDisposition {
+    Attachment(String),
+}
+
+impl Header for ContentDisposition {
+    fn header_name() -> &'static str {
+        "Content-Disposition"
+    }
+
+    /// We only ever send these
+    fn parse_header<T: AsRef<[u8]>>(_: &[T]) -> HyperResult<ContentDisposition> {
+        unreachable!()
+    }
+}
+
+impl HeaderFormat for ContentDisposition {
+    fn fmt_header(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            // we don't really know if it's UTF-8 since we parrot the request's percent-encoded value
+            ContentDisposition::Attachment(fname) => write!(f, "attachment; filename*=UTF-8''{}", fname),
+        }
+    }
+}
+
 #[derive(Debug, Copy, Clone, Hash, PartialOrd, Ord, PartialEq, Eq)]
 pub struct CommaList<D: fmt::Display, I: Iterator<Item = D>>(pub I);
 
@@ -300,11 +329,11 @@ fn file_binary_impl(path: &Path) -> bool {
                         if rd == 0 || remaining[0..rd].contains(&b'\0') {
                             return Err(());
                         }
-                        if let Some(idx) = remaining[0..rd].iter().position(|&b| b== b'\n') {
+                        if let Some(idx) = remaining[0..rd].iter().position(|&b| b == b'\n') {
                             remaining = &mut remaining[idx..];
                             let remaining_len = remaining.len();
                             let _ = remaining;
-                            return str::from_utf8(&buf[0..buf.len() - remaining_len]).map(|_|()).map_err(|_|());
+                            return str::from_utf8(&buf[0..buf.len() - remaining_len]).map(|_| ()).map_err(|_| ());
                         }
                         remaining = &mut remaining[rd..];
                         if remaining.len() == 0 {
@@ -447,8 +476,8 @@ pub fn is_descendant_of<Pw: AsRef<Path>, Po: AsRef<Path>>(who: Pw, of_whom: Po) 
     false
 }
 
-/// Check if the specified path is a direct descendant (or an equal) of the specified path, without without requiring it to
-/// exist in the first place.
+/// Check if the specified path is a direct descendant (or an equal) of the specified path,
+/// without requiring it to exist in the first place.
 pub fn is_nonexistent_descendant_of<Pw: AsRef<Path>, Po: AsRef<Path>>(who: Pw, of_whom: Po) -> bool {
     let mut who = fs::canonicalize(&who).unwrap_or_else(|_| who.as_ref().to_path_buf());
     let of_whom = if let Ok(p) = fs::canonicalize(of_whom) {
@@ -631,7 +660,7 @@ pub fn copy_dir(from: &Path, to: &Path) -> IoResult<Vec<(IoError, String)>> {
             }
         };
 
-        let relative_path = entry.path().strip_prefix(&from).expect("strip_prefix failed; this is a probably a bug in copy_dir");
+        let relative_path = entry.path().strip_prefix(&from).expect("strip_prefix failed; this is a probably a bug in walkdir");
 
         let target_path = to.join(relative_path);
 

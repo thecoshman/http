@@ -34,10 +34,11 @@ arrayvec = "0.7"
 walkdir = "2.2"
 blake3 = "1.3"
 chrono = "0.4"
-flate2 = "1.0"
+flate2 = "1.1"
 xml-rs = "0.8"
 serde = "1.0"
 clap = "2.33"
+tar = "0.4"
 
 [dependencies.trivial_colours]
 version = "0.3"
@@ -64,6 +65,11 @@ features = ["hyper-native-tls"]
 
 [patch.crates-io.hyper]
 path = "vendor/hyper-0.10.16"
+
+[dependencies.zip]
+version = "5.1"
+default-features = false
+features = ["deflate-flate2", "chrono"]
 
 [target.'cfg(not(target_os = "windows"))'.dependencies.libc]
 version = "0.2"

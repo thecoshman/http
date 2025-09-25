@@ -24,7 +24,9 @@ extern crate clap;
 extern crate iron;
 #[cfg(not(target_os = "windows"))]
 extern crate libc;
+extern crate tar;
 extern crate xml;
+extern crate zip;
 
 mod options;
 

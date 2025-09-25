@@ -200,6 +200,31 @@ pass parameters like what port to use.
 
     False by default. Supersedes -D.
 
+  -A --archives
+
+    Allow requesting tar and ZIP archives with
+      curl -H 'Accept: application/tar' ...
+    and by including a form in the generated indices.
+
+    This defines two APIs:
+    1. GET + Accept: containing any of the following:
+       application/tar application/x-tar            => tar
+       application/zip application/x-zip-compressed => ZIP
+    2. POST + sentinel values embedded into the generated index
+       (POST is otherwise unsupported)
+
+    The results should be conceptually (w.r.t. symlink handling &c.)
+    like "cd -L"ing to the requested path (subject to -s and -r),
+    then "tar -c * .*".
+
+    ZIPs only include regular files, directories, and symbolic links.
+    Files that would be encoded if requesting them directly will be DEFLATEd
+    (subject to -e).
+
+    If the requested path is a file, then a single-file archive is produced.
+
+    False by default.
+
   -l --no-listings
 
     Do not generate directory listings.

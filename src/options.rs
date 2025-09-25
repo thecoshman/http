@@ -102,6 +102,8 @@ pub struct Options {
     pub log_colour: bool,
     /// Whether to handle WebDAV requests. Default: false
     pub webdav: WebDavLevel,
+    /// Whether to allow requesting tar and ZIP archives. Default: false
+    pub archives: bool,
     /// Data for HTTPS, identity file and password. Default: `None`
     pub tls_data: Option<((String, PathBuf), String)>,
     /// Whether to generate a one-off certificate. Default: false
@@ -156,6 +158,7 @@ impl Options {
             .arg(Arg::from_usage("-c --no-colour 'Don't colourise the log output'"))
             .arg(Arg::from_usage("-d --webdav 'Handle WebDAV requests. Default: false'"))
             .arg(Arg::from_usage("-D --convenient-webdav 'Allow WebDAV MKCOL and MOVE only. Default: false'"))
+            .arg(Arg::from_usage("-A --archives 'Allow requesting tar and ZIP archives. Default: false'"))
             .arg(Arg::from_usage("--ssl [TLS_IDENTITY] 'Data for HTTPS, identity file. Password in HTTP_SSL_PASS env var, otherwise empty'")
                 .validator(Options::identity_validator))
             .arg(Arg::from_usage("--gen-ssl 'Generate a one-off TLS certificate'").conflicts_with("ssl"))
@@ -275,6 +278,7 @@ impl Options {
                         } else {
                             WebDavLevel::No
                         }),
+            archives: matches.is_present("archives"),
             tls_data: matches.value_of("ssl").map(|id| ((id.to_string(), fs::canonicalize(id).unwrap()), env::var("HTTP_SSL_PASS").unwrap_or_default())),
             generate_tls: matches.is_present("gen-ssl"),
             path_auth_data: path_auth_data,
