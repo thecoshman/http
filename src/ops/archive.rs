@@ -127,17 +127,14 @@ fn write_zip_body(res: &mut Write, path: &Path, allow_encoding: bool) -> IoResul
         #[cfg(unix)] // Win32 metadata.change_time() is always None
         {
             let mut ut = vec![0b111];
-            for (i, t) in [metadata.mtime(), metadata.atime(), metadata.ctime()].into_iter().enumerate() {
-                let mut tb: [u8; 4] = mem::transmute(t as u32);
-                #[cfg(target_endian="big")]
-                tb.reverse();
-                ut.extend(tb);
+            for (i, t) in [metadata.mtime(), metadata.atime(), metadata.ctime()].iter().enumerate() {
+                ut.extend(t.to_le_bytes());
 
                 if i == 0 {
-                    options.add_extra_data(0x5455, ut.clone(), true);
+                    let _ = options.add_extra_data(0x5455, ut.clone().into_boxed_slice(), true);
                 }
             }
-            options.add_extra_data(0x5455, ut, false);
+            let _ = options.add_extra_data(0x5455, ut.into_boxed_slice(), false);
         }
 
         match metadata.file_type() {
