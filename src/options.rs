@@ -156,7 +156,7 @@ impl Options {
             .arg(Arg::from_usage("-q --quiet... 'Suppress increasing amounts of output'"))
             .arg(Arg::from_usage("-Q --quiet-time 'Don't prefix logs with the timestamp'"))
             .arg(Arg::from_usage("-c --no-colour 'Don't colourise the log output'"))
-            .arg(Arg::from_usage("-d --webdav 'Handle WebDAV requests. Default: false'"))
+            .arg(Arg::from_usage("-d --webdav 'Handle WebDAV requests (MKCOL, MOVE, PROPFIND, COPY, PROPPATCH). Default: false'"))
             .arg(Arg::from_usage("-D --convenient-webdav 'Allow WebDAV MKCOL and MOVE only. Default: false'"))
             .arg(Arg::from_usage("-A --archives 'Allow requesting tar and ZIP archives. Default: false'"))
             .arg(Arg::from_usage("--ssl [TLS_IDENTITY] 'Data for HTTPS, identity file. Password in HTTP_SSL_PASS env var, otherwise empty'")
