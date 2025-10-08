@@ -230,6 +230,8 @@ pass parameters like what port to use.
     If a file or directory fails to open,
     it is skipped and does not abort archiving.
 
+    Files with st_nlink > 1 are detected and accrued for tar archives.
+
     ZIPs only include regular files, directories, and symbolic links.
     Files that would be encoded if requesting them directly will be DEFLATEd
     (subject to -e).

@@ -5,13 +5,14 @@ use self::super::super::util::{ContentDisposition, DisplayThree, Maybe, extensio
                                MIN_ENCODING_SIZE};
 use std::io::{self, ErrorKind as IoErrorKind, BufWriter, Error as IoError, Result as IoResult, Write, Read};
 use iron::{headers, status, method, IronResult, Listening, Response, Headers, Request, Handler};
+use tar::{EntryType as TarEntryType, Builder as TarBuilder, Header as TarHeader};
 use zip::{CompressionMethod as ZipCompressionMethod, DateTime as ZipDateTime};
 use iron::mime::{Mime, SubLevel as MimeSubLevel, TopLevel as MimeTopLevel};
+use std::collections::btree_map::{BTreeMap, Entry as BTreeMapEntry};
 use zip::write::{FullFileOptions as ZipFileOptions, ZipWriter};
 #[cfg(unix)]
 use std::os::unix::fs::{PermissionsExt, MetadataExt};
 use std::convert::{TryFrom, TryInto};
-use tar::Builder as TarBuilder;
 use std::path::{PathBuf, Path};
 use iron::response::WriteBody;
 use self::super::HttpHandler;
@@ -104,6 +105,8 @@ fn write_tar_body(res: &mut Write, path: &Path) -> IoResult<()> {
             _ => Ok(()),
         }
     }
+    #[cfg(unix)]
+    let mut links = BTreeMap::<(u64, u64), PathBuf>::new();
     for entry in WalkDir::new(&path).follow_links(false).follow_root_links(false).into_iter().flatten() {
         if entry.depth() == 0 && entry.file_type().is_dir() {
             continue;
@@ -114,6 +117,25 @@ fn write_tar_body(res: &mut Write, path: &Path) -> IoResult<()> {
         } else {
             entry.path().strip_prefix(&path).expect("strip_prefix failed; this is a probably a bug in walkdir")
         };
+
+        #[cfg(unix)] // Win32 metadata.number_of_links() is always None
+        if !entry.file_type().is_dir() {
+            if let Ok(metadata) = entry.metadata() {
+                if metadata.nlink() > 1 {
+                    match links.entry((metadata.dev(), metadata.ino())) {
+                        BTreeMapEntry::Occupied(previous) => {
+                            let mut header = TarHeader::new_gnu();
+                            header.set_metadata(&metadata);
+                            header.set_size(0);
+                            header.set_entry_type(TarEntryType::Link);
+                            tar.append_link(&mut header, &relative_path, previous.get())?;
+                            continue;
+                        }
+                        BTreeMapEntry::Vacant(v) => drop(v.insert(relative_path.to_path_buf())),
+                    }
+                }
+            }
+        }
 
         tar.append_path_with_name(entry.path(), relative_path).or_else(ignorable)?;
     }
