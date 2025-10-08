@@ -227,6 +227,9 @@ pass parameters like what port to use.
     "cd -L"ing to the requested path (subject to -s and -r), then
     "tar -c * .*" (so symbolic links are never followed, for example).
 
+    If a file or directory fails to open,
+    it is skipped and does not abort archiving.
+
     ZIPs only include regular files, directories, and symbolic links.
     Files that would be encoded if requesting them directly will be DEFLATEd
     (subject to -e).

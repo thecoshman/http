@@ -1,9 +1,10 @@
 #![allow(unused_imports)]
 #![allow(bare_trait_objects)]
 
-use self::super::super::util::{ContentDisposition, DisplayThree, Maybe, extension_is_blacklisted, is_descendant_of, USER_AGENT, MAX_ENCODING_SIZE, MIN_ENCODING_SIZE};
+use self::super::super::util::{ContentDisposition, DisplayThree, Maybe, extension_is_blacklisted, is_descendant_of, USER_AGENT, MAX_ENCODING_SIZE,
+                               MIN_ENCODING_SIZE};
+use std::io::{self, ErrorKind as IoErrorKind, BufWriter, Error as IoError, Result as IoResult, Write, Read};
 use iron::{headers, status, method, IronResult, Listening, Response, Headers, Request, Handler};
-use std::io::{self, ErrorKind as IoErrorKind, BufWriter, Result as IoResult, Write, Read};
 use zip::{CompressionMethod as ZipCompressionMethod, DateTime as ZipDateTime};
 use iron::mime::{Mime, SubLevel as MimeSubLevel, TopLevel as MimeTopLevel};
 use zip::write::{FullFileOptions as ZipFileOptions, ZipWriter};
@@ -78,15 +79,45 @@ impl fmt::Display for ArchiveType {
     }
 }
 
-
 fn write_tar_body(res: &mut Write, path: &Path) -> IoResult<()> {
     let mut tar = TarBuilder::new(BufWriter::with_capacity(128 * 1024, res));
     tar.follow_symlinks(false);
-    if path.is_dir() {
-        tar.append_dir_all("", path)?;
-    } else {
-        tar.append_path_with_name(path, path.file_name().map(Path::new).unwrap_or(path))?;
+
+    // append_dir_all() early-exits and follows symlinks (https://github.com/alexcrichton/tar-rs/pull/417)
+    // We want to use append_path_with_name() to avoid replicating the whole file type detexion logic
+    // (incl. append_special() which is private and only accessible via append_path_with_name() and append_dir_all());
+    // treat network errors as fatal (so that we correctly exit when the remote hangs up) but ignore local I/O errors
+    fn ignorable(err: IoError) -> IoResult<()> {
+        match err.kind() {
+            IoErrorKind::ConnectionRefused |
+            IoErrorKind::ConnectionReset |
+            IoErrorKind::HostUnreachable |
+            IoErrorKind::NetworkUnreachable |
+            IoErrorKind::ConnectionAborted |
+            IoErrorKind::NotConnected |
+            IoErrorKind::AddrInUse |
+            IoErrorKind::AddrNotAvailable |
+            IoErrorKind::NetworkDown |
+            IoErrorKind::BrokenPipe |
+            IoErrorKind::WriteZero |
+            IoErrorKind::StorageFull => Err(err),
+            _ => Ok(()),
+        }
     }
+    for entry in WalkDir::new(&path).follow_links(false).follow_root_links(false).into_iter().flatten() {
+        if entry.depth() == 0 && entry.file_type().is_dir() {
+            continue;
+        }
+
+        let relative_path = if entry.depth() == 0 {
+            entry.path().file_name().or_else(|| path.file_name()).map(Path::new).unwrap_or(path)
+        } else {
+            entry.path().strip_prefix(&path).expect("strip_prefix failed; this is a probably a bug in walkdir")
+        };
+
+        tar.append_path_with_name(entry.path(), relative_path).or_else(ignorable)?;
+    }
+
     tar.into_inner()?.flush()
 }
 
@@ -95,7 +126,7 @@ fn write_zip_body(res: &mut Write, path: &Path, allow_encoding: bool) -> IoResul
 
     for entry in WalkDir::new(&path).follow_links(false).follow_root_links(false).into_iter().flatten() {
         if entry.depth() == 0 && entry.file_type().is_dir() {
-            continue
+            continue;
         }
 
         let relative_path = if entry.depth() == 0 {
@@ -106,14 +137,13 @@ fn write_zip_body(res: &mut Write, path: &Path, allow_encoding: bool) -> IoResul
         let Ok(metadata) = entry.metadata() else { continue };
 
         let mut options = ZipFileOptions::default().compression_method(ZipCompressionMethod::Stored).large_file(metadata.len() >= 2 * 1024 * 1024 * 1024);
-        options = match metadata.modified()
+        if let Some(zdt) = metadata.modified()
             .ok()
             .and_then(|mtime| mtime.duration_since(SystemTime::UNIX_EPOCH).ok())
             .and_then(|mdur| DateTime::<Utc>::from_timestamp_secs(mdur.as_secs() as i64))
             .and_then(|mdt| ZipDateTime::try_from(mdt.naive_utc()).ok()) {
-            Some(zdt) => options.last_modified_time(zdt),
-            None => options,
-        };
+            options = options.last_modified_time(zdt);
+        }
         #[cfg(unix)]
         {
             options = options.unix_permissions(metadata.mode());
@@ -175,11 +205,7 @@ fn write_zip_body_yes_encoding(res: &mut Write, path: &Path) -> IoResult<()> {
 struct WriteArchiveBody((bool, bool, bool), String, ArchiveType, PathBuf, fn(&mut Write, &Path) -> IoResult<()>);
 impl WriteBody for WriteArchiveBody {
     fn write_body(&mut self, res: &mut Write) -> IoResult<()> {
-        log!(self.0,
-             "{} is  served {} archive for {magenta}{}{reset}",
-             self.1,
-             self.2,
-             self.3.display());
+        log!(self.0, "{} is  served {} archive for {magenta}{}{reset}", self.1, self.2, self.3.display());
         let ret = self.4(res, &self.3);
         log!(self.0,
              "{} was served {} archive for {magenta}{}{reset}{}",
