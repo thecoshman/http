@@ -213,7 +213,7 @@ pass parameters like what port to use.
     2. POST + sentinel values embedded into the generated index
        (POST is otherwise unsupported)
 
-    The results should be conceptually logically equivalent to
+    The results should be logically equivalent to
     "cd -L"ing to the requested path (subject to -s and -r), then
     "tar -c * .*" (so symbolic links are never followed, for example).
 
