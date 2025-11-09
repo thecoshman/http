@@ -22,16 +22,26 @@ window.addEventListener("DOMContentLoaded", function() {
       return (ev.dataTransfer.types.contains || ev.dataTransfer.types.includes).call(ev.dataTransfer.types, el);
     })) {
       ev.preventDefault();
-
-      for(let i = ev.dataTransfer.files.length - 1; i >= 0; --i) {
-        if(!ev.dataTransfer.items[i].webkitGetAsEntry) {
-          let file = ev.dataTransfer.files[i];
-          upload_file(url + encodeURIComponent(file.name), file);
-        } else
-          recurse_upload(ev.dataTransfer.items[i].webkitGetAsEntry(), url);
-      }
+      process_transfer(ev.dataTransfer);
     }
   });
+
+  body.addEventListener("paste", function(ev) {
+    if(ev.target.tagName != "INPUT" && (ev.clipboardData || window.clipboardData).files.length) {
+      ev.preventDefault();
+      process_transfer(ev.clipboardData || window.clipboardData);
+    }
+  });
+
+  function process_transfer(transfer) {
+    for(let i = transfer.files.length - 1; i >= 0; --i) {
+      if(!transfer.items[i].webkitGetAsEntry) {
+        let file = transfer.files[i];
+        upload_file(url + encodeURIComponent(file.name), file);
+      } else
+        recurse_upload(transfer.items[i].webkitGetAsEntry(), url);
+    }
+  }
 
   let file_upload = document.querySelector("input[type=file]");
   let upload_list = document.createElement("dl");

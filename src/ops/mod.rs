@@ -1177,7 +1177,7 @@ impl HttpHandler {
                                                                        list_f,
                                                                        if show_file_management_controls {
                                                                            "<hr />\
-                                                                            <p>Drag&amp;Drop to upload or <input type=\"file\" multiple />.</p>"
+                                                                            <p>Upload via drag&drop, paste, or <input type=\"file\" multiple />.</p>"
                                                                        } else {
                                                                            ""
                                                                        },
