@@ -10,13 +10,13 @@ use percent_encoding;
 use walkdir::WalkDir;
 use std::borrow::Cow;
 use rfsapi::RawFileData;
-use chrono::{DateTime, Utc};
 use iron::{mime, Headers, Url};
 use std::{cmp, fmt, f64, mem, str};
 use mime_guess::guess_mime_type_opt;
 use std::time::{SystemTime, Instant};
 use std::fs::{self, FileType, Metadata, File};
 use iron::headers::{HeaderFormat, UserAgent, Header};
+use chrono::{DateTime, TimeZone, Utc, Local as LocalTz};
 use xml::name::{OwnedName as OwnedXmlName, Name as XmlName};
 use iron::error::{HttpResult as HyperResult, HttpError as HyperError};
 use iron::mime::{Mime, SubLevel as MimeSubLevel, TopLevel as MimeTopLevel};
@@ -251,11 +251,15 @@ impl<T: fmt::Display> fmt::Display for Maybe<T> {
 }
 
 #[derive(Debug, Copy, Clone, Hash, PartialOrd, Ord, PartialEq, Eq)]
-pub struct MsAsS(pub u64);
+pub struct MsAsSAnd3339(pub u64);
 
-impl fmt::Display for MsAsS {
+impl fmt::Display for MsAsSAnd3339 {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "{}.{:03}", self.0 / 1000, self.0 % 1000)
+        write!(f,
+               "@{}.{:03}{}",
+               self.0 / 1000,
+               self.0 % 1000,
+               Maybe(LocalTz.timestamp_millis_opt(self.0 as _).earliest().map(|ts| DisplayThree(" (", ts, ")"))))
     }
 }
 

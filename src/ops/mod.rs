@@ -26,11 +26,12 @@ use iron::{headers, status, method, IronResult, Listening, Response, Headers, Re
 use std::io::{self, ErrorKind as IoErrorKind, BufReader, SeekFrom, Write, Error as IoError, Read, Seek};
 use iron::mime::{Mime, Attr as MimeAttr, Value as MimeAttrValue, SubLevel as MimeSubLevel, TopLevel as MimeTopLevel};
 use self::super::util::{HumanReadableSize, WwwAuthenticate, NoDoubleQuotes, NoHtmlLiteral, XLastModified, DisplayThree, CommaList,
-                        XOcMTime, MsAsS, Maybe, Dav, url_path, file_etag, file_hash, set_mtime_f, is_symlink, encode_str, error_html, encode_file, file_length,
-                        file_binary, client_mobile, percent_decode, escape_specials, precise_time_ns, file_icon_suffix, is_actually_file, is_descendant_of,
-                        response_encoding, detect_file_as_dir, encoding_extension, file_time_modified, file_time_modified_p, dav_level_1_methods,
-                        get_raw_fs_metadata, encode_tail_if_trimmed, extension_is_blacklisted, directory_listing_html, directory_listing_mobile_html,
-                        is_nonexistent_descendant_of, USER_AGENT, MAX_SYMLINKS, INDEX_EXTENSIONS, MIN_ENCODING_GAIN, MAX_ENCODING_SIZE, MIN_ENCODING_SIZE};
+                        XOcMTime, MsAsSAnd3339, Maybe, Dav, url_path, file_etag, file_hash, set_mtime_f, is_symlink, encode_str, error_html, encode_file,
+                        file_length, file_binary, client_mobile, percent_decode, escape_specials, precise_time_ns, file_icon_suffix, is_actually_file,
+                        is_descendant_of, response_encoding, detect_file_as_dir, encoding_extension, file_time_modified, file_time_modified_p,
+                        dav_level_1_methods, get_raw_fs_metadata, encode_tail_if_trimmed, extension_is_blacklisted, directory_listing_html,
+                        directory_listing_mobile_html, is_nonexistent_descendant_of, USER_AGENT, MAX_SYMLINKS, INDEX_EXTENSIONS, MIN_ENCODING_GAIN,
+                        MAX_ENCODING_SIZE, MIN_ENCODING_SIZE};
 
 macro_rules! log {
     ($logcfg:expr, $fmt:expr) => {{
@@ -1275,7 +1276,7 @@ impl HttpHandler {
              req_p.display(),
              *req.headers.get::<headers::ContentLength>().expect("No Content-Length header"),
              mtime.map_or("", |_| ". modified: "),
-             Maybe(mtime.map(MsAsS)));
+             Maybe(mtime.map(MsAsSAnd3339)));
 
         let mut ibuf = BufReader::with_capacity(1024 * 1024, &mut req.body);
         let file = match direct_output {
