@@ -1039,7 +1039,7 @@ impl HttpHandler {
                                                                                   concat!(r#"<form method=post enctype=text/plain class="heading">"#,
                                                                                           "Download as archive: ",
                                                                                           include_str!(concat!(env!("OUT_DIR"),
-                                                                                                       "/assets/directory_listing_achive_inputs.html")),
+                                                                                                       "/assets/directory_listing_archive_inputs.html")),
                                                                                           "</form>")
                                                                               } else {
                                                                                   ""
@@ -1198,7 +1198,7 @@ impl HttpHandler {
                                                                             <form method=post enctype=text/plain>\
                                                                             <p>Archive as ",
                                                                             include_str!(concat!(env!("OUT_DIR"),
-                                                                            "/assets/directory_listing_achive_inputs.html")),
+                                                                            "/assets/directory_listing_archive_inputs.html")),
                                                                             ".</p></form>")
                                                                        } else {
                                                                            ""

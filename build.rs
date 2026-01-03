@@ -148,7 +148,7 @@ fn htmls() {
             .unwrap();
     }
 
-    for file in ["assets/directory_listing_achive_inputs.html"] {
+    for file in ["assets/directory_listing_archive_inputs.html"] {
         println!("cargo:rerun-if-changed={}", file);
         fs::write(Path::new(&env::var("OUT_DIR").unwrap()).join(file),
                   fs::read_to_string(file).unwrap().trim().as_bytes())
