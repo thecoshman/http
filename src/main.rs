@@ -34,7 +34,7 @@ pub mod ops;
 pub mod util;
 
 pub struct Error(pub String);
-pub use options::{LogLevel, Options};
+pub use options::{ReadmeFormat, LogLevel, Options};
 
 use std::mem;
 use iron::Iron;

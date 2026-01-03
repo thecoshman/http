@@ -148,11 +148,17 @@ fn htmls() {
             .unwrap();
     }
 
-    for file in ["assets/directory_listing_archive_inputs.html"] {
+    let simple = |file: &str| {
         println!("cargo:rerun-if-changed={}", file);
         fs::write(Path::new(&env::var("OUT_DIR").unwrap()).join(file),
                   fs::read_to_string(file).unwrap().trim().as_bytes())
             .unwrap();
+    };
+    simple("assets/directory_listing_archive_inputs.html");
+    for format in ["plain", "normal", "mobile"] {
+        for section in ["before", "after"] {
+            simple(&format!("assets/directory_listing_readme_{}_{}.html", format, section));
+        }
     }
 }
 

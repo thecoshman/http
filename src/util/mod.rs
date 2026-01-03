@@ -574,6 +574,29 @@ impl<'s> fmt::Display for NoHtmlLiteral<'s> {
     }
 }
 
+/// `f.read_to_end(buf)` but escape `&` and `<` for HTML
+pub fn read_to_end_plaintext_for_html<R: Read>(f: &mut R, buf: &mut Vec<u8>) -> IoResult<()> {
+    #[allow(invalid_value)]
+    let mut tmp: [u8; 64 * 1024] = unsafe { mem::MaybeUninit::uninit().assume_init() };
+
+    loop {
+        match f.read(&mut tmp) {
+            Err(e) => return Err(e),
+            Ok(0) => return Ok(()),
+            Ok(rd) =>
+                for b in tmp[0..rd].split_inclusive(|&b| matches!(b, b'&' | b'<')).flat_map(|b|
+                    match b.last() {
+                        Some(b'&') => [&b[..b.len() - 1], b"&amp;"],
+                        Some(b'<') => [&b[..b.len() - 1], b"&lt;"],
+                        _ => [b, b""],
+                    }
+                ) {
+                    buf.extend(b);
+                },
+        }
+    }
+}
+
 /// Check if, given the request headers, the client should be considered a mobile device.
 pub fn client_mobile(hdr: &Headers) -> bool {
     hdr.get::<UserAgent>().map(|s| s.contains("Mobi") || s.contains("mobi")).unwrap_or(false)

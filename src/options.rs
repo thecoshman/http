@@ -52,6 +52,13 @@ impl From<u64> for LogLevel {
 }
 
 
+#[derive(Debug, Copy, Clone, Hash, PartialEq, Eq, PartialOrd, Ord)]
+pub enum ReadmeFormat {
+    /// `<pre>`-wrapped
+    Plain,
+}
+
+
 /// Representation of the application's all configurable values.
 #[derive(Debug, Clone, Hash, PartialEq, Eq)]
 pub struct Options {
@@ -76,6 +83,10 @@ pub struct Options {
     pub generate_listings: bool,
     /// Whether to check for index files in served directories before serving a listing. Default: true
     pub check_indices: bool,
+    /// Add the given README with the given format at the given position to generated indices. Default: none
+    ///
+    /// `[top as usize]`
+    pub index_readmes: [Vec<(ReadmeFormat, PathBuf)>; 2],
     /// Whether to allow requests to `/file` to return `/file.{INDEX_EXTENSIONS`. Default: false
     pub strip_extensions: bool,
     /// Instead of returning 404, try this file first. Default: `None`
@@ -145,6 +156,11 @@ impl Options {
             .arg(Arg::from_usage("-w --allow-write 'Allow for write operations. Default: false'"))
             .arg(Arg::from_usage("-l --no-listings 'Never generate dir listings. Default: false'"))
             .arg(Arg::from_usage("-i --no-indices 'Do not automatically use index files. Default: false'"))
+            .arg(Arg::from_usage("-I --index-readme [[top|bottom:]plain:README]... 'Add the given README with the given format at the given position to \
+                                  generated indices. Default: none'")
+                .number_of_values(1)
+                .use_delimiter(false)
+                .validator_os(|s| Options::index_readme_parse(s.into()).map(|_| ())))
             .arg(Arg::from_usage("-e --no-encode 'Do not encode filesystem files. Default: false'"))
             .arg(Arg::from_usage("--encoded-filesystem [FS_LIMIT] 'Consume at most FS_LIMIT space for encoded filesystem files.'")
                 .validator(|s| Options::size_parse(s.into()).map(|_| ())))
@@ -258,6 +274,17 @@ impl Options {
             },
             generate_listings: !matches.is_present("no-listings"),
             check_indices: !matches.is_present("no-indices"),
+            index_readmes: {
+                let mut im = [vec![], vec![]];
+                for (top, one) in matches.values_of_os("index-readme")
+                    .unwrap_or_default()
+                    .map(Cow::from)
+                    .map(Options::index_readme_parse)
+                    .map(Result::unwrap) {
+                    im[top as usize].push(one);
+                }
+                im
+            },
             strip_extensions: matches.is_present("strip-extensions"),
             try_404: matches.value_of("404").map(PathBuf::from),
             allow_writes: matches.is_present("allow-write"),
@@ -269,15 +296,15 @@ impl Options {
             log_time: !matches.is_present("quiet-time"),
             log_colour: !matches.is_present("no-colour"),
             webdav: cmp::max(if matches.is_present("webdav") {
-                            WebDavLevel::All
-                        } else {
-                            WebDavLevel::No
-                        },
-                        if matches.is_present("convenient-webdav") {
-                            WebDavLevel::MkColMoveOnly
-                        } else {
-                            WebDavLevel::No
-                        }),
+                                 WebDavLevel::All
+                             } else {
+                                 WebDavLevel::No
+                             },
+                             if matches.is_present("convenient-webdav") {
+                                 WebDavLevel::MkColMoveOnly
+                             } else {
+                                 WebDavLevel::No
+                             }),
             archives: matches.is_present("archives"),
             tls_data: matches.value_of("ssl").map(|id| ((id.to_string(), fs::canonicalize(id).unwrap()), env::var("HTTP_SSL_PASS").unwrap_or_default())),
             generate_tls: matches.is_present("gen-ssl"),
@@ -506,5 +533,25 @@ impl Options {
             })
             .map(|(hn, hd)| (hn.to_string(), hd.as_bytes().to_vec()))
             .ok_or_else(|| format!("\"{}\" invalid format", s))
+    }
+
+    fn index_readme_parse<'s>(s: Cow<'s, OsStr>) -> Result<(bool, (ReadmeFormat, PathBuf)), OsString> {
+        let mut top = false;
+        let mut format = None;
+        let mut name = None;
+        for token in s.as_encoded_bytes().split(|&b| b == b':') {
+            if let Some(option) = name.replace(token) {
+                match option {
+                    b"top" => top = true,
+                    b"bottom" => top = false,
+                    b"plain" => format = Some(ReadmeFormat::Plain),
+                    _ => return Err(unsafe { OsStr::from_encoded_bytes_unchecked(option) }.to_owned()),// TODO
+                }
+            }
+        }
+        Ok((top,
+            (format.ok_or_else(|| format!("Missing format: must be one of {{plain}}"))?,
+             unsafe { OsStr::from_encoded_bytes_unchecked(name.ok_or_else(|| format!("Missing name. Must be in the form of [[top|bottom:]plain:README]"))?) }
+                 .into())))
     }
 }

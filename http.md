@@ -260,6 +260,17 @@ pass parameters like what port to use.
 
     This is false by default because it's most likely for debugging purposes.
 
+  -I --index-readme [top|bottom:]plain:README...
+
+    When generating an index file, look for file README in the directory being indexed;
+    if it exists, read it, and inject it at the given position (default bottom),
+    in the given format (plain will be <pre>-wrapped).
+
+    The last option in a group takes effect.
+
+    Any amount of READMEs can be added, and are reproduced in the order given.
+    The entire index, with all the files embedded, is stored in memory.
+
   -e --no-encode
 
     Do not encode filesystem files.

@@ -18,20 +18,20 @@ use mime_guess::get_mime_type_opt;
 use hyper_native_tls::NativeTlsServer;
 use std::hash::{BuildHasher, RandomState};
 use std::collections::{BTreeMap, HashMap};
-use self::super::{LogLevel, Options, Error};
+use self::super::{ReadmeFormat, LogLevel, Options, Error};
 use std::process::{ExitStatus, Command, Child, Stdio};
 use rfsapi::{RawFsApiHeader, FilesetData, RawFileData};
 use std::sync::atomic::{AtomicU64, Ordering as AtomicOrdering};
 use iron::{headers, status, method, IronResult, Listening, Response, Headers, Request, Handler, Iron};
 use std::io::{self, ErrorKind as IoErrorKind, BufReader, SeekFrom, Write, Error as IoError, Read, Seek};
 use iron::mime::{Mime, Attr as MimeAttr, Value as MimeAttrValue, SubLevel as MimeSubLevel, TopLevel as MimeTopLevel};
-use self::super::util::{HumanReadableSize, WwwAuthenticate, NoDoubleQuotes, NoHtmlLiteral, XLastModified, DisplayThree, CommaList,
+use self::super::util::{HtmlResponseElement, HumanReadableSize, WwwAuthenticate, NoDoubleQuotes, NoHtmlLiteral, XLastModified, DisplayThree, CommaList,
                         XOcMTime, MsAsSAnd3339, Maybe, Dav, url_path, file_etag, file_hash, set_mtime_f, is_symlink, encode_str, error_html, encode_file,
                         file_length, file_binary, client_mobile, percent_decode, escape_specials, precise_time_ns, file_icon_suffix, is_actually_file,
                         is_descendant_of, response_encoding, detect_file_as_dir, encoding_extension, file_time_modified, file_time_modified_p,
                         dav_level_1_methods, get_raw_fs_metadata, encode_tail_if_trimmed, extension_is_blacklisted, directory_listing_html,
-                        directory_listing_mobile_html, is_nonexistent_descendant_of, USER_AGENT, MAX_SYMLINKS, INDEX_EXTENSIONS, MIN_ENCODING_GAIN,
-                        MAX_ENCODING_SIZE, MIN_ENCODING_SIZE};
+                        directory_listing_mobile_html, is_nonexistent_descendant_of, read_to_end_plaintext_for_html, USER_AGENT, MAX_SYMLINKS,
+                        INDEX_EXTENSIONS, MIN_ENCODING_GAIN, MAX_ENCODING_SIZE, MIN_ENCODING_SIZE};
 
 macro_rules! log {
     ($logcfg:expr, $fmt:expr) => {{
@@ -120,6 +120,67 @@ pub use self::archive::ArchiveType;
 pub use self::bandwidth::{LimitBandwidthMiddleware, SimpleChain};
 
 
+impl ReadmeFormat {
+    pub fn before(self) -> &'static str {
+        match self {
+            ReadmeFormat::Plain => include_str!(concat!(env!("OUT_DIR"), "/assets/directory_listing_readme_plain_before.html")),
+        }
+    }
+
+    pub fn after(self) -> &'static str {
+        match self {
+            ReadmeFormat::Plain => include_str!(concat!(env!("OUT_DIR"), "/assets/directory_listing_readme_plain_after.html")),
+        }
+    }
+}
+
+struct ListingReadme<'i, 'p>(&'i [(ReadmeFormat, PathBuf)], &'p Path, &'static str, &'static str);
+impl<'i, 'p> ListingReadme<'i, 'p> {
+    fn normal(index_readmes: &'i [(ReadmeFormat, PathBuf)], req_p: &'p Path) -> Self {
+        Self(
+            index_readmes,
+            req_p,
+            include_str!(concat!(env!("OUT_DIR"), "/assets/directory_listing_readme_normal_before.html")),
+            include_str!(concat!(env!("OUT_DIR"), "/assets/directory_listing_readme_normal_after.html")),
+        )
+    }
+
+    fn mobile(index_readmes: &'i [(ReadmeFormat, PathBuf)], req_p: &'p Path) -> Self {
+        Self(
+            index_readmes,
+            req_p,
+            include_str!(concat!(env!("OUT_DIR"), "/assets/directory_listing_readme_mobile_before.html")),
+            include_str!(concat!(env!("OUT_DIR"), "/assets/directory_listing_readme_mobile_after.html")),
+        )
+    }
+}
+impl<'i, 'p> HtmlResponseElement for ListingReadme<'i, 'p> {
+    fn commit(self, data: &mut Vec<u8>) {
+        let Self(index_readmes, req_p, before, after) = self;
+
+        for (format, basename) in index_readmes {
+            if let Ok(mut f) = File::open(req_p.join(basename)) {
+                let rollback_to = data.len();
+
+                data.extend(before.as_bytes());
+                data.extend(format.before().as_bytes());
+                let rollback_if = data.len();
+
+                match format {
+                    ReadmeFormat::Plain => drop(read_to_end_plaintext_for_html(&mut f, data)),
+                }
+
+                if data.len() == rollback_if {
+                    data.truncate(rollback_to);
+                } else {
+                    data.extend(format.after().as_bytes());
+                    data.extend(after.as_bytes());
+                }
+            }
+        }
+    }
+}
+
 type CacheT<Cnt> = HashMap<(blake3::Hash, EncodingType), (Cnt, AtomicU64)>;
 
 #[derive(Debug, Copy, Clone, Hash, PartialEq, Eq, PartialOrd, Ord)]
@@ -135,6 +196,8 @@ pub struct HttpHandler {
     pub sandbox_symlinks: bool,
     pub generate_listings: bool,
     pub check_indices: bool,
+    /// `[top as usize]`
+    pub index_readmes: [Vec<(ReadmeFormat, PathBuf)>; 2],
     pub strip_extensions: bool,
     pub try_404: Option<PathBuf>,
     /// (at all, log_time, log_colour)
@@ -198,6 +261,7 @@ impl HttpHandler {
             sandbox_symlinks: opts.sandbox_symlinks,
             generate_listings: opts.generate_listings,
             check_indices: opts.check_indices,
+            index_readmes: opts.index_readmes.clone(),
             strip_extensions: opts.strip_extensions,
             try_404: opts.try_404.clone(),
             log: (opts.loglevel < LogLevel::NoServeStatus, opts.log_time, opts.log_colour),
@@ -1043,7 +1107,9 @@ impl HttpHandler {
                                                                                           "</form>")
                                                                               } else {
                                                                                   ""
-                                                                              }))
+                                                                              },
+                                                                              ListingReadme::mobile(&self.index_readmes[true as usize], &req_p),
+                                                                              ListingReadme::mobile(&self.index_readmes[false as usize], &req_p)))
     }
 
     fn handle_get_dir_listing(&self, req: &mut Request, req_p: PathBuf) -> IronResult<Response> {
@@ -1202,7 +1268,9 @@ impl HttpHandler {
                                                                             ".</p></form>")
                                                                        } else {
                                                                            ""
-                                                                       }))
+                                                                       },
+                                                                       ListingReadme::normal(&self.index_readmes[true as usize], &req_p),
+                                                                       ListingReadme::normal(&self.index_readmes[false as usize], &req_p)))
     }
 
     fn handle_put(&self, req: &mut Request) -> IronResult<Response> {
