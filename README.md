@@ -51,6 +51,8 @@ for use with [cargo-update](//crates.io/crates/cargo-update)
 
 This will install `http` and `httplz` (identical, disable one or another if they clash) in the folder where all other binaries go.
 
+The `brotli-simd` feature will enable the SIMD implementation in brotli. [Which is currently not compatible with all rustc versions.](https://github.com/thecoshman/http/issues/181) It may go away (be turned into a no-op) in future as the compatibility table changes.
+
 #### From Debian repository
 
 The following line in `/etc/apt/sources.list` or equivalent:

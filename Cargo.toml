@@ -24,6 +24,9 @@ authors = ["thecoshman <rust@thecoshman.com>",
            "ideless <pyjy@yahoo.com>",
            "Sympatron GmbH"]
 
+[features]
+brotli-simd = ["brotli/simd"] # https://github.com/thecoshman/http/issues/181; if removing, turn into a no-op
+
 [dependencies]
 hyper-native-tls = "0.3"
 percent-encoding = "2.1"
@@ -33,6 +36,7 @@ tabwriter = "1.1"
 arrayvec = "0.7"
 walkdir = "2.2"
 blake3 = "1.3"
+brotli = "8.0"
 chrono = "0.4"
 flate2 = "1.1"
 xml-rs = "0.8"
@@ -54,10 +58,6 @@ features = ["termination"]
 [dependencies.cidr]
 version = "0.1"
 default-features = false
-
-[dependencies.brotli]
-version = "8.0"
-features = ["simd"]
 
 [dependencies.iron]
 path = "vendor/iron-0.6.1"
